@@ -54,7 +54,6 @@ def train(data_path, max_epoch, pretrained_model,
         train_loss = 0
         unet_model.train()
         for index, (hp_data, hp_data_gt) in enumerate(train_dataloader):
-            hp_data_gt_np = hp_data_gt.detach().numpy().copy()
             pos_weight = hp_data_gt.detach().numpy().copy()[0, 0, ...]
             zeroidx = np.where(pos_weight < 10)
             nonzeroidx = np.where(pos_weight >= 10)
@@ -70,8 +69,6 @@ def train(data_path, max_epoch, pretrained_model,
 
             confidence = output[:, 0, :, :]
 
-            # loss = criterion(
-            #     output, hp_data_gt.transpose(1, 3).transpose(2, 3))
             loss = criterion(output, hp_data_gt, pos_weight)
 
             loss.backward()
@@ -80,18 +77,8 @@ def train(data_path, max_epoch, pretrained_model,
             optimizer.step()
 
             confidence_np = confidence.cpu().detach().numpy().copy()
-            # confidence_np = confidence_np.transpose(1, 2, 0)
-            # confidence_img = np.zeros((width, height, 1), dtype=np.uint8)
-            # print(confidence_np.shape)
-            # conf_idx = np.where(
-            #     confidence_np[..., 0] > confidence_np[..., 0].mean())
-            print(np.max(confidence_np))
-            confidence_np[confidence_np>=255] = 255
-            confidence_np[confidence_np<=0] = 0
-            # conf_idx = np.where(
-            #     confidence_np[..., 0] > 10)
-            # confidence_img[conf_idx] = 255
-            # confidence_img = confidence_img.transpose(2, 0, 1)
+            confidence_np[confidence_np >= 255] = 255
+            confidence_np[confidence_np <= 0] = 0
 
             bgr = hp_data.cpu().detach().numpy().copy()[0, :3, ...]
             bgr = bgr.transpose(1, 2, 0)
@@ -121,14 +108,6 @@ def train(data_path, max_epoch, pretrained_model,
                            win='depth',
                            opts=dict(
                                title='depth'))
-                vis.images(ground_truth,
-                           win='hp_data_input',
-                           opts=dict(
-                               title='hp_data input'))
-                vis.images(confidence_np,
-                           win='train_confidencena pred',
-                           opts=dict(
-                               title='train confidence(Pred)'))   
                 vis.images([ground_truth, confidence_np],
                            win='train_confidencena',
                            opts=dict(
@@ -145,53 +124,70 @@ def train(data_path, max_epoch, pretrained_model,
 
         test_loss = 0
         unet_model.eval()
-        if np.mod(epo, 1) == 0:
-            torch.save(unet_model.state_dict(),
-                       'checkpoints/unet_latestmodel_' + now + '.pt')
-        vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]), win='loss',
-                 name='avg_train_loss', update='append')
-        continue
+
         with torch.no_grad():
             for index, (hp_data, hp_data_gt) in enumerate(test_dataloader):
-                hp_data_gt_np = hp_data_gt.detach().numpy().copy()  # HWC
+                pos_weight = hp_data_gt.detach().numpy().copy()[0, 0, ...]
+                zeroidx = np.where(pos_weight < 10)
+                nonzeroidx = np.where(pos_weight >= 10)
+                pos_weight[zeroidx] = 0.5
+                pos_weight[nonzeroidx] = 1
+                pos_weight = torch.from_numpy(pos_weight)
+                pos_weight = pos_weight.to(device)
+                criterion = UNETLoss().to(device)
                 hp_data = hp_data.to(device)
                 hp_data_gt = hp_data_gt.to(device)
-
                 optimizer.zero_grad()
                 output = unet_model(hp_data)
 
-                confidence = output[:, 3, :, :]
-                pred_class = output[:, 4:10, :, :]
+                confidence = output[:, 0, :, :]
 
-                loss = criterion(
-                    output, hp_data_gt.transpose(1, 3).transpose(2, 3))
+                loss = criterion(output, hp_data_gt, pos_weight)
 
                 iter_loss = loss.item()
                 test_loss += iter_loss
+                optimizer.step()
 
                 confidence_np = confidence.cpu().detach().numpy().copy()
-                confidence_np = confidence_np.transpose(1, 2, 0)
+                confidence_np[confidence_np >= 255] = 255
+                confidence_np[confidence_np <= 0] = 0
 
-                confidence_img = np.zeros((width, height, 1), dtype=np.uint8)
-                # conf_idx = np.where(confidence_np[..., 0] > 0.5)
-                conf_idx = np.where(
-                    confidence_np[..., 0] > confidence_np[..., 0].mean())
+                bgr = hp_data.cpu().detach().numpy().copy()[0, :3, ...]
+                bgr = bgr.transpose(1, 2, 0)
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                rgb = rgb.transpose(2, 0, 1)
 
-                confidence_img[conf_idx] = 1.
-                confidence_img = confidence_img.transpose(2, 0, 1)
+                depth = hp_data.cpu().detach().numpy().copy()[0, 3:, ...]
+                depth = depth.transpose(1, 2, 0)
+                depth = cv2.cvtColor(depth, cv2.COLOR_BGR2RGB)
+                depth = depth.transpose(2, 0, 1)
 
-                hp_data_gt_img = hp_data_gt[..., 0].cpu().detach().numpy().copy()
-
-                if np.mod(index, 25) == 0:
-                    vis.images([hp_data_gt_img, confidence_img],
-                               win='test_confidencena',
-                               opts=dict(
-                                   title='test confidence(GT, Pred)'))
+                ground_truth = hp_data_gt.cpu().detach().numpy().copy()[0, ...].astype(np.uint8)
+                print(np.max(ground_truth))
                 if index == test_data_num - 1:
                     print("Finish test {} data".format(index))
                     break
 
-            avg_test_loss = test_loss / len(test_dataloader)
+                if np.mod(index, 1) == 0:
+                    print('epoch {}, {}/{},train loss is {}'.format(
+                        epo,
+                        index,
+                        len(train_dataloader),
+                        iter_loss))
+                    vis.images(rgb,
+                               win='rgb test',
+                               opts=dict(
+                                   title='rgb test'))
+                    vis.images(depth,
+                               win='depth test',
+                               opts=dict(
+                                   title='depth test'))
+
+                    vis.images([ground_truth, confidence_np],
+                               win='test_confidence',
+                               opts=dict(
+                                   title='test confidence(GT, Pred)'))
+        avg_test_loss = test_loss / len(test_dataloader)
 
         vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]), win='loss',
                  name='avg_train_loss', update='append')
