@@ -16,13 +16,13 @@ from torchvision import transforms
 def load_dataset(data_path):
     transform = transforms.Compose([
         transforms.ToTensor()])
-    nusc = NuscDataset(data_path, transform)
+    hp_data = HangingPointsDataset(data_path, transform)
 
-    train_size = int(0.9 * len(nusc))
-    test_size = len(nusc) - train_size
+    train_size = int(0.9 * len(hp_data))
+    test_size = len(hp_data) - train_size
     # train_size = 1
     # test_size = 2
-    train_dataset, test_dataset = random_split(nusc, [train_size, test_size])
+    train_dataset, test_dataset = random_split(hp_data, [train_size, test_size])
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=1, shuffle=True, num_workers=1)
@@ -39,7 +39,7 @@ def onehot(data, n):
     return buf
 
 
-class NuscDataset(Dataset):
+class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None):
         self.data_path = data_path
         self.transform = transform

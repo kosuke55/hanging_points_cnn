@@ -7,7 +7,7 @@ import os.path
 from torch.autograd import Variable
 import torch.onnx
 
-from BCNN import BCNN
+from UNET import UNET
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -26,9 +26,9 @@ if __name__ == "__main__":
                         default=8)
     args = parser.parse_args()
 
-    bcnn_model = BCNN()
-    bcnn_model.load_state_dict(torch.load(args.pretrained_model))
+    unet_model = UNET()
+    unet_model.load_state_dict(torch.load(args.pretrained_model))
     x = Variable(torch.randn(1, args.channel, args.width, args.height))
 
-    torch.onnx.export(bcnn_model, x, os.path.splitext(
+    torch.onnx.export(unet_model, x, os.path.splitext(
         args.pretrained_model)[0] + '.onnx', verbose=True)

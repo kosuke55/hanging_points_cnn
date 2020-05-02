@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torchviz import make_dot
 
-from BCNN import BCNN
+from UNET import UNET
 
 
 def visualize_out_feature(
@@ -59,11 +59,11 @@ def visualize_out_feature(
 
 
 def visualize_model():
-    net = BCNN()
-    bcnn_img = torch.rand(1, 8, 640, 640)
-    output = net(bcnn_img)
+    net = UNET()
+    unet_img = torch.rand(1, 8, 640, 640)
+    output = net(unet_img)
     dot = make_dot(output, params=dict(net.named_parameters()))
-    dot.render("bcnn")
+    dot.render("unet")
 
 
 if __name__ == '__main__':

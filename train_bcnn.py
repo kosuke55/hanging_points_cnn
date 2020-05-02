@@ -5,16 +5,15 @@ import argparse
 import os
 import sys
 
-
 import numpy as np
 import torch
 import torch.optim as optim
 import visdom
 from datetime import datetime
 
-from BCNN import BCNN
-from BcnnLoss import BcnnLoss
-from NuscData import load_dataset
+from UNET import UNET
+from UNETLoss import UNETLoss
+from HangingPointsData import load_dataset
 import cv2
 
 
@@ -27,17 +26,17 @@ def train(data_path, max_epoch, pretrained_model,
     vis = visdom.Visdom()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    bcnn_model = BCNN(in_channels=6).to(device)
+    unet_model = UNET(in_channels=6).to(device)
     if os.path.exists(pretrained_model):
         print('use pretrained model')
-        bcnn_model.load_state_dict(torch.load(pretrained_model))
-    bcnn_model.eval()
+        unet_model.load_state_dict(torch.load(pretrained_model))
+    unet_model.eval()
 
     transfer_learning = False
     if transfer_learning:
         params_to_update = []
         update_param_names = ["deconv0.weight", "deconv0.bias"]
-        for name, param in bcnn_model.named_parameters():
+        for name, param in unet_model.named_parameters():
             if name in update_param_names:
                 param.requires_grad = True
                 params_to_update.append(param)
@@ -48,32 +47,32 @@ def train(data_path, max_epoch, pretrained_model,
         print(params_to_update)
         optimizer = optim.SGD(params=params_to_update, lr=1e-5, momentum=0.9)
     else:
-        optimizer = optim.SGD(bcnn_model.parameters(), lr=1e-10, momentum=0.9)
+        optimizer = optim.SGD(unet_model.parameters(), lr=1e-10, momentum=0.9)
 
     prev_time = datetime.now()
     for epo in range(max_epoch):
         train_loss = 0
-        bcnn_model.train()
-        for index, (nusc, nusc_msk) in enumerate(train_dataloader):
-            nusc_msk_np = nusc_msk.detach().numpy().copy()
-            pos_weight = nusc_msk.detach().numpy().copy()[0, 0, ...]
+        unet_model.train()
+        for index, (hp_data, hp_data_gt) in enumerate(train_dataloader):
+            hp_data_gt_np = hp_data_gt.detach().numpy().copy()
+            pos_weight = hp_data_gt.detach().numpy().copy()[0, 0, ...]
             zeroidx = np.where(pos_weight < 10)
             nonzeroidx = np.where(pos_weight >= 10)
             pos_weight[zeroidx] = 0.5
             pos_weight[nonzeroidx] = 1
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(device)
-            criterion = BcnnLoss().to(device)
-            nusc = nusc.to(device)
-            nusc_msk = nusc_msk.to(device)
+            criterion = UNETLoss().to(device)
+            hp_data = hp_data.to(device)
+            hp_data_gt = hp_data_gt.to(device)
             optimizer.zero_grad()
-            output = bcnn_model(nusc)
+            output = unet_model(hp_data)
 
             confidence = output[:, 0, :, :]
 
             # loss = criterion(
-            #     output, nusc_msk.transpose(1, 3).transpose(2, 3))
-            loss = criterion(output, nusc_msk, pos_weight)
+            #     output, hp_data_gt.transpose(1, 3).transpose(2, 3))
+            loss = criterion(output, hp_data_gt, pos_weight)
 
             loss.backward()
             iter_loss = loss.item()
@@ -94,17 +93,17 @@ def train(data_path, max_epoch, pretrained_model,
             # confidence_img[conf_idx] = 255
             # confidence_img = confidence_img.transpose(2, 0, 1)
 
-            bgr = nusc.cpu().detach().numpy().copy()[0, :3, ...]
+            bgr = hp_data.cpu().detach().numpy().copy()[0, :3, ...]
             bgr = bgr.transpose(1, 2, 0)
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             rgb = rgb.transpose(2, 0, 1)
 
-            depth = nusc.cpu().detach().numpy().copy()[0, 3:, ...]
+            depth = hp_data.cpu().detach().numpy().copy()[0, 3:, ...]
             depth = depth.transpose(1, 2, 0)
             depth = cv2.cvtColor(depth, cv2.COLOR_BGR2RGB)
             depth = depth.transpose(2, 0, 1)
 
-            ground_truth = nusc_msk.cpu().detach().numpy().copy()[0, ...].astype(np.uint8)
+            ground_truth = hp_data_gt.cpu().detach().numpy().copy()[0, ...].astype(np.uint8)
             print(np.max(ground_truth))
 
             if np.mod(index, 1) == 0:
@@ -123,9 +122,9 @@ def train(data_path, max_epoch, pretrained_model,
                            opts=dict(
                                title='depth'))
                 vis.images(ground_truth,
-                           win='nusc_input',
+                           win='hp_data_input',
                            opts=dict(
-                               title='nusc input'))
+                               title='hp_data input'))
                 vis.images(confidence_np,
                            win='train_confidencena pred',
                            opts=dict(
@@ -145,27 +144,27 @@ def train(data_path, max_epoch, pretrained_model,
             avg_train_loss = train_loss
 
         test_loss = 0
-        bcnn_model.eval()
+        unet_model.eval()
         if np.mod(epo, 1) == 0:
-            torch.save(bcnn_model.state_dict(),
-                       'checkpoints/bcnn_latestmodel_' + now + '.pt')
+            torch.save(unet_model.state_dict(),
+                       'checkpoints/unet_latestmodel_' + now + '.pt')
         vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]), win='loss',
                  name='avg_train_loss', update='append')
         continue
         with torch.no_grad():
-            for index, (nusc, nusc_msk) in enumerate(test_dataloader):
-                nusc_msk_np = nusc_msk.detach().numpy().copy()  # HWC
-                nusc = nusc.to(device)
-                nusc_msk = nusc_msk.to(device)
+            for index, (hp_data, hp_data_gt) in enumerate(test_dataloader):
+                hp_data_gt_np = hp_data_gt.detach().numpy().copy()  # HWC
+                hp_data = hp_data.to(device)
+                hp_data_gt = hp_data_gt.to(device)
 
                 optimizer.zero_grad()
-                output = bcnn_model(nusc)
+                output = unet_model(hp_data)
 
                 confidence = output[:, 3, :, :]
                 pred_class = output[:, 4:10, :, :]
 
                 loss = criterion(
-                    output, nusc_msk.transpose(1, 3).transpose(2, 3))
+                    output, hp_data_gt.transpose(1, 3).transpose(2, 3))
 
                 iter_loss = loss.item()
                 test_loss += iter_loss
@@ -181,10 +180,10 @@ def train(data_path, max_epoch, pretrained_model,
                 confidence_img[conf_idx] = 1.
                 confidence_img = confidence_img.transpose(2, 0, 1)
 
-                nusc_msk_img = nusc_msk[..., 0].cpu().detach().numpy().copy()
+                hp_data_gt_img = hp_data_gt[..., 0].cpu().detach().numpy().copy()
 
                 if np.mod(index, 25) == 0:
-                    vis.images([nusc_msk_img, confidence_img],
+                    vis.images([hp_data_gt_img, confidence_img],
                                win='test_confidencena',
                                opts=dict(
                                    title='test confidence(GT, Pred)'))
@@ -206,8 +205,8 @@ def train(data_path, max_epoch, pretrained_model,
         prev_time = cur_time
 
         if np.mod(epo, 1) == 0:
-            torch.save(bcnn_model.state_dict(),
-                       'checkpoints/bcnn_latestmodel_' + now + '.pt')
+            torch.save(unet_model.state_dict(),
+                       'checkpoints/unet_latestmodel_' + now + '.pt')
         print('epoch train loss = %f, epoch test loss = %f, best_loss = %f, %s'
               % (train_loss / len(train_dataloader),
                  test_loss / len(test_dataloader),
@@ -217,8 +216,8 @@ def train(data_path, max_epoch, pretrained_model,
             print('update best model {} -> {}'.format(
                 best_loss, test_loss / len(test_dataloader)))
             best_loss = test_loss / len(test_dataloader)
-            torch.save(bcnn_model.state_dict(),
-                       'checkpoints/bcnn_bestmodel_' + now + '.pt')
+            torch.save(unet_model.state_dict(),
+                       'checkpoints/unet_bestmodel_' + now + '.pt')
 
 
 if __name__ == "__main__":
@@ -233,7 +232,7 @@ if __name__ == "__main__":
                         default=1000000)
     parser.add_argument('--pretrained_model', '-p', type=str,
                         help='Pretrained model',
-                        default='checkpoints/base_1700.pt')
+                        default='checkpoints/base_1500.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)

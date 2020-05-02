@@ -5,9 +5,9 @@ import torch
 from torch.nn import Module
 
 
-class BcnnLoss(Module):
+class UNETLoss(Module):
     def __init__(self):
-        super(BcnnLoss, self).__init__()
+        super(UNETLoss, self).__init__()
 
     def forward(self, output, target, weight):
         diff = output[:, 0, ...] - target[:, 0, ...]
