@@ -45,7 +45,9 @@ class HangingPointsNet():
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '../learning_scripts/checkpoints/unet_bestmodel_20200504_2253.pt')
+            '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
+            # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
+
         # pretrained_model = rospy.get_param(
         #     '~pretrained_model',
         #     'checkpoints/mango_best.pt')
@@ -98,51 +100,59 @@ class HangingPointsNet():
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
         depth = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
 
-        if depth is None:
+        if depth is None or bgr is None:
             return
 
-        print(np.max(depth), np.min(depth))
-        depth = self.colorize_depth(depth)
-        depth_rgb = cv2.cvtColor(depth, cv2.COLOR_BGR2RGB)
+        print("depth min", np.min(depth))
+        print("depth mean", np.mean(depth))
+        print("depth max", np.max(depth))
+        depth_bgr = self.colorize_depth(depth, 100, 1500)
+        depth_rgb = cv2.cvtColor(depth_bgr, cv2.COLOR_BGR2RGB)
 
         bgr = cv2.resize(bgr, (256, 256))
-        depth = cv2.resize(depth, (256, 256))
+        depth_bgr = cv2.resize(depth_bgr, (256, 256))
         # import pdb
         # pdb.set_trace()
-        depth[np.where(np.all(bgr==[0, 0, 0], axis=-1))] = [0, 0, 0]
+        depth_bgr[np.where(np.all(bgr==[0, 0, 0], axis=-1))] = [0, 0, 0]
         # img = np.concatenate((bgr, depth), axis=2).astype(np.float32)
-        img = depth
+
+        img = depth_bgr.copy().astype(np.float32)
         # pred_img = img.copy()
         # print("0  ", img.shape)
         # img = torch.FloatTensor(img.astype(np.float32)).to(self.device)
-        print(img.shape)
+        # print(img.shape)
+        # print(np.mean(img))
         if self.transform:
             img = self.transform(img)
 
 
-        print(img.shape)
         # img = torch.tensor(img, requires_grad=True)
         img = img.to(self.device)
         # img = transforms.ToTensor(img.astype(np.float32))
         # print("1  ", img.shape)
         img = img.unsqueeze(0)
-        print("2  ", img.shape)
         # output = self.model(img)
+
         output = self.model(img)
+        # print(output.shape)
         output = output[:, 0, :, :]
         # output = torch.sigmoid(output)
         output_np = output.cpu().detach().numpy().copy()
-        output_np = output_np.transpose(1, 2, 0)
+        output_np = output_np.transpose(1, 2, 0) * 2
+        # print(output_np.shape)
+
         # print(output_np)
         # output_img = output_np * 255
         output_np[output_np <= 0] = 0
         # output_np /= np.max(output_np)
         # output_np *= 255
         output_np[output_np >= 255] = 255
+        # print(np.max(output_np))
+        # print(np.mean(output_np))
+        # print(np.min(output_np))
         output_img = output_np.astype(np.uint8)
 
         # annotation_img = annotation_img.astype(np.uint8)
-        print(output_img.shape)
         pred_color = np.zeros_like(bgr, dtype=np.uint8)
         pred_color[..., 2] = output_img[..., 0]
 
@@ -162,6 +172,10 @@ class HangingPointsNet():
         # conf_idx = np.where(output_np[..., 0] > 0.01)
         # pred_img[conf_idx] = [255, 0, 0]
 
+        # print(output_img.shape)
+        # print(np.mean(output_img))
+        # cv2.imshow('output', output_img)
+        # cv2.waitKey(1)
         msg_out = self.bridge.cv2_to_imgmsg(output_img, "mono8")
         msg_out.header.stamp = img_msg.header.stamp
 
@@ -170,9 +184,10 @@ class HangingPointsNet():
         pred_msg.header.stamp = img_msg.header.stamp
 
         # depth_msg = self.bridge.cv2_to_imgmsg(depth, "rgb8")
-        depth_msg = self.bridge.cv2_to_imgmsg(depth, "bgr8")
+
+        depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
         depth_msg.header.stamp = img_msg.header.stamp
-        print(output.shape)
+
         self.pub_pred.publish(pred_msg)
         self.pub.publish(msg_out)
         self.pub_depth.publish(depth_msg)

@@ -50,7 +50,7 @@ class HangingPointsDataset(Dataset):
     def __getitem__(self, idx):
         data_name = os.listdir(os.path.join(self.data_path, 'color'))[idx]
         color = cv2.imread(os.path.join(self.data_path, "color/", data_name)).astype(np.float32)
-        depth = cv2.imread(os.path.join(self.data_path, "depth/", data_name)).astype(np.float32)
+        depth = cv2.imread(os.path.join(self.data_path, "depth_bgr/", data_name)).astype(np.float32)
         # color = cv2.resize(color, (640, 640))
         # depth = cv2.resize(depth, (640, 640))
         # print(color.shape)
