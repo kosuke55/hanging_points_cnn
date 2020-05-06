@@ -8,7 +8,8 @@ import torch.nn.functional as F
 
 class UNET(nn.Module):
     def __init__(self, in_channels=6):
-        super().__init__()
+        super(UNET, self).__init__()
+        # super().__init__()
         self.relu = nn.ReLU(inplace=True)
 
         # conv

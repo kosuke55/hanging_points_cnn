@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 
 
-def load_dataset(data_path):
+def load_dataset(data_path, batch_size):
     transform = transforms.Compose([
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(data_path, transform)
@@ -25,9 +25,9 @@ def load_dataset(data_path):
     train_dataset, test_dataset = random_split(hp_data, [train_size, test_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=1)
+        train_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
     test_dataloader = DataLoader(
-        test_dataset, batch_size=1, shuffle=True, num_workers=1)
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
 
     return train_dataloader, test_dataloader
 
@@ -55,7 +55,8 @@ class HangingPointsDataset(Dataset):
         # depth = cv2.resize(depth, (640, 640))
         # print(color.shape)
         # print(depth.shape)
-        in_feature = np.concatenate((color, depth), axis=2)
+        in_feature = depth
+        # in_feature = np.concatenate((color, depth), axis=2)
 
         ground_truth = cv2.imread(os.path.join(self.data_path, "annotation/", data_name), cv2.IMREAD_GRAYSCALE).astype(np.float32)
 

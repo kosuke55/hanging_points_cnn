@@ -228,7 +228,7 @@ if __name__ == "__main__":
                         default=1000000)
     parser.add_argument('--pretrained_model', '-p', type=str,
                         help='Pretrained model',
-                        default='checkpoints/base_1500.pt')
+                        default='checkpoints/unet_bestmodel_20200502_1639.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)

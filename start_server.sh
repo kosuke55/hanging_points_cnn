@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python -m visdom.server
+python -m visdom.server -port 6000
