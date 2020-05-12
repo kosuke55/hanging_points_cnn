@@ -49,7 +49,7 @@ class HangingPointsDataset(Dataset):
 
     def __getitem__(self, idx):
         data_name = os.listdir(os.path.join(self.data_path, 'color'))[idx]
-        color = cv2.imread(os.path.join(self.data_path, "color/", data_name)).astype(np.float32)
+        # color = cv2.imread(os.path.join(self.data_path, "color/", data_name)).astype(np.float32)
         depth = cv2.imread(os.path.join(self.data_path, "depth_bgr/", data_name)).astype(np.float32)
         # color = cv2.resize(color, (640, 640))
         # depth = cv2.resize(depth, (640, 640))
@@ -58,7 +58,25 @@ class HangingPointsDataset(Dataset):
         in_feature = depth
         # in_feature = np.concatenate((color, depth), axis=2)
 
-        ground_truth = cv2.imread(os.path.join(self.data_path, "annotation/", data_name), cv2.IMREAD_GRAYSCALE).astype(np.float32)
+        # ground_truth = cv2.imread(os.path.join(self.data_path, "annotation/", data_name), cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        ground_truth = cv2.imread(
+            os.path.join(self.data_path, "heatmap/", data_name),
+            cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        heatmap = cv2.imread(
+            os.path.join(self.data_path, "heatmap/", data_name),
+            cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        rotations = np.load(
+            os.path.join(self.data_path, "rotations/",
+                         os.path.splitext(data_name)[0]) + ".npy")
+
+        # import ipdb; ipdb.set_trace()
+
+        print("heatmap ", heatmap.shape, "rotations ", rotations.shape)
+        ground_truth = np.concatenate([heatmap[..., None], rotations], axis=2)
+        print("ground_truth ", ground_truth.shape)
 
         if self.transform:
             in_feature = self.transform(in_feature)
