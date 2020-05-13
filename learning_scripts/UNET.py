@@ -13,7 +13,8 @@ class Conv2DBatchNormRelu(nn.Module):
             in_channels, out_channels,
             kernel_size, stride, padding, dilation, bias=bias)
         self.batchnorm = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
 
     def forward(self, x):
         x = self.conv(x)
@@ -89,7 +90,7 @@ class UNET(nn.Module):
             96, 48, kernel_size=3, stride=1, padding=1)
 
         self.deconv0 = nn.ConvTranspose2d(
-            48, 1, kernel_size=4, stride=2, padding=1)
+            48, 6, kernel_size=4, stride=2, padding=1)
 
     def forward(self, x):
         # conv

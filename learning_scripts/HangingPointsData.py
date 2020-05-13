@@ -5,8 +5,9 @@ import os
 import sys
 
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-
 import cv2
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -49,37 +50,46 @@ class HangingPointsDataset(Dataset):
 
     def __getitem__(self, idx):
         data_name = os.listdir(os.path.join(self.data_path, 'color'))[idx]
-        # color = cv2.imread(os.path.join(self.data_path, "color/", data_name)).astype(np.float32)
-        depth = cv2.imread(os.path.join(self.data_path, "depth_bgr/", data_name)).astype(np.float32)
-        # color = cv2.resize(color, (640, 640))
-        # depth = cv2.resize(depth, (640, 640))
-        # print(color.shape)
-        # print(depth.shape)
+        # depth = cv2.imread(os.path.join(self.data_path, "depth_bgr/", data_name)).astype(np.float32)
+        depth = np.load(
+            os.path.join(self.data_path, "depth/",
+                         os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
+
+        clip_info = np.load(
+            os.path.join(self.data_path, "clip_info/",
+                         os.path.splitext(data_name)[0]) + ".npy")
         in_feature = depth
-        # in_feature = np.concatenate((color, depth), axis=2)
 
-        # ground_truth = cv2.imread(os.path.join(self.data_path, "annotation/", data_name), cv2.IMREAD_GRAYSCALE).astype(np.float32)
-
-        ground_truth = cv2.imread(
+        confidence = cv2.imread(
             os.path.join(self.data_path, "heatmap/", data_name),
             cv2.IMREAD_GRAYSCALE).astype(np.float32)
+        # print('confidence max', np.max(confidence))
+        confidence /= 255.
+        # print('confidence max 2', np.max(confidence))
 
-        heatmap = cv2.imread(
-            os.path.join(self.data_path, "heatmap/", data_name),
-            cv2.IMREAD_GRAYSCALE).astype(np.float32)
+        hanging_point_depth = np.load(
+            os.path.join(self.data_path, "hanging_points_depth/",
+                         os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
 
         rotations = np.load(
             os.path.join(self.data_path, "rotations/",
-                         os.path.splitext(data_name)[0]) + ".npy")
+                         os.path.splitext(data_name)[0]) + ".npy").astype(np.float32)
 
         # import ipdb; ipdb.set_trace()
 
-        print("heatmap ", heatmap.shape, "rotations ", rotations.shape)
-        ground_truth = np.concatenate([heatmap[..., None], rotations], axis=2)
-        print("ground_truth ", ground_truth.shape)
+        # print("confidence ", confidence.shape,
+        #       "rotations ", rotations.shape,
+        #       "hp depth", hanging_point_depth.shape)
+
+        ground_truth = np.concatenate(
+            [confidence[..., None],
+             hanging_point_depth[..., None],
+             rotations], axis=2)
+
+        # print("ground_truth ", ground_truth.shape)
 
         if self.transform:
             in_feature = self.transform(in_feature)
             ground_truth = self.transform(ground_truth)
 
-        return in_feature, ground_truth
+        return in_feature, clip_info, ground_truth
