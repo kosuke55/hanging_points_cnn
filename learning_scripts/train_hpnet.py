@@ -112,10 +112,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     }
 
     hpnet_model = HPNET(config).to(device)
-    # if os.path.exists(pretrained_model):
-    #     print('use pretrained model')
-    #     unet_model.load_state_dict(torch.load(pretrained_model), strict=False)
-    # unet_model.eval()
+    if os.path.exists(pretrained_model):
+        print('use pretrained model')
+        hpnet_model.load_state_dict(torch.load(pretrained_model), strict=False)
+    hpnet_model.eval()
 
     # transfer_learning = False
     # if transfer_learning:
@@ -172,8 +172,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # confidence_gt = ground_truth[0, 0, ...]
             confidence_gt = ground_truth[:, 0, ...]
             # print('confidence_gt ', confidence_gt.shape)
-            confidence_mask = np.zeros_like(
-                confidence_gt, dtype=(np.float32))
+            # confidence_mask = np.zeros_like(
+            #     confidence_gt, dtype=(np.float32))
+            confidence_mask = np.full_like(
+                confidence_gt, 0.1, dtype=(np.float32))
 
             # confidence = output[0, 0, :, :]
             confidence = output[:, 0, :, :]
@@ -249,6 +251,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #       confidence_binary_gt.shape)
 
             cx, cy = find_contour_center(confidence_binary_gt)
+            
+            
             axis_gt = depth_bgr.copy()
             if cx is not None and cy is not None:
 
@@ -546,7 +550,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 best_loss, test_loss / len(test_dataloader)))
             best_loss = test_loss / len(test_dataloader)
             torch.save(hpnet_model.state_dict(),
-                       os.path.join(save_dir, 'hpnet_bsetmodel_' + now + '.pt'))
+                       os.path.join(save_dir, 'hpnet_bestmodel_' + now + '.pt'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -564,7 +568,7 @@ if __name__ == "__main__":
                         default=1000000)
     parser.add_argument('--pretrained_model', '-p', type=str,
                         help='Pretrained model',
-                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hpnet_latestmodel_20200516_1848_.pt')
+                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hpnet_bsetmodel_20200516_2107.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
@@ -574,7 +578,7 @@ if __name__ == "__main__":
                         default=1000000)
     parser.add_argument('--save_dir', '-sd', type=str,
                         help='pt model save dir',
-                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints')
+                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
 
     args = parser.parse_args()
     train(data_path=args.data_path,
