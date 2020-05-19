@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+# from __future__ import absolute_import
+# from __future__ import division
+# from __future__ import print_function
 
 import math
 
@@ -19,133 +19,10 @@ import numpy as np
 from torchvision.ops import RoIAlign
 
 from resnet import resnet18
+from utils.rois_tools import expand_roi, find_rois
 # from layers.anchor_generation_layer import generate_anchors
 # from layers.proposal_computation_layer import compute_proposals
 # from layers.region_proposal_network import RegionProposalNetwor
-
-
-def expand_roi(box, img_shape, scale=1.5):
-    x, y, w, h = box
-    wmax, hmax = img_shape
-    xo = np.max([x - (scale - 1) * w / 2, 0])
-    yo = np.max([y - (scale - 1) * h / 2, 0])
-    wo = w * scale
-    ho = h * scale
-    if xo + wo >= wmax:
-        wo = wmax - xo - 1
-    if yo + ho >= hmax:
-        ho = hmax - yo - 1
-
-    return [xo, yo, wo, ho]
-
-
-def find_rois(confidence,
-              confidence_gt=None,
-              confidence_thresh=0.5,
-              area_thresh=1000,
-              mode='train'):
-    """Find rois
-
-    gtとの比較はlossの方で行う.ここではconfidenceの推論からroiを提案すればよい.
-
-    Parametersa
-    ----------
-    confidence : torch.tensor
-        NCHW
-    Returns
-    -------
-    rois : torch.tensor
-        rois [[[x1, y1, x2, y2], ..., [x1, y1, x2, y2]],
-              ... [x1, y1, x2, y2], ..., [x1, y1, x2, y2]]
-        len(rois) = n (batch size)
-
-        - example shape
-        rois_list (2,)
-        rois_list[0] torch.Size([46, 4])
-        rois_list[1] torch.Size([38, 4])
-        The first dimension of rois_list shows a batch,
-        which contains (the number of roi, (dx, dy, dw, dh)).
-    """
-
-    # if mode == 'train':
-
-    confidence = confidence.cpu().detach().numpy().copy()
-    # confidence_gt = confidence_gt.detach().numpy().copy()
-
-    rois = []
-    for n in range(confidence.shape[0]):
-        rois_n = None
-        # confidence_mask = np.full_like(
-        #     confidence_gt, 0.1, dtype=(np.float32))
-        # confidence_mask[np.where(
-        #     np.logical_and(
-        #         confidence_gt[n, ...].transpose(1, 2, 0) > confidence_thresh,
-        #         confidence_gt[n, ...].transpose(1, 2, 0) > confidence_thresh))] = 1.
-        # confidence_mask = np.zeros((confidence.shape[2:]))
-        # confidence_mask[np.where(
-        #     confidence_gt[n, ...].transpose(1, 2, 0)) > confidence_thresh] = 1.
-        confidence_mask = confidence[n, ...].transpose(1, 2, 0)
-        confidence_mask[confidence_mask > 1] = 1
-        confidence_mask[confidence_mask < 0] = 0
-        confidence_mask *= 255
-        confidence_mask = confidence_mask.astype(np.uint8)
-
-        # HWC
-        # confidence_mask[np.where(cond)]
-        _, confidence_mask = cv2.threshold(
-            confidence_mask, int(255 * confidence_thresh), 255, 0)
-        contours, hierarchy = cv2.findContours(confidence_mask,
-                                               cv2.RETR_TREE,
-                                               cv2.CHAIN_APPROX_SIMPLE)
-        # print('len(contours)', len(contours))
-        if len(contours) == 0:
-            return None
-        area_max = 0
-        # cx_result = None
-        # cy_result = None
-        box = None
-        for i, cnt in enumerate(contours):
-            # M = cv2.moments(cnt)
-            try:
-                # cx = int(M['m10'] / M['m00'])
-                # cy = int(M['m01'] / M['m00'])
-                area = cv2.contourArea(cnt)
-                print('area', area)
-                if area < area_thresh:
-                    continue
-                # print('{} area {} '.format(i, area))
-                # if area_max < area:
-                #     box = cv2.boundingRect(cnt)
-                #     area_max = area
-
-                # else:
-                #     continue
-
-                box = cv2.boundingRect(cnt)
-                area_max = area
-
-            except Exception:
-                continue
-
-            box = expand_roi(box, confidence_mask.shape, scale=1.5)
-            if rois_n is None:
-                rois_n = torch.tensor(
-                    [[box[0], box[1],
-                      box[0] + box[2], box[1] + box[3]]],
-                    dtype=torch.float32).to('cuda')
-            else:
-                rois_n = torch.cat((rois_n, torch.tensor(
-                    [[box[0], box[1],
-                      box[0] + box[2], box[1] + box[3]]],
-                    dtype=torch.float32).to('cuda')))
-
-        # if rois is None:
-        #     rois = rois_n
-        if rois_n is not None:
-            rois.append(rois_n)
-
-    return None if rois == [] else rois
-    # return cx_result, cy_result, box
 
 
 class Conv2DBatchNormRelu(nn.Module):
@@ -274,6 +151,7 @@ class HPNET(nn.Module):
         # self.nms_top_n = config['nms_top_n']
         # self.nms_thresh = config['nms_thresh']
         self.pool_out_size = config['pool_out_size']
+
         self.n_class = config['num_class']
 
         # self.rois_list = None  # for train
@@ -345,7 +223,6 @@ class HPNET(nn.Module):
         feature = self.feature_extractor(h)
         # pool = self.roi_pool(feature, rois_list)
 
-
         # rois_list = torch.cuda.FloatTensor([[0, 10, 10, 100, 100],
         #                                     [1, 10, 10, 100, 200],
         #                                     [1, 10, 10, 100, 300],
@@ -355,7 +232,8 @@ class HPNET(nn.Module):
         #                                     [10, 10, 100, 300],
                                             # ])
 
-        h = self.decoder(feature)
+        confidence = self.decoder(feature)
+        # confidence = h[:, 0:1, ...]
 
         # rois_list = [torch.tensor([[10, 10, 100, 100],
         #                           [10, 10, 100, 200],
@@ -364,7 +242,6 @@ class HPNET(nn.Module):
         #                           [10, 10, 300, 200],
         #                           [10, 10, 400, 300]], dtype=torch.float32).to(self.device)]
 
-        confidence = h[:, 0:1, ...]
         # rois_list = self.find_rois(confidence)
         self.rois_list = find_rois(confidence)
         if self.rois_list is None:
@@ -373,14 +250,14 @@ class HPNET(nn.Module):
                 [[0, 0, 0, 0]], dtype=torch.float32).to(self.device)]
 
         # print('rois_list.shape', rois_list.shape)
-        print('rois_list', self.rois_list)
+        # print('rois_list', self.rois_list)
 
         rois = self.roi_align(feature, self.rois_list)
         # print('rois', rois)
-        print('rois.shape', rois.shape)
+        # print('rois.shape', rois.shape)
 
         depth_and_rotation = self.conv_to_head(rois)
-        print('depth_and_rotaion.shape', depth_and_rotation.shape)
+        # print('depth_and_rotaion.shape', depth_and_rotation.shape)
         # torch.backends.cudnn.benchmark = True
 
         # print('pool.shape ', pool.shape)
@@ -395,7 +272,7 @@ class HPNET(nn.Module):
         # h = self.score_fr(h)
         # h = self.upscore(h)
 
-        return h
+        return confidence, depth_and_rotation
 
         # self.rois_list = rois_list
         # pool = self.roi_pool(feature, rois_list)

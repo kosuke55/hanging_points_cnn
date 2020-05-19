@@ -10,8 +10,10 @@ import cv2
 import os
 import sys
 
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
+from utils.rois_tools import expand_roi, find_rois
 
 
 config = {
@@ -33,8 +35,9 @@ config = {
 data_path = '/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/rotations_0514_1000'
 pretrained_model = '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200517_0426.pt'
 
-for idx in range(10):
+for idx in range(1):
     data_name = sorted(os.listdir(os.path.join(data_path, 'color')))[idx]
+
     # data_name = data_name.sort()
 
     print(data_name)
@@ -46,6 +49,11 @@ for idx in range(10):
                      os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
     color = cv2.imread(os.path.join(data_path, "color/", data_name)).astype(np.float32)
 
+    confidence_gt_img = cv2.imread(
+        os.path.join(data_path, "heatmap/", data_name),
+        cv2.IMREAD_GRAYSCALE).astype(np.float32)
+    confidence_gt = confidence_gt_img / 255.
+
     model = HPNET(config).cuda()
     model.load_state_dict(torch.load(pretrained_model), strict=False)
     # image = torch.rand((4, 1, 256, 256)).cuda()
@@ -53,19 +61,27 @@ for idx in range(10):
         transforms.ToTensor()])
     depth = transform(depth)[None, ...].cuda()
     # print(depth.shape)
-    output = model.forward(depth)
+    confidence, depth_and_rotation = model.forward(depth)
 
-    # print(model.rois_list)
-    confidence = output[0, 0, ...]
+    confidence_gt = transform(confidence_gt)[None, ...].cuda()
+    gt_rois_list = find_rois(confidence_gt)
+    print('gt_rois', gt_rois_list)
+    print('rois', model.rois_list)
+
+    print('confidence.shape', confidence.shape)
+    print('depth_and_rotation.shape', depth_and_rotation.shape)
+
+    print(model.rois_list)
+    confidence = confidence[0, 0, ...]
     confidence = confidence.cpu().detach().numpy().copy() * 255
     confidence = confidence.astype(np.uint8)
 
     confidence_bgr = cv2.cvtColor(confidence, cv2.COLOR_GRAY2BGR)
 
     for rois in model.rois_list:
-        print('--')
+        # print('--')
         for roi in rois:
-            print(roi)
+            # print(roi)
             confidence_bgr = cv2.rectangle(
                 confidence_bgr, (roi[0], roi[1]), (roi[2], roi[3]), (0, 255, 0), 3)
             color = cv2.rectangle(
