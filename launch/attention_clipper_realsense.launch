@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+  <!-- <arg name="INPUT_CLOUD" value="/camera/depth_registered/points" /> -->
+  <!-- <arg name="INPUT_IMAGE" value="/camera/color/image_rect_color" /> -->
+  <!-- <arg name="CAMERA_INFO" value="/head_mount_kinect/hd/camera_info" /> -->
+  <arg name="INPUT_CLOUD" value="/camera/depth_registered/points" />
+  <arg name="INPUT_IMAGE" value="/camera/color/image_rect_color" />
+  <arg name="INPUT_DEPTH" value="/camera/aligned_depth_to_color/image_raw" />
+  <arg name="CAMERA_INFO" value="/camera/depth/camera_info" />
+  <arg name="INPUT_BOX" value="/box" />
+  <arg name="RESOLUTION" default="0.01" />
+
+  <node name="gripper_box_publisher"
+        pkg="box_publisher" type="pub_box.py">
+    <remap from="~output" to="$(arg INPUT_BOX)"/>
+      <rosparam>
+        x: 0.4
+        y: 0.0
+        z: -0.03
+        w: 0.2
+        d: 0.2
+        h: 0.2
+        frame: camera_link
+      </rosparam>
+  </node>
+
+  <node name="attention_clipper_gripper"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_pcl/AttentionClipper">
+    <remap from="~input" to="$(arg CAMERA_INFO)" />
+    <remap from="~input/points" to="$(arg INPUT_CLOUD)" />
+    <remap from="~input/box" to="$(arg INPUT_BOX)" />
+  </node>
+
+  <node name="extract_indices_gripper"
+        pkg="jsk_pcl_ros" type="extract_indices">
+    <remap from="~input" to="$(arg INPUT_CLOUD)" />
+    <remap from="~indices" to="attention_clipper_gripper/output/point_indices" />
+  </node>
+
+  <node name="point_indices_to_mask_image"
+        pkg="jsk_pcl_ros_utils" type="point_indices_to_mask_image" >
+    <remap from="~input" to="attention_clipper_gripper/output/point_indices" />
+    <remap from="~input/image" to="$(arg INPUT_IMAGE)" />
+    <rosparam>
+      approximate_sync: true
+      static_image_size: false
+    </rosparam>
+  </node>
+
+  <node name="dilate_mask_image"
+        pkg="jsk_perception" type="dilate_mask_image" >
+    <remap from="~input" to="/point_indices_to_mask_image/output" />
+    <rosparam>
+      method: 0
+      size: 1
+    </rosparam>
+  </node>
+
+  <node name="apply_mask_image"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_perception/ApplyMaskImage">
+    <remap from="~input" to="$(arg INPUT_IMAGE)" />
+    <!-- <remap from="~input/mask" to="/point_indices_to_mask_image/output" /> -->
+    <remap from="~input/mask" to="/dilate_mask_image/output" />
+    <rosparam>
+      approximate_sync: true
+      clip: true
+    </rosparam>
+  </node>
+
+  <node name="apply_mask_depth"
+        pkg="nodelet" type="nodelet"
+        args="standalone jsk_perception/ApplyMaskImage">
+    <remap from="~input" to="$(arg INPUT_DEPTH)" />
+    <!-- <remap from="~input/mask" to="/point_indices_to_mask_image/output" /> -->
+    <remap from="~input/mask" to="/dilate_mask_image/output" />
+    <rosparam>
+      approximate_sync: true
+      clip: true
+    </rosparam>
+  </node>  
+
+</launch>

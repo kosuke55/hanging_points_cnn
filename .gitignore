@@ -2,3 +2,5 @@
 *.pyc
 \#*\#
 .\#*
+*.python-version
+debug
