@@ -43,7 +43,8 @@ def draw_axis(img, R, t, K):
     return img
 
 
-def find_contour_center(img):
+# def find_contour_center(img):
+def find_contours(img):
     ret, thresh = cv2.threshold(img.copy(), int(255 * 0.5), 255, 0)
     contours, hierarchy = cv2.findContours(thresh,
                                            cv2.RETR_TREE,
@@ -51,10 +52,11 @@ def find_contour_center(img):
     # contours, hierarchy = cv2.findContours(img, 1, 2)
     print(len(contours))
     if len(contours) == 0:
-        return None, None
+        return None, None, None
     area_max = 0
     cx_result = None
     cy_result = None
+    box = None
     for i, cnt in enumerate(contours):
         M = cv2.moments(cnt)
         try:
@@ -62,12 +64,13 @@ def find_contour_center(img):
             cy = int(M['m01'] / M['m00'])
             area = cv2.contourArea(cnt)
             if area_max < area:
+                box = cv2.boundingRect(cnt)
                 area_max = area
                 cx_result = cx
                 cy_result = cy
         except Exception:
             pass
-    return cx_result, cy_result
+    return cx_result, cy_result, box
 
 
 def colorize_depth(depth, min_value=None, max_value=None):
@@ -98,17 +101,21 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     cameramodel = cameramodels.PinholeCameraModel.from_intrinsic_matrix(
         intrinsics, 1080, 1920)
 
+
     train_dataloader, test_dataloader = load_dataset(data_path, batch_size)
     now = datetime.now().strftime('%Y%m%d_%H%M')
     best_loss = 1e10
     vis = visdom.Visdom(port='6006')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print('device: ', device)
     # unet_model = UNET(in_channels=3).to(device)
     # unet_model = UNET(in_channels=1).to(device)
 
     config = {
+        'feature_compress': 1 / 16,
         'num_class': 6,
+        'pool_out_size': 8,
     }
 
     hpnet_model = HPNET(config).to(device)
@@ -134,7 +141,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     # else:
     #     optimizer = optim.SGD(unet_model.parameters(), lr=1e-7, momentum=0.9)
 
-    optimizer = optim.SGD(hpnet_model.parameters(), lr=1e-7, momentum=0.9)
+    optimizer = optim.SGD(hpnet_model.parameters(), lr=1e-8, momentum=0.9)
 
     prev_time = datetime.now()
     for epo in range(max_epoch):
@@ -163,11 +170,13 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             hp_data_gt = hp_data_gt.to(device)
             optimizer.zero_grad()
             # output = unet_model(hp_data)
-            print(hp_data.shape)
-            output = hpnet_model(hp_data)
-
-            confidence_thresh = 0.5
+            # print(hp_data.shape)
             ground_truth = hp_data_gt.cpu().detach().numpy().copy()
+            output = hpnet_model(hp_data)
+            # ground_truth = hp_data_gt.cpu().detach().numpy().copy()
+            # import pdb
+            # pdb.set_trace()
+            confidence_thresh = 0.5
             # confidence_gt = ground_truth[0:1, ...]
             # confidence_gt = ground_truth[0, 0, ...]
             confidence_gt = ground_truth[:, 0, ...]
@@ -175,7 +184,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # confidence_mask = np.zeros_like(
             #     confidence_gt, dtype=(np.float32))
             confidence_mask = np.full_like(
-                confidence_gt, 0.1, dtype=(np.float32))
+                confidence_gt, 0, dtype=(np.float32))
 
             # confidence = output[0, 0, :, :]
             confidence = output[:, 0, :, :]
@@ -187,20 +196,12 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 np.logical_and(
                     confidence_gt > confidence_thresh,
                     confidence_np > confidence_thresh))] = 1.
-            # confidence_mask = confidence_mask[None, ...]
-            # print('confidence_mask ', confidence_mask.shape)
-            # print('pos_weight ', pos_weight.shape)
 
-            print(output.shape)
-            depth_pred = output[0, 1, :, :].cpu().detach().numpy().copy() * 1000
-            depth_pred_bgr = colorize_depth(depth_pred, 100, 1500)
-            depth_pred_rgb = cv2.cvtColor(
-                depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+            # depth_pred = output[0, 1, :, :].cpu().detach().numpy().copy() * 1000
+            # depth_pred_bgr = colorize_depth(depth_pred, 100, 1500)
+            # depth_pred_rgb = cv2.cvtColor(
+            #     depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
-            # rotations_gt = ground_truth[:, 2:, ...]
-            # rotations_gt = rotations_gt.transpose(1, 2, 0)
-
-            # print('confidence_mask ', confidence_mask.shape)
             loss = criterion(output, hp_data_gt, pos_weight,
                              torch.from_numpy(
                                  confidence_mask).to(device))
@@ -250,9 +251,11 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # print('confidence_binary_gt.shape ',
             #       confidence_binary_gt.shape)
 
-            cx, cy = find_contour_center(confidence_binary_gt)
-            
-            
+            # cx, cy = find_contour_center(confidence_binary_gt)
+            rois_list = []
+            cx, cy, box = find_contours(confidence_binary_gt)
+            # print(box)
+            rois_list.append([])
             axis_gt = depth_bgr.copy()
             if cx is not None and cy is not None:
 
@@ -287,60 +290,43 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             confidence_binary = (
                 confidence_np[0, ...] * 255).astype(np.uint8)
-            cx, cy = find_contour_center(confidence_binary)
+            cx, cy, box = find_contours(confidence_binary)
             axis = depth_bgr.copy()
-            if cx is not None and cy is not None:
-                dep = depth_pred[cy, cx]
-                rotations = output[0, 2:, :, :].cpu().detach().numpy().copy().transpose(1, 2, 0)
-                rotation = rotations[cy, cx, :] / np.linalg.norm(rotations[cy, cx, :])
-                # print(rotation)
-                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                               int(cy * (ymax - ymin) / float(256) + ymin)]
-                print("pred dep ", dep)
-                hanging_point_pose = np.array(
-                    cameramodel.project_pixel_to_3d_ray(pixel_point)) * dep * 0.001
-                    # hanging_point_depth_gt[0, cy, cx] * 0.001)
-                axis_large = np.zeros((1080, 1920, 3))
-                axis_large[ymin:ymax, xmin:xmax] \
-                    = cv2.resize(axis, (xmax - xmin, ymax - ymin))
-                try:
-                    draw_axis(axis_large,
-                              skrobot.coordinates.math.quaternion2matrix(rotation),
-                              hanging_point_pose,
-                              intrinsics)
-                except Exception:
-                    pass
-                axis = cv2.resize(axis_large[ymin:ymax, xmin:xmax],
-                                  (256, 256)).astype(np.uint8)
-            axis = cv2.cvtColor(
-                axis, cv2.COLOR_BGR2RGB)
 
-            rotations_mask = np.zeros((rotations_gt.shape[0],
-                                       rotations_gt.shape[1]))
-            for i in range(rotations_gt.shape[0]):
-                for j in range(rotations_gt.shape[1]):
-                    # TO DO. fix [0, 0, 0, 1] -> [1, 0, 0, 0]
-                    if np.all(rotations_gt[i, j, :] != [1, 0, 0, 0]):
-                        # print(rotations_gt_np[i, j, :])
-                        R = skrobot.coordinates.math.quaternion2matrix(
-                            rotations_gt[i, j, :])
-                        # rotations_mask[i, j, 0] = 255
-                        rotations_mask[i, j] = 255
+            # if cx is not None and cy is not None:
+            #     dep = depth_pred[cy, cx]
+            #     rotations = output[0, 2:, :, :].cpu().detach().numpy().copy().transpose(1, 2, 0)
+            #     rotation = rotations[cy, cx, :] / np.linalg.norm(rotations[cy, cx, :])
+            #     # print(rotation)
+            #     pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+            #                    int(cy * (ymax - ymin) / float(256) + ymin)]
+            #     print("pred dep ", dep)
+            #     hanging_point_pose = np.array(
+            #         cameramodel.project_pixel_to_3d_ray(pixel_point)) * dep * 0.001
+            #         # hanging_point_depth_gt[0, cy, cx] * 0.001)
+            #     axis_large = np.zeros((1080, 1920, 3))
+            #     axis_large[ymin:ymax, xmin:xmax] \
+            #         = cv2.resize(axis, (xmax - xmin, ymax - ymin))
+            #     try:
+            #         draw_axis(axis_large,
+            #                   skrobot.coordinates.math.quaternion2matrix(rotation),
+            #                   hanging_point_pose,
+            #                   intrinsics)
+            #     except Exception:
+            #         pass
+            #     axis = cv2.resize(axis_large[ymin:ymax, xmin:xmax],
+            #                       (256, 256)).astype(np.uint8)
+            # axis = cv2.cvtColor(
+            #     axis, cv2.COLOR_BGR2RGB)
 
-            # rotations_mask_vis = rotations_mask.transpose(2, 0, 1)
-            # print('rotations_gt.shape', rotations_gt.shape)
-            # print(ground_truth.shape)
-
-            # ground_truth = ground_truth.astype(np.uint8)
-
-            # print(confidence_np.shape)
-            # print(ground_truth.shape)
-            # print(np.max(ground_truth))
-            # print(np.min(ground_truth))
-
-            # print('confidence_gt.shape')
-            # print(confidence_gt.shape)
-            # print(confidence_np.shape)
+            # rotations_mask = np.zeros((rotations_gt.shape[0],
+            #                            rotations_gt.shape[1]))
+            # for i in range(rotations_gt.shape[0]):
+            #     for j in range(rotations_gt.shape[1]):
+            #         if np.all(rotations_gt[i, j, :] != [1, 0, 0, 0]):
+            #             R = skrobot.coordinates.math.quaternion2matrix(
+            #                 rotations_gt[i, j, :])
+            #             rotations_mask[i, j] = 255
 
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
@@ -356,10 +342,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                            win='hanging_point_depth_gt_rgb',
                            opts=dict(
                                title='hanging_point_depth_gt_rgb'))
-                vis.images(depth_pred_rgb,
-                           win='train depth_pred_rgb',
-                           opts=dict(
-                               title='train depth_pred_rgb'))
+                # vis.images(depth_pred_rgb,
+                #            win='train depth_pred_rgb',
+                #            opts=dict(
+                #                title='train depth_pred_rgb'))
                 # vis.images(rotations_mask,
                 #            win='rotations_mask',
                 #            opts=dict(
@@ -406,6 +392,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         test_loss = 0
         hpnet_model.eval()
 
+        print("start test.")
         with torch.no_grad():
             for index, (hp_data, clip_info, hp_data_gt) in enumerate(test_dataloader):
                 # pos_weight = hp_data_gt.detach().numpy().copy()[0, 0, ...]
@@ -488,10 +475,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     break
 
                 if np.mod(index, 1) == 0:
-                    print('epoch {}, {}/{},train loss is {}'.format(
+                    print('epoch {}, {}/{},test loss is {}'.format(
                         epo,
                         index,
-                        len(train_dataloader),
+                        len(test_dataloader),
                         iter_loss))
 
                     vis.images(depth_rgb,
@@ -524,7 +511,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                                opts=dict(
                                    title='test confidence(GT, Pred)'))
 
-        avg_test_loss = test_loss / len(test_dataloader)
+            avg_test_loss = test_loss / len(test_dataloader)
 
         vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]), win='loss',
                  name='avg_train_loss', update='append')
@@ -537,20 +524,20 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
         prev_time = cur_time
 
-        if np.mod(epo, 1) == 0:
+        if np.mod(epo, 30) == 0 and epo > 0:
             torch.save(hpnet_model.state_dict(),
                        os.path.join(save_dir, 'hpnet_latestmodel_' + now + '.pt'))
-        print('epoch train loss = %f, epoch test loss = %f, best_loss = %f, %s'
-              % (train_loss / len(train_dataloader),
-                 test_loss / len(test_dataloader),
-                 best_loss,
-                 time_str))
-        if best_loss > test_loss / len(test_dataloader):
-            print('update best model {} -> {}'.format(
-                best_loss, test_loss / len(test_dataloader)))
-            best_loss = test_loss / len(test_dataloader)
-            torch.save(hpnet_model.state_dict(),
-                       os.path.join(save_dir, 'hpnet_bestmodel_' + now + '.pt'))
+            print('epoch train loss = %f, epoch test loss = %f, best_loss = %f, %s'
+                  % (train_loss / len(train_dataloader),
+                     test_loss / len(test_dataloader),
+                     best_loss,
+                     time_str))
+            if best_loss > test_loss / len(test_dataloader):
+                print('update best model {} -> {}'.format(
+                    best_loss, test_loss / len(test_dataloader)))
+                best_loss = test_loss / len(test_dataloader)
+                torch.save(hpnet_model.state_dict(),
+                           os.path.join(save_dir, 'hpnet_bestmodel_' + now + '.pt'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -561,14 +548,14 @@ if __name__ == "__main__":
                         default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/rotations_0514_1000')
                         # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
-                        help='max epoch',
-                        default=8)
+                        help='batch size',
+                        default=16)
     parser.add_argument('--max_epoch', '-me', type=int,
                         help='max epoch',
                         default=1000000)
     parser.add_argument('--pretrained_model', '-p', type=str,
                         help='Pretrained model',
-                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hpnet_bsetmodel_20200516_2107.pt')
+                        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200517_0426.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',

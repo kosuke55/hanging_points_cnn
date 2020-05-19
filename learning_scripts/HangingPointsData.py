@@ -19,7 +19,7 @@ def load_dataset(data_path, batch_size):
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(data_path, transform)
 
-    train_size = int(0.9 * len(hp_data))
+    train_size = int(0.99 * len(hp_data))
     test_size = len(hp_data) - train_size
     # train_size = 1
     # test_size = 2
@@ -49,7 +49,8 @@ class HangingPointsDataset(Dataset):
         return len(os.listdir(os.path.join(self.data_path, 'color')))
 
     def __getitem__(self, idx):
-        data_name = os.listdir(os.path.join(self.data_path, 'color'))[idx]
+        data_name = sorted(os.listdir(os.path.join(self.data_path, 'color')))[idx]
+        # data_name = os.listdir(os.path.join(self.data_path, 'color'))[idx]
         # depth = cv2.imread(os.path.join(self.data_path, "depth_bgr/", data_name)).astype(np.float32)
         depth = np.load(
             os.path.join(self.data_path, "depth/",
