@@ -60,7 +60,6 @@ for idx in range(10):
     confidence = confidence.cpu().detach().numpy().copy() * 255
     confidence = confidence.astype(np.uint8)
 
-
     confidence_bgr = cv2.cvtColor(confidence, cv2.COLOR_GRAY2BGR)
 
     for rois in model.rois_list:

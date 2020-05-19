@@ -24,6 +24,21 @@ from resnet import resnet18
 # from layers.region_proposal_network import RegionProposalNetwor
 
 
+def expand_roi(box, img_shape, scale=1.5):
+    x, y, w, h = box
+    wmax, hmax = img_shape
+    xo = np.max([x - (scale - 1) * w / 2, 0])
+    yo = np.max([y - (scale - 1) * h / 2, 0])
+    wo = w * scale
+    ho = h * scale
+    if xo + wo >= wmax:
+        wo = wmax - xo - 1
+    if yo + ho >= hmax:
+        ho = hmax - yo - 1
+
+    return [xo, yo, wo, ho]
+
+
 def find_rois(confidence,
               confidence_gt=None,
               confidence_thresh=0.5,
@@ -112,6 +127,7 @@ def find_rois(confidence,
             except Exception:
                 continue
 
+            box = expand_roi(box, confidence_mask.shape, scale=1.5)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],
