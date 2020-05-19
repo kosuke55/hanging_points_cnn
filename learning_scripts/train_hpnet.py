@@ -122,7 +122,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     if os.path.exists(pretrained_model):
         print('use pretrained model')
         hpnet_model.load_state_dict(torch.load(pretrained_model), strict=False)
-    hpnet_model.eval()
+    hpnet_model.train()
 
     # transfer_learning = False
     # if transfer_learning:
