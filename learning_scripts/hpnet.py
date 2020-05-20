@@ -243,7 +243,7 @@ class HPNET(nn.Module):
         #                           [10, 10, 400, 300]], dtype=torch.float32).to(self.device)]
 
         # rois_list = self.find_rois(confidence)
-        print('-----------find_rois(confidence)--------------')
+        # print('-----------find_rois(confidence)--------------')
         self.rois_list = find_rois(confidence)
 
         if self.rois_list is None:

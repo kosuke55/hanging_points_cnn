@@ -177,16 +177,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             ground_truth = hp_data_gt.cpu().detach().numpy().copy()
             # confidence_gt = ground_truth[:, 0:1, ...]
             confidence_gt = hp_data_gt[:, 0:1, ...]
-            print('----------find_rois(confidence_gt)------------')
+            # print('----------find_rois(confidence_gt)------------')
             rois_list_gt = find_rois(confidence_gt)
 
-            print('len(rois_list_gt)', len(rois_list_gt))
+            # print('len(rois_list_gt)', len(rois_list_gt))
             confidence, depth_and_rotation = hpnet_model.forward(hp_data)
-            print('depth_and_rotation',
-                  np.shape(depth_and_rotation))
+            # print('depth_and_rotation',
+            #       np.shape(depth_and_rotation))
 
             # for visualize
-            print('confidence.shape', confidence.shape)
+            # print('confidence.shape', confidence.shape)
             confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
             confidence_np[confidence_np <= 0] = 0.
@@ -199,9 +199,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # print('confidence.shape', confidence.shape)
             # print('len(hpnet_model.rois_list)',
             #       len(hpnet_model.rois_list))
-            if rois_list_gt is not None:
-                print('len(rois_list_gt) ', len(rois_list_gt))
-            # annotate_rois(hpnet_model.rois_list, rois_list_gt)
+            # if rois_list_gt is not None:
+                # pass
+                # print('len(rois_list_gt) ', len(rois_list_gt))
+            rois_pairs = annotate_rois(hpnet_model.rois_list, rois_list_gt)
+
+            # print(index, len(rois_list_gt), rois_pairs)
+            # print(index, len(rois_pairs), rois_pairs)
+            print(index, len(rois_pairs), depth_and_rotation.shape[0])
+            # print(depth_and_rotation.shape)
+
             continue
 
             # find gt of rois
