@@ -19,9 +19,10 @@ from datetime import datetime
 
 from UNET import UNET
 from hpnet import HPNET
-from UNETLoss import UNETLoss
+# from UNETLoss import UNETLoss
 from HPNETLoss import HPNETLoss
 from HangingPointsData import load_dataset
+from utils.rois_tools import annotate_rois, expand_roi, find_rois
 
 
 def draw_axis(img, R, t, K):
@@ -167,45 +168,59 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # criterion = UNETLoss().to(device)
             criterion = HPNETLoss().to(device)
             hp_data = hp_data.to(device)
-            hp_data_gt = hp_data_gt.to(device)
-            optimizer.zero_grad()
-            # output = unet_model(hp_data)
-            # print(hp_data.shape)
-            ground_truth = hp_data_gt.cpu().detach().numpy().copy()
-            output = hpnet_model(hp_data)
-            # ground_truth = hp_data_gt.cpu().detach().numpy().copy()
-            # import pdb
-            # pdb.set_trace()
-            confidence_thresh = 0.5
-            # confidence_gt = ground_truth[0:1, ...]
-            # confidence_gt = ground_truth[0, 0, ...]
-            confidence_gt = ground_truth[:, 0, ...]
-            # print('confidence_gt ', confidence_gt.shape)
-            # confidence_mask = np.zeros_like(
-            #     confidence_gt, dtype=(np.float32))
-            confidence_mask = np.full_like(
-                confidence_gt, 0, dtype=(np.float32))
 
-            # confidence = output[0, 0, :, :]
-            confidence = output[:, 0, :, :]
-            confidence_np = confidence.cpu().detach().numpy().copy()
+            optimizer.zero_grad()
+
+            # output = hpnet_model(hp_data)
+
+            hp_data_gt = hp_data_gt.to(device)
+            ground_truth = hp_data_gt.cpu().detach().numpy().copy()
+            # confidence_gt = ground_truth[:, 0:1, ...]
+            confidence_gt = hp_data_gt[:, 0:1, ...]
+            print('----------find_rois(confidence_gt)------------')
+            rois_list_gt = find_rois(confidence_gt)
+
+            print('len(rois_list_gt)', len(rois_list_gt))
+            confidence, depth_and_rotation = hpnet_model.forward(hp_data)
+            print('depth_and_rotation',
+                  np.shape(depth_and_rotation))
+
+            # for visualize
+            print('confidence.shape', confidence.shape)
+            confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
             confidence_np[confidence_np <= 0] = 0.
 
-            confidence_mask[np.where(
-                np.logical_and(
-                    confidence_gt > confidence_thresh,
-                    confidence_np > confidence_thresh))] = 1.
+            # print('hpnet_model.rois_lis', hpnet_model.rois_list)
+
+            # print('len(rois_list_gt',
+            #       len(rois_list_gt))
+            print('confidence_gt.shape', confidence_gt.shape)
+            print('confidence.shape', confidence.shape)
+            print('len(hpnet_model.rois_list)',
+                  len(hpnet_model.rois_list))
+            if rois_list_gt is not None:
+                print('len(rois_list_gt) ', len(rois_list_gt))
+            # annotate_rois(hpnet_model.rois_list, rois_list_gt)
+            continue
+
+            # find gt of rois
+
+            # confidence_mask[np.where(
+            #     np.logical_and(
+            #         confidence_gt > confidence_thresh,
+            #         confidence_np > confidence_thresh))] = 1.
 
             # depth_pred = output[0, 1, :, :].cpu().detach().numpy().copy() * 1000
             # depth_pred_bgr = colorize_depth(depth_pred, 100, 1500)
             # depth_pred_rgb = cv2.cvtColor(
             #     depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
-            loss = criterion(output, hp_data_gt, pos_weight,
-                             torch.from_numpy(
-                                 confidence_mask).to(device))
+            # loss = criterion(output, hp_data_gt, pos_weight,
+            #                  torch.from_numpy(
+            #                      confidence_mask).to(device))
 
+            loss = criterion(confidence, hp_data_gt, pos_weight)
             loss.backward()
             iter_loss = loss.item()
             train_loss += iter_loss
@@ -246,8 +261,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 hanging_point_depth_gt_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
             # print(rotations_gt_np.shape)
 
-            confidence_binary_gt = (
-                confidence_gt[0, ...] * 255).astype(np.uint8)
+            # confidence_binary_gt = (
+            #     confidence_gt[0, ...] * 255).astype(np.uint8)
             # print('confidence_binary_gt.shape ',
             #       confidence_binary_gt.shape)
 
@@ -328,6 +343,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #                 rotations_gt[i, j, :])
             #             rotations_mask[i, j] = 255
 
+
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
                     epo,
@@ -389,8 +405,13 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         else:
             avg_train_loss = train_loss
 
+
+        continue
+
+
         test_loss = 0
         hpnet_model.eval()
+
 
         print("start test.")
         with torch.no_grad():

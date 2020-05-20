@@ -33,7 +33,8 @@ class HPNETLoss(Module):
     def __init__(self):
         super(HPNETLoss, self).__init__()
 
-    def forward(self, output, target, weight, mask):
+    # def forward(self, output, target, weight, mask):
+    def forward(self, output, target, weight):
 
         confidence_diff = output[:, 0, ...] - target[:, 0, ...]
         confidence_loss = torch.sum((weight * confidence_diff) ** 2)

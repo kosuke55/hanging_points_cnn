@@ -243,16 +243,21 @@ class HPNET(nn.Module):
         #                           [10, 10, 400, 300]], dtype=torch.float32).to(self.device)]
 
         # rois_list = self.find_rois(confidence)
+        print('-----------find_rois(confidence)--------------')
         self.rois_list = find_rois(confidence)
+
         if self.rois_list is None:
             # set dummy roi
             self.rois_list = [torch.tensor(
                 [[0, 0, 0, 0]], dtype=torch.float32).to(self.device)]
 
+        print('len(self.rois_list_gt)', len(self.rois_list))
+        # import ipdb; ipdb.set_trace()
         # print('rois_list.shape', rois_list.shape)
         # print('rois_list', self.rois_list)
 
         rois = self.roi_align(feature, self.rois_list)
+
         # print('rois', rois)
         # print('rois.shape', rois.shape)
 
