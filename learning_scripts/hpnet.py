@@ -247,12 +247,15 @@ class HPNET(nn.Module):
         self.rois_list = find_rois(confidence)
 
         if self.rois_list is None:
-            # set dummy roi
+            # set dummy rois whose size is equal to batch size
             self.rois_list = [torch.tensor(
-                [[0, 0, 0, 0]], dtype=torch.float32).to(self.device)]
+                [[0, 0, 0, 0]], dtype=torch.float32).to(self.device)
+                              for _ in range(confidence.shape[0])]
 
-        print('len(self.rois_list_gt)', len(self.rois_list))
         # import ipdb; ipdb.set_trace()
+
+        # print('len(self.rois_list_gt)', len(self.rois_list))
+
         # print('rois_list.shape', rois_list.shape)
         # print('rois_list', self.rois_list)
 

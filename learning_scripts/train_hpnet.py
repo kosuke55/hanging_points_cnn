@@ -195,10 +195,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             # print('len(rois_list_gt',
             #       len(rois_list_gt))
-            print('confidence_gt.shape', confidence_gt.shape)
-            print('confidence.shape', confidence.shape)
-            print('len(hpnet_model.rois_list)',
-                  len(hpnet_model.rois_list))
+            # print('confidence_gt.shape', confidence_gt.shape)
+            # print('confidence.shape', confidence.shape)
+            # print('len(hpnet_model.rois_list)',
+            #       len(hpnet_model.rois_list))
             if rois_list_gt is not None:
                 print('len(rois_list_gt) ', len(rois_list_gt))
             # annotate_rois(hpnet_model.rois_list, rois_list_gt)
