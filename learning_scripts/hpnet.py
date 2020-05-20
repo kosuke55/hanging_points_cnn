@@ -19,7 +19,7 @@ import numpy as np
 from torchvision.ops import RoIAlign
 
 from resnet import resnet18
-from utils.rois_tools import expand_roi, find_rois
+from utils.rois_tools import find_rois
 # from layers.anchor_generation_layer import generate_anchors
 # from layers.proposal_computation_layer import compute_proposals
 # from layers.region_proposal_network import RegionProposalNetwor

@@ -22,7 +22,7 @@ from hpnet import HPNET
 # from UNETLoss import UNETLoss
 from HPNETLoss import HPNETLoss
 from HangingPointsData import load_dataset
-from utils.rois_tools import annotate_rois, expand_roi, find_rois
+from utils.rois_tools import annotate_rois, find_rois
 
 
 def draw_axis(img, R, t, K):
@@ -143,7 +143,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     #     optimizer = optim.SGD(unet_model.parameters(), lr=1e-7, momentum=0.9)
 
     optimizer = optim.SGD(hpnet_model.parameters(), lr=1e-8, momentum=0.9)
-
     prev_time = datetime.now()
     for epo in range(max_epoch):
         train_loss = 0
@@ -202,11 +201,27 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # if rois_list_gt is not None:
                 # pass
                 # print('len(rois_list_gt) ', len(rois_list_gt))
-            rois_pairs = annotate_rois(hpnet_model.rois_list, rois_list_gt)
-
+            depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
+            # print('rois_list_gt', rois_list_gt)
+            annotated_rois = annotate_rois(
+                hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
+            # print('--')
+            # for ar in annotated_rois:
+            #     if ar[2]:
+            #         print('o', ar[1], ar[3])
+            #     else:
+            #         print('x', ar[1], ar[3])
+            # print(index, len(annotated_rois), annotated_rois)
             # print(index, len(rois_list_gt), rois_pairs)
-            # print(index, len(rois_pairs), rois_pairs)
-            print(index, len(rois_pairs), depth_and_rotation.shape[0])
+            # import ipdb; ipdb.set_trace()
+            # print(index, len(rois_pairs), depth_and_rotation.shape[0])
+            # print(index, len(annotated_rois), depth_and_rotation.shape[0])
+            # num_rois = 0
+            # for ar in annotated_rois:
+            #     print(ar)
+            #     num_rois += len(ar)
+            # print('num_rois', num_rois)
+
             # print(depth_and_rotation.shape)
 
             continue
@@ -226,6 +241,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # loss = criterion(output, hp_data_gt, pos_weight,
             #                  torch.from_numpy(
             #                      confidence_mask).to(device))
+
 
             loss = criterion(confidence, hp_data_gt, pos_weight)
             loss.backward()
