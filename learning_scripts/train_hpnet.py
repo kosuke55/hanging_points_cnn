@@ -38,36 +38,6 @@ def draw_axis(img, R, t, K):
     return img
 
 
-# def find_contour_center(img):
-def find_contours(img):
-    ret, thresh = cv2.threshold(img.copy(), int(255 * 0.5), 255, 0)
-    contours, hierarchy = cv2.findContours(thresh,
-                                           cv2.RETR_TREE,
-                                           cv2.CHAIN_APPROX_SIMPLE)
-    # contours, hierarchy = cv2.findContours(img, 1, 2)
-    # print(len(contours))
-    if len(contours) == 0:
-        return None, None, None
-    area_max = 0
-    cx_result = None
-    cy_result = None
-    box = None
-    for i, cnt in enumerate(contours):
-        M = cv2.moments(cnt)
-        try:
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            area = cv2.contourArea(cnt)
-            if area_max < area:
-                box = cv2.boundingRect(cnt)
-                area_max = area
-                cx_result = cx
-                cy_result = cy
-        except Exception:
-            pass
-    return cx_result, cy_result, box
-
-
 def colorize_depth(depth, min_value=None, max_value=None):
     min_value = np.nanmin(depth) if min_value is None else min_value
     max_value = np.nanmax(depth) if max_value is None else max_value
