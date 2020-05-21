@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+import time
 
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
@@ -213,7 +214,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #         print('x', ar[1], ar[3])
             # print(index, len(annotated_rois), annotated_rois)
             # print(index, len(rois_list_gt), rois_pairs)
-            # import ipdb; ipdb.set_trace()
+
             # print(index, len(rois_pairs), depth_and_rotation.shape[0])
             # print(index, len(annotated_rois), depth_and_rotation.shape[0])
             # num_rois = 0
@@ -223,10 +224,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # print('num_rois', num_rois)
 
             # print(depth_and_rotation.shape)
-
-            continue
-
-            # find gt of rois
 
             # confidence_mask[np.where(
             #     np.logical_and(
@@ -242,8 +239,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #                  torch.from_numpy(
             #                      confidence_mask).to(device))
 
-
-            loss = criterion(confidence, hp_data_gt, pos_weight)
+            loss = criterion(confidence, hp_data_gt, pos_weight,
+                             depth_and_rotation, annotated_rois)
             loss.backward()
             iter_loss = loss.item()
             train_loss += iter_loss
@@ -253,6 +250,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # bgr = bgr.transpose(1, 2, 0)
             # rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             # rgb = rgb.transpose(2, 0, 1)
+            # continue
 
             depth = hp_data.cpu().detach().numpy(
             ).copy()[0, 0, ...] * 1000
@@ -270,13 +268,9 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             hanging_point_depth_gt \
                 = ground_truth[:, 1, ...].astype(np.float32) * 1000
-            # print('hanging_point_depth_gt  ', hanging_point_depth_gt.shape)
-            # hanging_point_depth_gt_np \
-            #     = hanging_point_depth_gt.transpose(1, 2, 0)
             rotations_gt = ground_truth[0, 2:, ...]
             rotations_gt = rotations_gt.transpose(1, 2, 0)
             # rotations_gt = rotations_gt.transpose(0, 2, 3, 1)
-
             # print('hanging_point_depth_gt 2 ', hanging_point_depth_gt_np.shape)
             hanging_point_depth_gt_bgr \
                 = colorize_depth(hanging_point_depth_gt[0, ...], 100, 1500)
@@ -290,46 +284,108 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #       confidence_binary_gt.shape)
 
             # cx, cy = find_contour_center(confidence_binary_gt)
-            rois_list = []
-            cx, cy, box = find_contours(confidence_binary_gt)
+            # rois_list = []
+            # cx, cy, box = find_contours(confidence_binary_gt)
             # print(box)
-            rois_list.append([])
+            # rois_list.append([])
+
+            # print(rois_list_gt)
+            # import ipdb; ipdb.set_trace()
+            # if cx is not None and cy is not None:
+
+            # For visualization
+            # axis_gt = depth_bgr.copy()
+            # for rois in rois_list_gt:
+            #     if rois[0].tolist() == [0, 0, 0, 0]:
+            #         continue
+            #     for roi in rois:
+            #         print(roi)
+            #         roi = roi.cpu().detach().numpy().copy()
+            #         cx = int((roi[0] + roi[2]) / 2)
+            #         cy = int((roi[1] + roi[3]) / 2)
+
+            #         dep = hanging_point_depth_gt[0, cy, cx]
+            #         rotation = rotations_gt[cy, cx, :]
+            #         pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+            #                        int(cy * (ymax - ymin) / float(256) + ymin)]
+            #         hanging_point_pose = np.array(
+            #             cameramodel.project_pixel_to_3d_ray(
+            #                 pixel_point)) * dep * 0.001
+
+            #         axis_large_gt = np.zeros((1080, 1920, 3))
+            #         axis_large_gt[ymin:ymax, xmin:xmax] \
+            #             = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
+            #         try:
+            #             draw_axis(axis_large_gt,
+            #                       skrobot.coordinates.math.quaternion2matrix(
+            #                           rotation),
+            #                       hanging_point_pose,
+            #                       intrinsics)
+            #         except Exception:
+            #             print('Fail to draw axis')
+            #             pass
+
             axis_gt = depth_bgr.copy()
-            if cx is not None and cy is not None:
+            # for rois in rois_list_gt:
+            #     if rois[0].tolist() == [0, 0, 0, 0]:
+            #         continue
+            rois = rois_list_gt[0]
+            axis_large_gt = np.zeros((1080, 1920, 3))
+            axis_large_gt[ymin:ymax, xmin:xmax] \
+                = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
+            flag = False
+
+            confidence_gt_tmp = confidence_gt[0, 0, ...].cpu().detach().numpy().copy() * 255
+            confidence_gt_tmp = confidence_gt_tmp.astype(np.uint8)
+            print(confidence_gt_tmp.shape)
+            # confidence_gt_bgr = cv2.cvtColor(confidence_gt_tmp,
+            #                                  cv2.COLOR_GRAY2BGR)
+
+            confidence_gt_bgr = cv2.cvtColor(confidence_gt[0, 0, ...].cpu().detach().numpy().copy() * 255,
+                                             cv2.COLOR_GRAY2BGR)
+            for roi in rois:
+                if roi.tolist() == [0, 0, 0, 0]:
+                    continue
+                roi = roi.cpu().detach().numpy().copy()
+                cx = int((roi[0] + roi[2]) / 2)
+                cy = int((roi[1] + roi[3]) / 2)
+                # print(cx, cy)
 
                 dep = hanging_point_depth_gt[0, cy, cx]
-                # print('hanging_point_depth_gt ',
-                #       hanging_point_depth_gt.shape, hanging_point_depth_gt[0, cy, cx], dep)
+                if dep == 0:
+                    flag = True
 
                 rotation = rotations_gt[cy, cx, :]
-                # print('rotation ', rotation)
-                # print(ymax)
                 pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                                int(cy * (ymax - ymin) / float(256) + ymin)]
-                # print(cameramodel.project_pixel_to_3d_ray(pixel_point))
+                print(pixel_point, cx, cy, rotation, dep)
                 hanging_point_pose = np.array(
-                    cameramodel.project_pixel_to_3d_ray(pixel_point)) * dep * 0.001
-                    # hanging_point_depth_gt[0, cy, cx] * 0.001)
+                    cameramodel.project_pixel_to_3d_ray(
+                        pixel_point)) * dep * 0.001
 
-                axis_large_gt = np.zeros((1080, 1920, 3))
-                axis_large_gt[ymin:ymax, xmin:xmax] \
-                    = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
                 try:
                     draw_axis(axis_large_gt,
-                              skrobot.coordinates.math.quaternion2matrix(rotation),
+                              skrobot.coordinates.math.quaternion2matrix(
+                                  rotation),
                               hanging_point_pose,
                               intrinsics)
                 except Exception:
+                    print('Fail to draw axis')
                     pass
-                axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
-                                     (256, 256)).astype(np.uint8)
+
+                confidence_gt_bgr = cv2.rectangle(
+                    confidence_gt_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
+                    (0, 255, 0), 3)
+
+            axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
+                                 (256, 256)).astype(np.uint8)
             axis_gt = cv2.cvtColor(
                 axis_gt, cv2.COLOR_BGR2RGB)
 
-            confidence_binary = (
-                confidence_np[0, ...] * 255).astype(np.uint8)
-            cx, cy, box = find_contours(confidence_binary)
-            axis = depth_bgr.copy()
+            # confidence_binary = (
+            #     confidence_np[0, ...] * 255).astype(np.uint8)
+            #     cx, cy, box = find_contours(confidence_binary)
+            #     axis = depth_bgr.copy()
 
             # if cx is not None and cy is not None:
             #     dep = depth_pred[cy, cx]
@@ -366,7 +422,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             #                 rotations_gt[i, j, :])
             #             rotations_mask[i, j] = 255
 
-
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
                     epo,
@@ -390,12 +445,12 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 #            opts=dict(
                 #                title='rotations_mask'))
                 # vis.images(confidence_mask.transpose(2, 0, 1),
-                vis.images(confidence_mask[0, ...],
-                           win='confidence_mask',
-                           opts=dict(
-                               title='confidence_mask'))
-                vis.images([axis_gt.transpose(2, 0, 1),
-                            axis.transpose(2, 0, 1)],
+                # vis.images(confidence_mask[0, ...],
+                #            win='confidence_mask',
+                #            opts=dict(
+                #                title='confidence_mask'))
+                vis.images([axis_gt.transpose(2, 0, 1)],
+                            # axis.transpose(2, 0, 1)],
                            win='train axis',
                            opts=dict(
                                title='train axis'))
@@ -405,9 +460,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 #                title='depth'))
 
                 # vis.images([confidence_gt, confidence_np],
-                vis.images([confidence_gt[0, ...][None, ...],
-                            confidence_np[0, ...][None, ...]],
+                # print(confidence_gt[0, ...]..shape)
+                # print(confidence_np.shape)
+                vis.images([confidence_gt[0, ...].cpu().detach().numpy().copy(),
+                            confidence_np],
                            win='train_confidence',
+                           opts=dict(
+                               title='train confidence(GT, Pred)'))
+
+                vis.images([confidence_gt_bgr.transpose(2, 0, 1)],
+                           win='train_confidence_roi',
                            opts=dict(
                                title='train confidence(GT, Pred)'))
                 # vis.images([confidence_gt],
@@ -418,6 +480,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 #            win='train_confidence pred',
                 #            opts=dict(
                 #                title='train confidence(Pred)'))
+                if flag:
+                    time.sleep(100)
 
             if index == train_data_num - 1:
                 print("Finish train {} data. So start test.".format(index))
@@ -427,7 +491,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             avg_train_loss = train_loss / len(train_dataloader)
         else:
             avg_train_loss = train_loss
-
 
         continue
 
