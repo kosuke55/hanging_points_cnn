@@ -49,6 +49,7 @@ class HPNETLoss(Module):
             if ar[2]:
                 depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
+        depth_loss *= 1000
             # ar: [[pred_rois], [depth], iou > iou_thresh, max_iou]
 
             # for _, ar in enumerate(ar_n):
@@ -77,7 +78,7 @@ class HPNETLoss(Module):
         # print('rotations_loss', float(rotations_loss))
 
         # loss = confidence_loss + depth_loss + rotations_loss
-        loss = confidence_loss + depth_loss * 1000
+        loss = confidence_loss + depth_loss
         # loss = confidence_loss
 
         return loss

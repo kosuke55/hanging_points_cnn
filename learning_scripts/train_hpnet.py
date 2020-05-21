@@ -58,6 +58,24 @@ def colorize_depth(depth, min_value=None, max_value=None):
     return colorized
 
 
+def create_circular_mask(h, w, cy, cx, radius=50):
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - cx)**2 + (Y - cy)**2)
+    mask = dist_from_center <= radius
+    return mask
+
+
+def create_depth_circle(img, cy, cx, value, radius=50):
+    depth_mask = np.zeros_like(img)
+    depth_mask[np.where(img == 0)] = 1
+    circlular_mask = np.zeros_like(img)
+    circlular_mask_idx = np.where(
+        create_circular_mask(img.shape[0], img.shape[1], cy, cx,
+                             radius=radius))
+    circlular_mask[circlular_mask_idx] = 1
+    img[circlular_mask_idx] = value
+
+
 def train(data_path, batch_size, max_epoch, pretrained_model,
           train_data_num, test_data_num, save_dir,
           width=256, height=256):
@@ -137,7 +155,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             depth = hp_data.cpu().detach().numpy(
             ).copy()[0, 0, ...] * 1000
-            depth_bgr = colorize_depth(depth, 100, 1500)
+            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
             depth_rgb = cv2.cvtColor(
                 depth_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
@@ -161,6 +179,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             # Visualize gt axis and roi
             rois_gt_filtered = []
+            dep_gt = []
             for roi in rois_list_gt[0]:
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
@@ -170,6 +189,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
                 # expand roiしたらなどしたらdep = 0になる場合はある. そしたら弾きたい.
                 dep = hanging_point_depth_gt[0, cy, cx]
+                dep_gt.append(dep)
 
                 rotation = rotations_gt[cy, cx, :]
                 pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
@@ -189,6 +209,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     pass
 
                 rois_gt_filtered.append(roi)
+            print('dep_gt', dep_gt)
 
             axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
                                  (256, 256)).astype(np.uint8)
@@ -204,16 +225,25 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
 
-            # Visualize pre axis and roi
+            # Visualize pred axis and roi
+            dep_pred = []
             for i, roi in enumerate(hpnet_model.rois_list[0]):
+                if roi.tolist() == [0, 0, 0, 0]:
+                    continue
                 roi = roi.cpu().detach().numpy().copy()
                 cx = int((roi[0] + roi[2]) / 2)
                 cy = int((roi[1] + roi[3]) / 2)
-
-                # dep = hanging_point_depth_gt[0, cy, cx]
+                dep = depth_and_rotation[i, 0] * 1000
+                dep_pred.append(float(dep))
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
+                create_depth_circle(depth, cy, cx, dep.cpu().detach())
+
+            print('dep_pred', dep_pred)
+            depth_pred_bgr = colorize_depth(depth, 100, 1500)
+            depth_pred_rgb = cv2.cvtColor(
+                depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
@@ -221,14 +251,15 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     index,
                     len(train_dataloader),
                     iter_loss))
-                vis.images(depth_rgb,
-                           win='depth_rgb',
-                           opts=dict(
-                               titlep='depth_rgb'))
-                vis.images(hanging_point_depth_gt_rgb,
+                # vis.images(depth_rgb,
+                #            win='depth_rgb',
+                #            opts=dict(
+                #                titlep='depth_rgb'))
+                vis.images([hanging_point_depth_gt_rgb,
+                            depth_pred_rgb],
                            win='hanging_point_depth_gt_rgb',
                            opts=dict(
-                               title='hanging_point_depth_gt_rgb'))
+                               title='hanging_point_depth (GT, pred)'))
                 vis.images([axis_gt.transpose(2, 0, 1)],
                            # axis.transpose(2, 0, 1)],
                            win='train axis',
@@ -248,8 +279,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             avg_train_loss = train_loss / len(train_dataloader)
         else:
             avg_train_loss = train_loss
-
-        continue
 
         test_loss = 0
         hpnet_model.eval()
@@ -274,7 +303,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
         prev_time = cur_time
 
-        if np.mod(epo, 30) == 0 and epo > 0:
+        if np.mod(epo, 10) == 0 and epo > 0:
             torch.save(
                 hpnet_model.state_dict(),
                 os.path.join(
@@ -319,7 +348,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200517_0426.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200521_2300.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
