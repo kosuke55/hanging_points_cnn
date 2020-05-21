@@ -52,7 +52,7 @@ def find_contours(img):
                                            cv2.RETR_TREE,
                                            cv2.CHAIN_APPROX_SIMPLE)
     # contours, hierarchy = cv2.findContours(img, 1, 2)
-    print(len(contours))
+    # print(len(contours))
     if len(contours) == 0:
         return None, None, None
     area_max = 0
@@ -337,7 +337,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             confidence_gt_tmp = confidence_gt[0, 0, ...].cpu().detach().numpy().copy() * 255
             confidence_gt_tmp = confidence_gt_tmp.astype(np.uint8)
-            print(confidence_gt_tmp.shape)
+            # print(confidence_gt_tmp.shape)
             # confidence_gt_bgr = cv2.cvtColor(confidence_gt_tmp,
             #                                  cv2.COLOR_GRAY2BGR)
 
@@ -360,7 +360,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 rotation = rotations_gt[cy, cx, :]
                 pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                                int(cy * (ymax - ymin) / float(256) + ymin)]
-                print(pixel_point, cx, cy, rotation, dep)
+                # print(pixel_point, cx, cy, rotation, dep)
                 hanging_point_pose = np.array(
                     cameramodel.project_pixel_to_3d_ray(
                         pixel_point)) * dep * 0.001
