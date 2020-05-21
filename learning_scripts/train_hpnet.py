@@ -3,10 +3,13 @@
 
 import argparse
 import os
+import sys
 from datetime import datetime
 
 import cameramodels
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import numpy as np
 import skrobot
 import torch
@@ -154,6 +157,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             confidence_gt_bgr = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
             ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
 
+            # Visualize gt axis and roi
             rois_gt_filtered = []
             for roi in rois_list_gt[0]:
                 if roi.tolist() == [0, 0, 0, 0]:
