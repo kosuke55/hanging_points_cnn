@@ -1,29 +1,22 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import argparse
+import os
+from datetime import datetime
+
+import cameramodels
+import cv2
+import numpy as np
+import skrobot
+import torch
+import torch.optim as optim
+import visdom
+
 from utils.rois_tools import annotate_rois, find_rois
 from HangingPointsData import load_dataset
 from HPNETLoss import HPNETLoss
 from hpnet import HPNET
-from UNET import UNET
-from datetime import datetime
-import visdom
-from torchvision import transforms
-import torch.optim as optim
-import torch
-import skrobot
-import numpy as np
-import cameramodels
-import cv2
-import argparse
-import os
-import sys
-import time
-
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
-
-# from UNETLoss import UNETLoss
 
 
 def draw_axis(img, R, t, K):
