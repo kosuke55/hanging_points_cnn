@@ -329,7 +329,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # for rois in rois_list_gt:
             #     if rois[0].tolist() == [0, 0, 0, 0]:
             #         continue
-            rois = rois_list_gt[0]
+
             axis_large_gt = np.zeros((1080, 1920, 3))
             axis_large_gt[ymin:ymax, xmin:xmax] \
                 = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
@@ -343,7 +343,9 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             confidence_gt_bgr = cv2.cvtColor(confidence_gt[0, 0, ...].cpu().detach().numpy().copy() * 255,
                                              cv2.COLOR_GRAY2BGR)
-            for roi in rois:
+
+            rois_gt_filtered = []
+            for roi in rois_list_gt[0]:
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
                 roi = roi.cpu().detach().numpy().copy()
@@ -373,14 +375,21 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     print('Fail to draw axis')
                     pass
 
-                confidence_gt_bgr = cv2.rectangle(
-                    confidence_gt_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
-                    (0, 255, 0), 3)
+                rois_gt_filtered.append(roi)
 
             axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
                                  (256, 256)).astype(np.uint8)
             axis_gt = cv2.cvtColor(
                 axis_gt, cv2.COLOR_BGR2RGB)
+
+            # draw rois
+            for roi in rois_gt_filtered:
+                confidence_gt_bgr = cv2.rectangle(
+                    confidence_gt_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
+                    (0, 255, 0), 3)
+                axis_gt = cv2.rectangle(
+                    axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
+                    (0, 255, 0), 3)
 
             # confidence_binary = (
             #     confidence_np[0, ...] * 255).astype(np.uint8)
