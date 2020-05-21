@@ -121,7 +121,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
             confidence_np[confidence_np <= 0] = 0.
-            confidence_bgr = cv2.cvtColor(confidence_np[0, ...] * 255,
+            confidence_vis = cv2.cvtColor(confidence_np[0, ...] * 255,
                                           cv2.COLOR_GRAY2BGR)
 
             depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
@@ -156,7 +156,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             axis_large_gt[ymin:ymax, xmin:xmax] \
                 = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
 
-            confidence_gt_bgr = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
+            confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
             ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
 
             # Visualize gt axis and roi
@@ -197,8 +197,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             # draw rois
             for roi in rois_gt_filtered:
-                confidence_gt_bgr = cv2.rectangle(
-                    confidence_gt_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
+                confidence_gt_vis = cv2.rectangle(
+                    confidence_gt_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
                 axis_gt = cv2.rectangle(
                     axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
@@ -211,8 +211,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 cy = int((roi[1] + roi[3]) / 2)
 
                 # dep = hanging_point_depth_gt[0, cy, cx]
-                confidence_bgr = cv2.rectangle(
-                    confidence_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
+                confidence_vis = cv2.rectangle(
+                    confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
 
             if np.mod(index, 1) == 0:
@@ -234,8 +234,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                            win='train axis',
                            opts=dict(
                                title='train axis'))
-                vis.images([confidence_gt_bgr.transpose(2, 0, 1),
-                            confidence_bgr.transpose(2, 0, 1)],
+                vis.images([confidence_gt_vis.transpose(2, 0, 1),
+                            confidence_vis.transpose(2, 0, 1)],
                            win='train_confidence_roi',
                            opts=dict(
                                title='train confidence(GT, Pred)'))
