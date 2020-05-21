@@ -121,6 +121,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
             confidence_np[confidence_np <= 0] = 0.
+            confidence_bgr = cv2.cvtColor(confidence_np[0, ...] * 255,
+                                          cv2.COLOR_GRAY2BGR)
 
             depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
             annotated_rois = annotate_rois(
@@ -202,6 +204,17 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
 
+            # Visualize pre axis and roi
+            for i, roi in enumerate(hpnet_model.rois_list[0]):
+                roi = roi.cpu().detach().numpy().copy()
+                cx = int((roi[0] + roi[2]) / 2)
+                cy = int((roi[1] + roi[3]) / 2)
+
+                # dep = hanging_point_depth_gt[0, cy, cx]
+                confidence_bgr = cv2.rectangle(
+                    confidence_bgr, (roi[0], roi[1]), (roi[2], roi[3]),
+                    (0, 255, 0), 3)
+
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
                     epo,
@@ -216,50 +229,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                            win='hanging_point_depth_gt_rgb',
                            opts=dict(
                                title='hanging_point_depth_gt_rgb'))
-                # vis.images(depth_pred_rgb,
-                #            win='train depth_pred_rgb',
-                #            opts=dict(
-                #                title='train depth_pred_rgb'))
-                # vis.images(rotations_mask,
-                #            win='rotations_mask',
-                #            opts=dict(
-                #                title='rotations_mask'))
-                # vis.images(confidence_mask.transpose(2, 0, 1),
-                # vis.images(confidence_mask[0, ...],
-                #            win='confidence_mask',
-                #            opts=dict(
-                #                title='confidence_mask'))
                 vis.images([axis_gt.transpose(2, 0, 1)],
                            # axis.transpose(2, 0, 1)],
                            win='train axis',
                            opts=dict(
                                title='train axis'))
-                # vis.images(depth,
-                #            win='depth',
-                #            opts=dict(
-                #                title='depth'))
-
-                # vis.images([confidence_gt, confidence_np],
-                # print(confidence_gt[0, ...]..shape)
-                # print(confidence_np.shape)
-                vis.images([confidence_gt[0, ...].cpu().detach().numpy().copy(),
-                            confidence_np],
-                           win='train_confidence',
-                           opts=dict(
-                               title='train confidence(GT, Pred)'))
-
-                vis.images([confidence_gt_bgr.transpose(2, 0, 1)],
+                vis.images([confidence_gt_bgr.transpose(2, 0, 1),
+                            confidence_bgr.transpose(2, 0, 1)],
                            win='train_confidence_roi',
                            opts=dict(
                                title='train confidence(GT, Pred)'))
-                # vis.images([confidence_gt],
-                #            win='train_confidence gt',
-                #            opts=dict(
-                #                title='train confidence(GT)'))
-                # vis.images([confidence_np],
-                #            win='train_confidence pred',
-                #            opts=dict(
-                #                title='train confidence(Pred)'))
 
             if index == train_data_num - 1:
                 print("Finish train {} data. So start test.".format(index))
