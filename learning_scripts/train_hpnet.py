@@ -156,8 +156,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             depth = hp_data.cpu().detach().numpy(
             ).copy()[0, 0, ...] * 1000
             depth_bgr = colorize_depth(depth.copy(), 100, 1500)
-            depth_rgb = cv2.cvtColor(
-                depth_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+            # depth_rgb = cv2.cvtColor(
+            #     depth_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             hanging_point_depth_gt \
                 = ground_truth[:, 1, ...].astype(np.float32) * 1000
@@ -216,7 +216,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             axis_gt = cv2.cvtColor(
                 axis_gt, cv2.COLOR_BGR2RGB)
 
-            # draw rois
+            # draw gt rois
             for roi in rois_gt_filtered:
                 confidence_gt_vis = cv2.rectangle(
                     confidence_gt_vis, (roi[0], roi[1]), (roi[2], roi[3]),
@@ -226,6 +226,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     (0, 255, 0), 3)
 
             # Visualize pred axis and roi
+            axis_pred = depth_bgr.copy()
+            axis_large_pred = np.zeros((1080, 1920, 3))
+            axis_large_pred[ymin:ymax, xmin:xmax] \
+                = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
             dep_pred = []
             for i, roi in enumerate(hpnet_model.rois_list[0]):
                 if roi.tolist() == [0, 0, 0, 0]:
@@ -240,10 +244,41 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     (0, 255, 0), 3)
                 create_depth_circle(depth, cy, cx, dep.cpu().detach())
 
+                q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
+                q /= np.linalg.norm(q)
+                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+                               int(cy * (ymax - ymin) / float(256) + ymin)]
+                hanging_point_pose = np.array(
+                    cameramodel.project_pixel_to_3d_ray(
+                        pixel_point)) * float(dep * 0.001)
+                # try:
+                draw_axis(axis_large_pred,
+                          skrobot.coordinates.math.quaternion2matrix(
+                              q),
+                          hanging_point_pose,
+                          intrinsics)
+                # except Exception:
+                    # print('Fail to draw axis')
+                    # pass
+
             print('dep_pred', dep_pred)
+
+            axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
+                                   (256, 256)).astype(np.uint8)
+            axis_pred = cv2.cvtColor(
+                axis_pred, cv2.COLOR_BGR2RGB)
+
             depth_pred_bgr = colorize_depth(depth, 100, 1500)
             depth_pred_rgb = cv2.cvtColor(
                 depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+
+            # draw pred rois
+            for roi in hpnet_model.rois_list[0]:
+                if roi.tolist() == [0, 0, 0, 0]:
+                    continue
+                axis_pred = cv2.rectangle(
+                    axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
+                    (0, 255, 0), 3)
 
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is {}'.format(
@@ -260,8 +295,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                            win='hanging_point_depth_gt_rgb',
                            opts=dict(
                                title='hanging_point_depth (GT, pred)'))
-                vis.images([axis_gt.transpose(2, 0, 1)],
-                           # axis.transpose(2, 0, 1)],
+                vis.images([axis_gt.transpose(2, 0, 1),
+                            axis_pred.transpose(2, 0, 1)],
                            win='train axis',
                            opts=dict(
                                title='train axis'))
@@ -303,7 +338,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
         prev_time = cur_time
 
-        if np.mod(epo, 10) == 0 and epo > 0:
+        if np.mod(epo, 1000) == 0 and epo > 0:
             torch.save(
                 hpnet_model.state_dict(),
                 os.path.join(
@@ -339,7 +374,7 @@ if __name__ == "__main__":
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
-                        default=16)
+                        default=32)
     parser.add_argument('--max_epoch', '-me', type=int,
                         help='max epoch',
                         default=1000000)
@@ -348,7 +383,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200521_2300.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',

@@ -6,25 +6,23 @@ from torch.nn import Module
 
 
 def quaternion2matrix(q, normalize=False):
-    if q.ndim == 1:
-        q0 = q[0]
-        q1 = q[1]
-        q2 = q[2]
-        q3 = q[3]
+    q0 = q[0]
+    q1 = q[1]
+    q2 = q[2]
+    q3 = q[3]
 
-        # m = np.zeros((3, 3))
-        m = torch.zeros((3, 3))
-        m[0, 0] = q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3
-        m[0, 1] = 2 * (q1 * q2 - q0 * q3)
-        m[0, 2] = 2 * (q1 * q3 + q0 * q2)
+    m = torch.zeros((3, 3)).to('cuda')
+    m[0, 0] = q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3
+    m[0, 1] = 2 * (q1 * q2 - q0 * q3)
+    m[0, 2] = 2 * (q1 * q3 + q0 * q2)
 
-        m[1, 0] = 2 * (q1 * q2 + q0 * q3)
-        m[1, 1] = q0 * q0 - q1 * q1 + q2 * q2 - q3 * q3
-        m[1, 2] = 2 * (q2 * q3 - q0 * q1)
+    m[1, 0] = 2 * (q1 * q2 + q0 * q3)
+    m[1, 1] = q0 * q0 - q1 * q1 + q2 * q2 - q3 * q3
+    m[1, 2] = 2 * (q2 * q3 - q0 * q1)
 
-        m[2, 0] = 2 * (q1 * q3 - q0 * q2)
-        m[2, 1] = 2 * (q2 * q3 + q0 * q1)
-        m[2, 2] = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3
+    m[2, 0] = 2 * (q1 * q3 - q0 * q2)
+    m[2, 1] = 2 * (q2 * q3 + q0 * q1)
+    m[2, 2] = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3
 
     return m
 
@@ -32,9 +30,10 @@ def quaternion2matrix(q, normalize=False):
 class HPNETLoss(Module):
     def __init__(self):
         super(HPNETLoss, self).__init__()
+        self.Ry = torch.tensor(
+            [[-1, 0, 0], [0, 1, 0], [0, 0, -1]],
+            dtype=torch.float32).to('cuda')
 
-    # def forward(self, output, target, weight, mask):
-    # def forward(self, output, target, weight):
     def forward(self, confidence, confidence_gt,
                 weight, depth_and_rotation, annotated_rois):
 
@@ -42,43 +41,25 @@ class HPNETLoss(Module):
         confidence_loss = torch.sum((weight * confidence_diff) ** 2)
 
         depth_loss, rotation_loss = torch.tensor(0.).to('cuda'), torch.tensor(0.).to('cuda')
-        # idx = 0
-        # print('len(annotated_rois)', len(annotated_rois))
+
         for i, ar in enumerate(annotated_rois):
-            # print('len(ar_n)', len(ar_n))
             if ar[2]:
                 depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
+                m_pred = quaternion2matrix(ar[1][1:])
+                q = depth_and_rotation[i, 1:]
+                q = q / torch.norm(q)
+                m_gt = quaternion2matrix(q)
+                rotation_loss += torch.min(
+                    torch.norm(m_gt - m_pred),
+                    torch.norm(m_gt - m_pred.mm(self.Ry)))
         depth_loss *= 1000
-            # ar: [[pred_rois], [depth], iou > iou_thresh, max_iou]
-
-            # for _, ar in enumerate(ar_n):
-            #     print('ar', ar)
-            #     print(ar[2])
-            #     if ar[2]:
-                #     depth_loss += (depth_and_rotation[idx, 0] - ar[1]) ** 2
-                # idx += 1
-
-        # depth_loss  = (depth_and_rotation[:, 0, ...] - annotated_rois[:, 0, ...]) ** 2
-
-        # depth_diff = output[:, 1, ...] - target[:, 1, ...]
-        # depth_loss = torch.sum((mask * depth_diff) ** 2)
-
-        # rotations_pred = output[:, 2:, ...]
-        # print(torch.norm(rotations_pred, dim=1).shape)
-        # rn = rotations_pred / torch.norm(rotations_pred, dim=1)[:, None, ...]
-        # print(rn.shape)
-        # rotations_loss = (torch.norm(
-        #     (target[:, 2:, ...] - rotations_pred / torch.norm(
-        #         rotations_pred, dim=1)[:, None, ...]) * mask[:, None, ...]))
+        rotation_loss *= 10000
 
         print('confidence_loss', float(confidence_loss))
         print('depth_loss', float(depth_loss))
-        # print('depth_loss', float(depth_loss))
-        # print('rotations_loss', float(rotations_loss))
+        print('rotation_loss', float(rotation_loss))
 
-        # loss = confidence_loss + depth_loss + rotations_loss
-        loss = confidence_loss + depth_loss
-        # loss = confidence_loss
+        loss = confidence_loss + depth_loss + rotation_loss
 
         return loss

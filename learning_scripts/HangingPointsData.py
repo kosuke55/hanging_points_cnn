@@ -22,7 +22,7 @@ def load_dataset(data_path, batch_size):
     train_size = int(0.99 * len(hp_data))
     test_size = len(hp_data) - train_size
     # train_size = 1
-    # test_size = 2
+    # test_size = 1
     train_dataset, test_dataset = random_split(hp_data, [train_size, test_size])
 
     train_dataloader = DataLoader(
