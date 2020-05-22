@@ -11,9 +11,14 @@ import numpy as np
 import torch
 import torchvision
 
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-import cv2
-sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+for path in sys.path:
+    if 'opt/ros/' in path:
+        print('sys.path.remove({})'.format(path))
+        sys.path.remove(path)
+        import cv2
+        sys.path.append(path)
+    else:
+        import cv2
 
 
 def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.5):

@@ -8,21 +8,25 @@ import numpy.matlib as npm
 import os
 import sys
 
-from math import pi
+import cameramodels
+import numpy as np
+import pybullet
+import pybullet_data
+# import skrobot
+
+import xml.etree.ElementTree as ET
+from sklearn.cluster import DBSCAN
+from skrobot import coordinates
+
+
 for path in sys.path:
     if 'opt/ros/' in path:
         print('sys.path.remove({})'.format(path))
         sys.path.remove(path)
-
-import cameramodels
-import cv2
-import numpy as np
-import pybullet
-import pybullet_data
-import raster_geometry
-import skrobot
-import xml.etree.ElementTree as ET
-from sklearn.cluster import DBSCAN
+        import cv2
+        sys.path.append(path)
+    else:
+        import cv2
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -45,7 +49,7 @@ def create_depth_circle(img, cy, cx, value, radius=50):
                              radius=radius))
     circlular_mask[circlular_mask_idx] = 1
 
-    mask = np.where(np.logical_and(depth_mask == 1, circlular_mask == 1))
+    # mask = np.where(np.logical_and(depth_mask == 1, circlular_mask == 1))
     # circlular_mask = np.where(
     #     create_circular_mask(img.shape[0], img.shape[1], cy, cx))
     # mask = np.logical_and(depth_mask, circlular_mask)
@@ -123,16 +127,16 @@ class Renderer:
         self.pm = pybullet.computeProjectionMatrixFOV(
             fov, aspect, near_plane, far_plane)
 
-        self.camera_coords = skrobot.coordinates.Coordinates(
+        self.camera_coords = coordinates.Coordinates(
             pos=np.array([0, 0, 0.5]),
-            rot=skrobot.coordinates.math.rotation_matrix_from_rpy([0, np.pi, 0]))
+            rot=coordinates.math.rotation_matrix_from_rpy([0, np.pi, 0]))
 
         # self.object_pos = np.array([0, 0, 0.1])
-        # self.object_rot = skrobot.coordinates.math.rotation_matrix_from_rpy([0, 0, 0])
+        # self.object_rot = coordinates.math.rotation_matrix_from_rpy([0, 0, 0])
 
-        self.object_coords = skrobot.coordinates.Coordinates(
+        self.object_coords = coordinates.Coordinates(
             pos=np.array([0, 0, 0.1]),
-            rot=skrobot.coordinates.math.rotation_matrix_from_rpy([0, 0, 0]))
+            rot=coordinates.math.rotation_matrix_from_rpy([0, 0, 0]))
 
         if DEBUG:
             self.cid = pybullet.connect(pybullet.GUI)
@@ -168,9 +172,9 @@ class Renderer:
         x = (np.random.rand() - 0.5) * 0.1
         y = (np.random.rand() - 0.5) * 0.1
         z = (np.random.rand() - 0.5) * 0.1
-        roll = np.random.rand() * pi
-        pitch = np.random.rand() * pi
-        yaw = np.random.rand() * pi
+        roll = np.random.rand() * np.pi
+        pitch = np.random.rand() * np.pi
+        yaw = np.random.rand() * np.pi
         pybullet.setGravity(0, 0, 0)
         pybullet.resetBasePositionAndOrientation(
             object_id,
@@ -267,7 +271,7 @@ class Renderer:
         return self.render()[4]
 
     def move_to(self, T):
-        self.camera_coords = skrobot.coordinates.Coordinates(
+        self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
             rot=r.camera_coords.worldrot())
 
@@ -276,7 +280,7 @@ class Renderer:
         if np.all(p == self.camera_coords.worldpos()):
             return
         z = p - self.camera_coords.worldpos()
-        skrobot.coordinates.geo.orient_coords_to_axis(self.camera_coords, z)
+        coordinates.geo.orient_coords_to_axis(self.camera_coords, z)
 
         self.draw_camera_pos()
 
@@ -433,13 +437,13 @@ if __name__ == '__main__':
 
                     pos, rot \
                         = pybullet.getBasePositionAndOrientation(object_id)
-                    r.object_coords = skrobot.coordinates.Coordinates(
+                    r.object_coords = coordinates.Coordinates(
                         pos=pos,
-                        rot=skrobot.coordinates.math.xyzw2wxyz(rot))
+                        rot=coordinates.math.xyzw2wxyz(rot))
 
-                    r.camera_coords = skrobot.coordinates.Coordinates(
+                    r.camera_coords = coordinates.Coordinates(
                         pos=r.camera_coords.worldpos(),
-                        rot=skrobot.coordinates.math.matrix2quaternion(
+                        rot=coordinates.math.matrix2quaternion(
                             r.camera_coords.worldrot()))
 
                     r.look_at(r.object_coords.worldpos() - center)
@@ -447,8 +451,8 @@ if __name__ == '__main__':
                     pybullet.resetBasePositionAndOrientation(
                         camera_id,
                         r.camera_coords.worldpos(),
-                        skrobot.coordinates.math.wxyz2xyzw(
-                            skrobot.coordinates.math.matrix2quaternion(
+                        coordinates.math.wxyz2xyzw(
+                            coordinates.math.matrix2quaternion(
                                 r.camera_coords.worldrot())))
 
                     r.step(1)
@@ -507,7 +511,7 @@ if __name__ == '__main__':
                     hanging_point_in_camera_coords_list = []
 
                     for cp in contact_points:
-                        hanging_point_coords = skrobot.coordinates.Coordinates(
+                        hanging_point_coords = coordinates.Coordinates(
                             pos=(cp[0] - center) * mesh_scale_list, rot=cp[1:])
 
                         # hanging_point_coords.translate([0, 0.01, 0])
@@ -563,7 +567,7 @@ if __name__ == '__main__':
                                 if q_base is None:
                                     q_base = hp.quaternion
                                 q_distance \
-                                    = skrobot.coordinates.math.quaternion_distance(
+                                    = coordinates.math.quaternion_distance(
                                         q_base, hp.quaternion)
                                 # print(label, idx, np.rad2deg(q_distance))
                                 if np.rad2deg(q_distance) > 135:
