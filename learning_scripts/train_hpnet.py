@@ -135,7 +135,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             confidence_gt = hp_data_gt[:, 0:1, ...]
             rois_list_gt = find_rois(confidence_gt)
 
-            confidence, depth_and_rotation = hpnet_model.forward(hp_data)
+            confidence, depth_and_rotation = hpnet_model(hp_data)
             confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
             confidence_np[confidence_np <= 0] = 0.

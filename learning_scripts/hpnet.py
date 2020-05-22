@@ -66,8 +66,16 @@ class Decoder(nn.Module):
 
 
 class HPNET(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config=None):
         nn.Module.__init__(self)
+
+        if config is None:
+            config = {
+                'feature_compress': 1 / 16,
+                'num_class': 6,
+                'pool_out_size': 8,
+            }
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.feature_compress = config['feature_compress']
         self.pool_out_size = config['pool_out_size']

@@ -5,29 +5,28 @@ from __future__ import absolute_import
 from __future__ import division
 
 import os
+import os.path as osp
 import sys
 
+import cv2
 import image_geometry
-import rospy
-from sensor_msgs.msg import CameraInfo
-import numpy as np
-from sensor_msgs.msg import Image, PointCloud2
-import sensor_msgs.point_cloud2 as pc2
-from cv_bridge import CvBridge
-from skimage.morphology import convex_hull_image
-
 import message_filters
 import numpy as np
-import cv2
+import rospy
+import sensor_msgs.point_cloud2 as pc2
 import torch
 import torch.optim as optim
-import os
-import os.path as osp
 import visdom
-# from BCNN import BCNN
+from cv_bridge import CvBridge
+from skimage.morphology import convex_hull_image
+from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import Image, PointCloud2
+
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
-from learning_scripts.UNET import UNET
-from torchvision import transforms
+from learning_scripts.torchvision import transforms
+from learning_scripts.hpnet import HPNET
+from learning_scripts.HPNETLoss import HPNETLoss
+# from learning_scripts.UNET import UNET
 
 
 class HangingPointsNet():
@@ -35,18 +34,27 @@ class HangingPointsNet():
         self.bridge = CvBridge()
         self.pub = rospy.Publisher("~output", Image, queue_size=10)
         self.pub_pred = rospy.Publisher("~output/pred", Image, queue_size=10)
-        self.pub_depth = rospy.Publisher("~colorized_depth", Image, queue_size=10)
+        self.pub_depth = rospy.Publisher(
+            "~colorized_depth", Image, queue_size=10)
+        self.input_image_raw = rospy.get_param(
+            '~image',
+            'camera/color/image_rect_color')
         self.input_image = rospy.get_param(
             '~image',
             '/apply_mask_image/output')
+        self.camera_info = rospy.get_param(
+            '~camera_info',
+            '/apply_mask_image/output/camera_info')
         self.input_depth = rospy.get_param(
             '~image',
             '/apply_mask_depth/output')
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
-            # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0258.pt')
+        # '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
+        # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
 
         # pretrained_model = rospy.get_param(
         #     '~pretrained_model',
@@ -56,7 +64,8 @@ class HangingPointsNet():
         # self.model = BCNN()
         # self.model = BCNN().to(self.device)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = UNET(in_channels=3).to(device)
+        # self.model = UNET(in_channels=3).to(device)
+        self.model = HPNET().to(device)
         if os.path.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(torch.load(pretrained_model))
@@ -64,6 +73,9 @@ class HangingPointsNet():
         self.subscribe()
 
     def subscribe(self):
+        self.sub_rgb_raw = message_filters.Subscriber(
+            self.input_image_raw, Image, queue_size=1, buff_size=2**24
+        )
         self.sub_rgb = message_filters.Subscriber(
             self.input_image, Image, queue_size=1, buff_size=2**24
         )
@@ -71,7 +83,10 @@ class HangingPointsNet():
             self.input_depth, Image, queue_size=1, buff_size=2**24
         )
         sync = message_filters.ApproximateTimeSynchronizer(
-            [self.sub_rgb, self.sub_depth],
+            [self.sub_rgb_raw,
+             self.sub_rgb,
+             self.sub_depth,
+             self.camera_info],
             queue_size=100,
             slop=0.1,
         )
@@ -95,7 +110,7 @@ class HangingPointsNet():
 
         return colorized
 
-    def callback(self, img_msg, depth_msg):
+    def callback(self, img_raw_msg, img_msg, depth_msg, ):
         # bgr = self.bridge.imgmsg_to_cv2(img_msg, "rgb8")
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
         depth = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
@@ -111,79 +126,101 @@ class HangingPointsNet():
 
         bgr = cv2.resize(bgr, (256, 256))
         depth_bgr = cv2.resize(depth_bgr, (256, 256))
-        # import pdb
-        # pdb.set_trace()
-        depth_bgr[np.where(np.all(bgr==[0, 0, 0], axis=-1))] = [0, 0, 0]
-        # img = np.concatenate((bgr, depth), axis=2).astype(np.float32)
+        depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
-        img = depth_bgr.copy().astype(np.float32)
-        # pred_img = img.copy()
-        # print("0  ", img.shape)
-        # img = torch.FloatTensor(img.astype(np.float32)).to(self.device)
-        # print(img.shape)
-        # print(np.mean(img))
+        in_feature = depth.copy() * 0.001
+
         if self.transform:
-            img = self.transform(img)
+            in_feature = self.transform(in_feature)
+
+        in_feature = in_feature.to(self.device)
+        in_feature = in_feature.unsqueeze(0)
+
+        # output = self.model(in_feature)
+        confidence, depth_and_rotation = self.model(in_feature)
+        confidence = confidence[0, 0:1, ...]
+        confidence_np = confidence.cpu().detach().numpy().copy()
+        confidence_np = confidence_np.transpose(1, 2, 0) * 2
+        confidence_np[confidence_np <= 0] = 0
+        confidence_np[confidence_np >= 255] = 255
+        confidence_img = confidence_np.astype(np.uint8)
 
 
-        # img = torch.tensor(img, requires_grad=True)
-        img = img.to(self.device)
-        # img = transforms.ToTensor(img.astype(np.float32))
-        # print("1  ", img.shape)
-        img = img.unsqueeze(0)
-        # output = self.model(img)
+        # -----
+        # Visualize pred axis and roi
+        axis_pred = depth_bgr.copy()
+        axis_large_pred = np.zeros((1080, 1920, 3))
+        axis_large_pred[ymin:ymax, xmin:xmax] \
+            = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
+        dep_pred = []
+        for i, roi in enumerate(self.model.rois_list[0]):
+            if roi.tolist() == [0, 0, 0, 0]:
+                continue
+            roi = roi.cpu().detach().numpy().copy()
+            cx = int((roi[0] + roi[2]) / 2)
+            cy = int((roi[1] + roi[3]) / 2)
+            dep = depth_and_rotation[i, 0] * 1000
+            dep_pred.append(float(dep))
+            confidence_vis = cv2.rectangle(
+                confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
+                (0, 255, 0), 3)
+            create_depth_circle(depth, cy, cx, dep.cpu().detach())
 
-        output = self.model(img)
-        # print(output.shape)
-        output = output[:, 0, :, :]
-        # output = torch.sigmoid(output)
-        output_np = output.cpu().detach().numpy().copy()
-        output_np = output_np.transpose(1, 2, 0) * 2
-        # print(output_np.shape)
+            q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
+            q /= np.linalg.norm(q)
+            pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+                           int(cy * (ymax - ymin) / float(256) + ymin)]
+            hanging_point_pose = np.array(
+                cameramodel.project_pixel_to_3d_ray(
+                    pixel_point)) * float(dep * 0.001)
+            # try:
+            draw_axis(axis_large_pred,
+                      skrobot.coordinates.math.quaternion2matrix(
+                          q),
+                      hanging_point_pose,
+                      intrinsics)
+            # except Exception:
+                # print('Fail to draw axis')
+                # pass
 
-        # print(output_np)
-        # output_img = output_np * 255
-        output_np[output_np <= 0] = 0
-        # output_np /= np.max(output_np)
-        # output_np *= 255
-        output_np[output_np >= 255] = 255
-        # print(np.max(output_np))
-        # print(np.mean(output_np))
-        # print(np.min(output_np))
-        output_img = output_np.astype(np.uint8)
+        print('dep_pred', dep_pred)
+
+        axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
+                               (256, 256)).astype(np.uint8)
+        axis_pred = cv2.cvtColor(
+            axis_pred, cv2.COLOR_BGR2RGB)
+
+        depth_pred_bgr = colorize_depth(depth, 100, 1500)
+        depth_pred_rgb = cv2.cvtColor(
+            depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+
+        # draw pred rois
+        for roi in self.model.rois_list[0]:
+            if roi.tolist() == [0, 0, 0, 0]:
+                continue
+            axis_pred = cv2.rectangle(
+                axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
+                (0, 255, 0), 3)
+        # -----
+
 
         # annotation_img = annotation_img.astype(np.uint8)
         pred_color = np.zeros_like(bgr, dtype=np.uint8)
-        pred_color[..., 2] = output_img[..., 0]
+        pred_color[..., 2] = confidence_img[..., 0]
 
         img2 = pred_color
-        img2gray = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
+        img2gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
         mask_inv = cv2.bitwise_not(img2gray)
-        white_background = np.full(img2.shape, 255, dtype=np.uint8)
-        bk = cv2.bitwise_or(white_background, white_background, mask=mask_inv)
+        # white_background = np.full(img2.shape, 255, dtype=np.uint8)
+        # bk = cv2.bitwise_or(white_background, white_background, mask=mask_inv)
         fg = cv2.bitwise_or(img2, img2, mask=mask_inv)
-        pred_color = cv2.bitwise_or(bgr,fg)
-        
-        # pred_color = cv2.addWeighted(bgr, 0.3,
-        #                              pred_color, 0.7, 0)
-        # pred_color = cv2.LUT(pred_color,gamma_cvt)
-        # pred_img = pred_img[0, ...]
-        # pred_img = pred_img.transpose(1, 2, 0)
-        # conf_idx = np.where(output_np[..., 0] > 0.01)
-        # pred_img[conf_idx] = [255, 0, 0]
+        pred_color = cv2.bitwise_or(bgr, fg)
 
-        # print(output_img.shape)
-        # print(np.mean(output_img))
-        # cv2.imshow('output', output_img)
-        # cv2.waitKey(1)
-        msg_out = self.bridge.cv2_to_imgmsg(output_img, "mono8")
+        msg_out = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
         msg_out.header.stamp = img_msg.header.stamp
 
         pred_msg = self.bridge.cv2_to_imgmsg(pred_color, "bgr8")
-        # pred_msg = self.bridge.cv2_to_imgmsg(bgr, "rgb8")        
         pred_msg.header.stamp = img_msg.header.stamp
-
-        # depth_msg = self.bridge.cv2_to_imgmsg(depth, "rgb8")
 
         depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
         depth_msg.header.stamp = img_msg.header.stamp
@@ -198,6 +235,6 @@ def main(args):
     hpn = HangingPointsNet()
     rospy.spin()
 
+
 if __name__ == '__main__':
     main(sys.argv)
-
