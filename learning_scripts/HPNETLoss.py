@@ -5,7 +5,7 @@ import torch
 from torch.nn import Module
 
 
-def quaternion2matrix(q, normalize=False):
+def quaternion2matrix(q):
     q0 = q[0]
     q1 = q[1]
     q2 = q[2]
