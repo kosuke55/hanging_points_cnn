@@ -3,22 +3,26 @@
 
 # from __future__ import absolute_import
 # from __future__ import division
-# from __future__ import print_function
 
-import math
 import sys
+import os.path as osp
 
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-import cv2
-sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 from torchvision.ops import RoIAlign
 
-from resnet import resnet18
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
+
 from utils.rois_tools import find_rois
+from learning_scripts.resnet import resnet18
 
 
 class Conv2DBatchNormRelu(nn.Module):
@@ -41,7 +45,7 @@ class Conv2DBatchNormRelu(nn.Module):
 class Decoder(nn.Module):
 
     def __init__(self, n_class=1):
-        super().__init__()
+        super(Decoder, self).__init__()
         self.n_class = 1
 
         self.conv1 = Conv2DBatchNormRelu(
@@ -74,12 +78,14 @@ class HPNET(nn.Module):
                 'feature_compress': 1 / 16,
                 'num_class': 6,
                 'pool_out_size': 8,
+                'confidence_thresh': 0.1,
             }
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.feature_compress = config['feature_compress']
         self.pool_out_size = config['pool_out_size']
         self.n_class = config['num_class']
+        self.confidence_thresh = config['confidence_thresh']
 
         resnet = resnet18()
         self.feature_extractor = nn.Sequential(
@@ -110,7 +116,7 @@ class HPNET(nn.Module):
 
         confidence = self.decoder(feature)
 
-        self.rois_list = find_rois(confidence)
+        self.rois_list = find_rois(confidence, confidence_thresh=self.confidence_thresh)
         if self.rois_list is None:
 
             self.rois_list = [torch.tensor(

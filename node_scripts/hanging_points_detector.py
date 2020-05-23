@@ -4,28 +4,32 @@
 from __future__ import absolute_import
 from __future__ import division
 
-import os
 import os.path as osp
 import sys
 
 import cameramodels
-import cv2
 import message_filters
 import numpy as np
 import rospy
 import torch
+from torchvision import transforms
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 from skrobot.coordinates.math import quaternion2matrix
 
-sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
-
-from learning_scripts.torchvision import transforms
 from learning_scripts.hpnet import HPNET
-from learning_scripts.HPNETLoss import HPNETLoss
-from utils.visualize import colorize_depth, create_depth_circle, draw_axis
+from utils.visualize import colorize_depth, draw_axis
 
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
 
 class HangingPointsNet():
     def __init__(self):
@@ -36,6 +40,8 @@ class HangingPointsNet():
             "~colorized_depth", Image, queue_size=10)
         self.pub_axis = rospy.Publisher(
             "~axis", Image, queue_size=10)
+        self.pub_axis_raw = rospy.Publisher(
+            "~axis_raw", Image, queue_size=10)
         self.camera_info = rospy.get_param(
             '~camera_info',
             '/apply_mask_image/output/camera_info')
@@ -60,17 +66,24 @@ class HangingPointsNet():
             transforms.ToTensor()])
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = HPNET().to(device)
-        if os.path.exists(pretrained_model):
+        config = {
+            'feature_compress': 1 / 16,
+            'num_class': 6,
+            'pool_out_size': 8,
+            'confidence_thresh': 0.3,
+        }
+        self.model = HPNET(config).to(device)
+        if osp.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(torch.load(pretrained_model))
         self.model.eval()
-        self.subscribe()
         self.camera_model = None
+        self.load_camera_info()
+        self.subscribe()
 
     def subscribe(self):
         self.sub_camera_info = message_filters.Subscriber(
-            self.input_camera_info, CameraInfo, queue_size=1, buff_size=2**24)
+            self.camera_info, CameraInfo, queue_size=1, buff_size=2**24)
         self.sub_rgb_raw = message_filters.Subscriber(
             self.input_image_raw, Image, queue_size=1, buff_size=2**24)
         self.sub_rgb = message_filters.Subscriber(
@@ -78,11 +91,10 @@ class HangingPointsNet():
         self.sub_depth = message_filters.Subscriber(
             self.input_depth, Image, queue_size=1, buff_size=2**24)
         sync = message_filters.ApproximateTimeSynchronizer(
-            [self.camera_info,
+            [self.sub_camera_info,
              self.sub_rgb_raw,
              self.sub_rgb,
-             self.sub_depth,
-             ],
+             self.sub_depth],
             queue_size=100,
             slop=0.1)
         sync.registerCallback(self.callback)
@@ -104,33 +116,40 @@ class HangingPointsNet():
     #     return colorized
 
     def load_camera_info(self):
-        self.camera_info = rospy.wait_for_message(self.camera_info_msg, CameraInfo)
+        print('load camera info')
+        camera_info = rospy.wait_for_message(self.camera_info, CameraInfo)
+        print(camera_info)
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_camera_info(
-                self.camera_info)
+                camera_info)
 
     def callback(self, camera_info_msg, img_raw_msg, img_msg, depth_msg):
         xmin = camera_info_msg.roi.x_offset
-        xmax = camera_info_msg.roi.x_offset + camera_info_msg.roi.widtho
+        xmax = camera_info_msg.roi.x_offset + camera_info_msg.roi.width
         ymin = camera_info_msg.roi.y_offset
         ymax = camera_info_msg.roi.y_offset + camera_info_msg.roi.height
 
+        bgr_raw = self.bridge.imgmsg_to_cv2(img_raw_msg, "bgr8")
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
         depth = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
 
         if depth is None or bgr is None:
             return
 
-        print("depth min", np.min(depth))
-        print("depth mean", np.mean(depth))
-        print("depth max", np.max(depth))
-        depth_bgr = self.colorize_depth(depth, 100, 1500)
+        # print("depth min", np.min(depth))
+        # print("depth mean", np.mean(depth))
+        # print("depth max", np.max(depth))
+        depth_bgr = colorize_depth(depth, 100, 1500)
 
         bgr = cv2.resize(bgr, (256, 256))
         depth_bgr = cv2.resize(depth_bgr, (256, 256))
         depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
+        # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
-        in_feature = depth.copy() * 0.001
+        depth = cv2.resize(depth, (256, 256))
+        in_feature = depth.copy().astype(np.float32) * 0.001
+
+        # print('in_feature.shape)', in_feature.shape)
 
         if self.transform:
             in_feature = self.transform(in_feature)
@@ -140,16 +159,21 @@ class HangingPointsNet():
 
         confidence, depth_and_rotation = self.model(in_feature)
         confidence = confidence[0, 0:1, ...]
-        confidence_np = confidence.cpu().detach().numpy().copy()
+        confidence_np = confidence.cpu().detach().numpy().copy() * 255
         confidence_np = confidence_np.transpose(1, 2, 0) * 2
         confidence_np[confidence_np <= 0] = 0
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
+        confidence_img = cv2.resize(confidence_img, (256, 256))
 
         axis_pred = bgr.copy()
-        axis_large_pred = np.zeros((1080, 1920, 3))
-        axis_large_pred[ymin:ymax, xmin:xmax] \
-            = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
+        axis_pred_raw = bgr_raw.copy()
+        # axis_large_pred = np.zeros((self.camera_model.height,
+        #                             self.camera_model.width, 3))
+
+        # axis_large_pred[ymin:ymax, xmin:xmax] \
+        #     = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
+
         dep_pred = []
         for i, roi in enumerate(self.model.rois_list[0]):
             if roi.tolist() == [0, 0, 0, 0]:
@@ -165,24 +189,32 @@ class HangingPointsNet():
             pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                            int(cy * (ymax - ymin) / float(256) + ymin)]
             hanging_point_pose = np.array(
-                cameramodels.project_pixel_to_3d_ray(
+                self.camera_model.project_pixel_to_3d_ray(
                     pixel_point)) * float(dep * 0.001)
-            draw_axis(axis_large_pred,
+            axis_pred_raw = cv2.rectangle(
+                axis_pred_raw,
+                (int(roi[0] * (xmax - xmin) / float(256) + xmin),
+                 int(roi[1] * (ymax - ymin) / float(256) + ymin)),
+                (int(roi[2] * (xmax - xmin) / float(256) + xmin),
+                 int(roi[3] * (ymax - ymin) / float(256) + ymin)),
+                (0, 255, 0), 1)
+            draw_axis(axis_pred_raw,
                       quaternion2matrix(q),
                       hanging_point_pose,
-                      cameramodels.K)
-        print('dep_pred', dep_pred)
+                      self.camera_model.K)
 
-        axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
+        # print('dep_pred', dep_pred)
+
+        axis_pred = cv2.resize(axis_pred_raw[ymin:ymax, xmin:xmax],
                                (256, 256)).astype(np.uint8)
 
         # draw pred rois
-        for roi in self.model.rois_list[0]:
-            if roi.tolist() == [0, 0, 0, 0]:
-                continue
-            axis_pred = cv2.rectangle(
-                axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
-                (0, 255, 0), 3)
+        # for roi in self.model.rois_list[0]:
+        #     if roi.tolist() == [0, 0, 0, 0]:
+        #         continue
+        #     axis_pred = cv2.rectangle(
+        #         axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
+        #         (0, 255, 0), 3)
 
         pred_color = np.zeros_like(bgr, dtype=np.uint8)
         pred_color[..., 2] = confidence_img[..., 0]
@@ -198,16 +230,20 @@ class HangingPointsNet():
         pred_msg = self.bridge.cv2_to_imgmsg(pred_color, "bgr8")
         pred_msg.header.stamp = img_msg.header.stamp
 
-        depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
-        depth_msg.header.stamp = img_msg.header.stamp
+        colorized_depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
+        colorized_depth_msg.header.stamp = img_msg.header.stamp
 
         axis_pred_msg = self.bridge.cv2_to_imgmsg(axis_pred, "bgr8")
         axis_pred_msg.header.stamp = img_msg.header.stamp
 
+        axis_pred_raw_msg = self.bridge.cv2_to_imgmsg(axis_pred_raw, "bgr8")
+        axis_pred_raw_msg.header.stamp = img_msg.header.stamp
+
         self.pub_pred.publish(pred_msg)
         self.pub.publish(msg_out)
-        self.pub_depth.publish(depth_msg)
+        self.pub_depth.publish(colorized_depth_msg)
         self.pub_axis.publish(axis_pred_msg)
+        self.pub_axis_raw.publish(axis_pred_raw_msg)
 
 
 def main(args):
