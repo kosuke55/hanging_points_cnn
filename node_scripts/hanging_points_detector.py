@@ -12,6 +12,7 @@ import message_filters
 import numpy as np
 import rospy
 import torch
+from geometry_msgs.msg import PoseArray, Pose
 from torchvision import transforms
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo
@@ -42,9 +43,14 @@ class HangingPointsNet():
             "~axis", Image, queue_size=10)
         self.pub_axis_raw = rospy.Publisher(
             "~axis_raw", Image, queue_size=10)
-        self.camera_info = rospy.get_param(
+        self.pub_hanging_points = rospy.Publisher(
+            "/hanging_points", PoseArray, queue_size=10)
+        self.camera_info_topic = rospy.get_param(
             '~camera_info',
             '/apply_mask_image/output/camera_info')
+        # self.camera_info_raw_topic = rospy.get_param(
+        #     '~camera_info',
+        #     '/camera/aligned_depth_to_color/camera_info')
         self.input_image_raw = rospy.get_param(
             '~image',
             'camera/color/image_rect_color')
@@ -79,11 +85,12 @@ class HangingPointsNet():
         self.model.eval()
         self.camera_model = None
         self.load_camera_info()
+        # self.hanging_points_pose_array = PoseArray()
         self.subscribe()
 
     def subscribe(self):
         self.sub_camera_info = message_filters.Subscriber(
-            self.camera_info, CameraInfo, queue_size=1, buff_size=2**24)
+            self.camera_info_topic, CameraInfo, queue_size=1, buff_size=2**24)
         self.sub_rgb_raw = message_filters.Subscriber(
             self.input_image_raw, Image, queue_size=1, buff_size=2**24)
         self.sub_rgb = message_filters.Subscriber(
@@ -117,11 +124,14 @@ class HangingPointsNet():
 
     def load_camera_info(self):
         print('load camera info')
-        camera_info = rospy.wait_for_message(self.camera_info, CameraInfo)
-        print(camera_info)
+        self.camera_info = rospy.wait_for_message(self.camera_info_topic, CameraInfo)
+        print(self.camera_info)
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_camera_info(
-                camera_info)
+                self.camera_info)
+        # import image_geometry
+        # self.camera_model = image_geometry.cameramodels.PinholeCameraModel()
+        # self.camera_model.fromCameraInfo(camera_info)
 
     def callback(self, camera_info_msg, img_raw_msg, img_msg, depth_msg):
         xmin = camera_info_msg.roi.x_offset
@@ -136,9 +146,9 @@ class HangingPointsNet():
         if depth is None or bgr is None:
             return
 
-        # print("depth min", np.min(depth))
-        # print("depth mean", np.mean(depth))
-        # print("depth max", np.max(depth))
+        print("depth min", np.min(depth))
+        print("depth mean", np.mean(depth))
+        print("depth max", np.max(depth))
         depth_bgr = colorize_depth(depth, 100, 1500)
 
         bgr = cv2.resize(bgr, (256, 256))
@@ -175,22 +185,43 @@ class HangingPointsNet():
         #     = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
 
         dep_pred = []
+        hanging_points_pose_array = PoseArray()
         for i, roi in enumerate(self.model.rois_list[0]):
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
             cx = int((roi[0] + roi[2]) / 2)
             cy = int((roi[1] + roi[3]) / 2)
-            dep = depth_and_rotation[i, 0] * 1000
-            dep_pred.append(float(dep))
+            dep = depth_and_rotation[i, 0]
+            # dep_pred.append(float(dep))
 
             q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
             q /= np.linalg.norm(q)
+
             pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                            int(cy * (ymax - ymin) / float(256) + ymin)]
-            hanging_point_pose = np.array(
+
+            hanging_point = np.array(
                 self.camera_model.project_pixel_to_3d_ray(
-                    pixel_point)) * float(dep * 0.001)
+                # self.camera_model.projectPixelTo3dRay(
+                    pixel_point))
+            # length = float(dep) / hanging_point[2]
+            length = 0.5 / hanging_point[2]
+            hanging_point *= length
+
+            print(hanging_point, float(dep))
+            # print(dep)
+
+            hanging_point_pose = Pose()
+            hanging_point_pose.position.x = hanging_point[0]
+            hanging_point_pose.position.y = hanging_point[1]
+            hanging_point_pose.position.z = hanging_point[2]
+            hanging_point_pose.orientation.w = q[0]
+            hanging_point_pose.orientation.x = q[1]
+            hanging_point_pose.orientation.y = q[2]
+            hanging_point_pose.orientation.z = q[3]
+            hanging_points_pose_array.poses.append(hanging_point_pose)
+
             axis_pred_raw = cv2.rectangle(
                 axis_pred_raw,
                 (int(roi[0] * (xmax - xmin) / float(256) + xmin),
@@ -200,12 +231,12 @@ class HangingPointsNet():
                 (0, 255, 0), 1)
             draw_axis(axis_pred_raw,
                       quaternion2matrix(q),
-                      hanging_point_pose,
+                      hanging_point,
                       self.camera_model.K)
 
         # print('dep_pred', dep_pred)
 
-        axis_pred = cv2.resize(axis_pred_raw[ymin:ymax, xmin:xmax],
+        axis_pred = cv2.resize(axis_pred_raw.copy()[ymin:ymax, xmin:xmax],
                                (256, 256)).astype(np.uint8)
 
         # draw pred rois
@@ -225,25 +256,34 @@ class HangingPointsNet():
         pred_color = cv2.bitwise_or(bgr, fg)
 
         msg_out = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
-        msg_out.header.stamp = img_msg.header.stamp
+        msg_out.header.stamp = depth_msg.header.stamp
 
         pred_msg = self.bridge.cv2_to_imgmsg(pred_color, "bgr8")
-        pred_msg.header.stamp = img_msg.header.stamp
+        pred_msg.header.stamp = depth_msg.header.stamp
 
         colorized_depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
-        colorized_depth_msg.header.stamp = img_msg.header.stamp
+        colorized_depth_msg.header.stamp = depth_msg.header.stamp
 
         axis_pred_msg = self.bridge.cv2_to_imgmsg(axis_pred, "bgr8")
-        axis_pred_msg.header.stamp = img_msg.header.stamp
+        axis_pred_msg.header.stamp = depth_msg.header.stamp
 
         axis_pred_raw_msg = self.bridge.cv2_to_imgmsg(axis_pred_raw, "bgr8")
-        axis_pred_raw_msg.header.stamp = img_msg.header.stamp
+        axis_pred_raw_msg.header.stamp = depth_msg.header.stamp
+
+        hanging_points_pose_array.header = depth_msg.header
+        hanging_points_pose_array.header.frame_id = self.camera_info.header.frame_id
+        print(depth_msg.header.frame_id)
+        print(self.camera_info.header.frame_id)
 
         self.pub_pred.publish(pred_msg)
         self.pub.publish(msg_out)
         self.pub_depth.publish(colorized_depth_msg)
         self.pub_axis.publish(axis_pred_msg)
         self.pub_axis_raw.publish(axis_pred_raw_msg)
+        self.pub_hanging_points.publish(hanging_points_pose_array)
+
+
+
 
 
 def main(args):

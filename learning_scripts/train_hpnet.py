@@ -107,6 +107,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         'feature_compress': 1 / 16,
         'num_class': 6,
         'pool_out_size': 8,
+        'confidence_thresh': 0.5,
     }
 
     hpnet_model = HPNET(config).to(device)
@@ -394,7 +395,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',

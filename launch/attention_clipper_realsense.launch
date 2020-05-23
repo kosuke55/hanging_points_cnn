@@ -3,10 +3,15 @@
   <!-- <arg name="INPUT_CLOUD" value="/camera/depth_registered/points" /> -->
   <!-- <arg name="INPUT_IMAGE" value="/camera/color/image_rect_color" /> -->
   <!-- <arg name="CAMERA_INFO" value="/head_mount_kinect/hd/camera_info" /> -->
+  <!-- <arg name="INPUT_CLOUD" value="/camera/depth_registered/points" /> -->
+  <!-- <arg name="INPUT_CLOUD" value="/camera/depth/color/points" /> -->
   <arg name="INPUT_CLOUD" value="/camera/depth_registered/points" />
   <arg name="INPUT_IMAGE" value="/camera/color/image_rect_color" />
-  <arg name="INPUT_DEPTH" value="/camera/aligned_depth_to_color/image_raw" />
+  <arg name="INPUT_DEPTH" value="/camera/depth/image_rect_raw" />
+  <!-- <arg name="INPUT_DEPTH" value="/camera/aligned_depth_to_color/image_raw" /> -->
   <arg name="CAMERA_INFO" value="/camera/depth/camera_info" />
+  <!-- <arg name="CAMERA_INFO" value="/camera/aligned_depth_to_color/camera_info" /> -->
+  
   <arg name="INPUT_BOX" value="/box" />
   <arg name="RESOLUTION" default="0.01" />
 
