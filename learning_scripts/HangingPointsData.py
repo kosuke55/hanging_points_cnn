@@ -4,14 +4,18 @@
 import os
 import sys
 
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-import cv2
-sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
-
 import numpy as np
-import torch
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
+
+for path in sys.path:
+    if 'opt/ros/' in path:
+        print('sys.path.remove({})'.format(path))
+        sys.path.remove(path)
+        import cv2
+        sys.path.append(path)
+    else:
+        import cv2
 
 
 def load_dataset(data_path, batch_size):

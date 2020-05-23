@@ -11,14 +11,15 @@ import numpy as np
 import torch
 import torchvision
 
-for path in sys.path:
-    if 'opt/ros/' in path:
-        print('sys.path.remove({})'.format(path))
-        sys.path.remove(path)
-        import cv2
-        sys.path.append(path)
-    else:
-        import cv2
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
 
 
 def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.5):

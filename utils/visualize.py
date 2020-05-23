@@ -5,14 +5,16 @@ import sys
 
 import numpy as np
 
-for path in sys.path:
-    if 'opt/ros/' in path:
-        print('sys.path.remove({})'.format(path))
-        sys.path.remove(path)
-        import cv2
-        sys.path.append(path)
-    else:
-        import cv2
+
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
 
 
 def colorize_depth(depth, min_value=None, max_value=None):

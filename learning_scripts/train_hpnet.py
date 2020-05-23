@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import os.path as osp
 import sys
 from datetime import datetime
 
@@ -14,20 +15,22 @@ import torch.optim as optim
 import visdom
 from skrobot.coordinates.math import quaternion2matrix
 
+sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
 from utils.rois_tools import annotate_rois, find_rois
 from utils.visualize import colorize_depth, create_depth_circle, draw_axis
 from HangingPointsData import load_dataset
 from HPNETLoss import HPNETLoss
 from hpnet import HPNET
 
-for path in sys.path:
-    if 'opt/ros/' in path:
-        print('sys.path.remove({})'.format(path))
-        sys.path.remove(path)
-        import cv2
-        sys.path.append(path)
-    else:
-        import cv2
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
 
 
 # def draw_axis(img, R, t, K):
