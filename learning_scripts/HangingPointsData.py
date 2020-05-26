@@ -23,7 +23,7 @@ def load_dataset(data_path, batch_size):
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(data_path, transform)
 
-    train_size = int(0.99 * len(hp_data))
+    train_size = int(0.9 * len(hp_data))
     test_size = len(hp_data) - train_size
     # train_size = 1
     # test_size = 1
