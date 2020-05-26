@@ -32,6 +32,7 @@ except ImportError:
             import cv2
             sys.path.append(path)
 
+
 def train(data_path, batch_size, max_epoch, pretrained_model,
           train_data_num, val_data_num, save_dir,
           width=256, height=256):
@@ -72,7 +73,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         confidence_train_loss = 0
         depth_train_loss = 0
         rotation_train_loss = 0
-        
+
         for index, (hp_data, clip_info, hp_data_gt) in enumerate(
                 train_dataloader):
             xmin = clip_info[0, 0]
@@ -113,13 +114,21 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             confidence_loss, depth_loss, rotation_loss \
                 = criterion(confidence, hp_data_gt, pos_weight,
                             depth_and_rotation, annotated_rois)
-            confidence_loss *= 1
-            depth_loss *= 100
-            rotation_loss *= 1
-            loss = confidence_loss + depth_loss + rotation_loss
+
+            if depth_loss > 0.01:
+                print('loss function1')
+                loss = confidence_loss + depth_loss + rotation_loss
+            elif depth_loss > 0.001:
+                print('loss function2')
+                loss = confidence_loss + depth_loss * 100 + rotation_loss
+            else:
+                print('loss function3')
+                loss = confidence_loss + depth_loss * 1000 + rotation_loss
+
             loss.backward()
 
-            iter_loss = loss.item()
+            loss_for_record = confidence_loss + depth_loss + rotation_loss
+            iter_loss = loss_for_record.item()
             train_loss += iter_loss
             confidence_train_loss += confidence_loss.item()
             depth_train_loss += depth_loss.item()
@@ -352,12 +361,19 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 confidence_loss, depth_loss, rotation_loss \
                     = criterion(confidence, hp_data_gt, pos_weight,
                                 depth_and_rotation, annotated_rois)
-                confidence_loss *= 1
-                depth_loss *= 10
-                rotation_loss *= 1
-                loss = confidence_loss + depth_loss + rotation_loss
+                # confidence_loss *= 1
+                # depth_loss *= 100
+                # rotation_loss *= 1
 
-                iter_loss = loss.item()
+                if depth_loss > 0.01:
+                    loss = confidence_loss + depth_loss + rotation_loss
+                elif depth_loss > 0.001:
+                    loss = confidence_loss + depth_loss * 100 + rotation_loss
+                else:
+                    loss = confidence_loss + depth_loss * 1000 + rotation_loss
+
+                loss_for_record = confidence_loss + depth_loss + rotation_loss
+                iter_loss = loss_for_record.item()
                 val_loss += iter_loss
 
                 depth = hp_data.cpu().detach().numpy(
