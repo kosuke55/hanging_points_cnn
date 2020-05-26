@@ -159,6 +159,8 @@ class HangingPointsNet():
         print("depth mean", np.mean(depth))
         print("depth max", np.max(depth))
         depth = cv2.resize(depth, (256, 256))
+        depth[depth < 200] = 0
+        depth[depth > 500] = 0
         # depth_bgr = colorize_depth(depth, 100, 1500)
         depth_bgr = colorize_depth(depth, 300, 700)
 
