@@ -54,13 +54,15 @@ class HPNETLoss(Module):
                 rotation_loss += torch.min(
                     torch.norm(m_gt - m_pred),
                     torch.norm(m_gt - m_pred.mm(self.Ry)))
+
+        if len(annotated_rois) > 0:
+            depth_loss /= len(annotated_rois)
+            rotation_loss /= len(annotated_rois)
         # depth_loss *= 10000
         # rotation_loss *= 10000
 
-        print('confidence_loss', float(confidence_loss))
-        print('depth_loss', float(depth_loss))
-        print('rotation_loss', float(rotation_loss))
+        # print('confidence_loss', float(confidence_loss))
+        # print('depth_loss', float(depth_loss))
+        # print('rotation_loss', float(rotation_loss))
 
-        loss = confidence_loss + depth_loss + rotation_loss
-
-        return loss
+        return confidence_loss, depth_loss, rotation_loss

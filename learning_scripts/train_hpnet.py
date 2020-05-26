@@ -69,6 +69,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
     prev_time = datetime.now()
     for epo in range(max_epoch):
         train_loss = 0
+        confidence_train_loss = 0
+        depth_train_loss = 0
+        rotation_train_loss = 0
+        
         for index, (hp_data, clip_info, hp_data_gt) in enumerate(
                 train_dataloader):
             xmin = clip_info[0, 0]
@@ -106,11 +110,21 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             annotated_rois = annotate_rois(
                 hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
-            loss = criterion(confidence, hp_data_gt, pos_weight,
-                             depth_and_rotation, annotated_rois)
+            confidence_loss, depth_loss, rotation_loss \
+                = criterion(confidence, hp_data_gt, pos_weight,
+                            depth_and_rotation, annotated_rois)
+            confidence_loss *= 1
+            depth_loss *= 100
+            rotation_loss *= 1
+            loss = confidence_loss + depth_loss + rotation_loss
             loss.backward()
+
             iter_loss = loss.item()
             train_loss += iter_loss
+            confidence_train_loss += confidence_loss.item()
+            depth_train_loss += depth_loss.item()
+            rotation_train_loss += rotation_loss.item()
+
             optimizer.step()
 
             depth = hp_data.cpu().detach().numpy(
@@ -268,18 +282,29 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
         if len(train_dataloader) > 0:
             avg_train_loss = train_loss / len(train_dataloader)
+            avg_confidence_train_loss \
+                = confidence_train_loss / len(train_dataloader)
+            avg_depth_train_loss \
+                = depth_train_loss / len(train_dataloader)
+            avg_rotation_train_loss \
+                = rotation_train_loss / len(train_dataloader)
+
         else:
             avg_train_loss = train_loss
-        scheduler.step()
+            avg_confidence_train_loss = confidence_train_loss
+            avg_depth_train_loss = depth_train_loss
+            avg_rotation_train_loss = rotation_train_loss
 
-        vis.line(
-            X=np.array(
-                [epo]),
-            Y=np.array(
-                [avg_train_loss]),
-            win='loss',
-            name='avg_train_loss',
-            update='append')
+        vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]),
+                 win='loss', name='avg_train_loss', update='append')
+        vis.line(X=np.array([epo]), Y=np.array([avg_confidence_train_loss]),
+                 win='loss', name='avg_confidence_train_loss', update='append')
+        vis.line(X=np.array([epo]), Y=np.array([avg_depth_train_loss]),
+                 win='loss', name='avg_depth_train_loss', update='append')
+        vis.line(X=np.array([epo]), Y=np.array([avg_rotation_train_loss]),
+                 win='loss', name='avg_rotation_train_loss', update='append')
+
+        scheduler.step()
 
         # validation
         val_loss = 0
@@ -324,8 +349,13 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 annotated_rois = annotate_rois(
                     hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
-                loss = criterion(confidence, hp_data_gt, pos_weight,
-                                 depth_and_rotation, annotated_rois)
+                confidence_loss, depth_loss, rotation_loss \
+                    = criterion(confidence, hp_data_gt, pos_weight,
+                                depth_and_rotation, annotated_rois)
+                confidence_loss *= 1
+                depth_loss *= 10
+                rotation_loss *= 1
+                loss = confidence_loss + depth_loss + rotation_loss
 
                 iter_loss = loss.item()
                 val_loss += iter_loss
@@ -490,8 +520,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
         vis.line(X=np.array([epo]), Y=np.array([avg_val_loss]), win='loss',
                  name='avg_test_loss', update='append')
-        vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]), win='loss',
-                 name='avg_train_loss', update='append')
 
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)
@@ -499,7 +527,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
         prev_time = cur_time
 
-        if np.mod(epo, 1000) == 0 and epo > 0:
+        if np.mod(epo, 100) == 0 and epo > 30:
             torch.save(hpnet_model.state_dict(),
                        os.path.join(save_dir, 'hpnet_lavalmodel_' + now + '.pt'))
         print('epoch val loss = %f, epoch val loss = %f, best_loss = %f, %s' %
@@ -507,7 +535,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                val_loss / len(val_dataloader),
                best_loss,
                time_str))
-        if best_loss > val_loss / len(val_dataloader):
+        if best_loss > val_loss / len(val_dataloader) and epo > 30:
             print('update best model {} -> {}'.format(
                 best_loss, val_loss / len(val_dataloader)))
             best_loss = val_loss / len(val_dataloader)
@@ -537,7 +565,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200526_1635.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
