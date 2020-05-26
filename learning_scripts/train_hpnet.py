@@ -85,7 +85,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             pos_weight = pos_weight[:, 0, ...]
             zeroidx = np.where(pos_weight < 0.5)
             nonzeroidx = np.where(pos_weight >= 0.5)
-            pos_weight[zeroidx] = 0.5
+            pos_weight[zeroidx] = 1.0
             pos_weight[nonzeroidx] = 1.0
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(device)
@@ -117,13 +117,13 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             if depth_loss > 0.01:
                 print('loss function1')
-                loss = confidence_loss + depth_loss + rotation_loss
+                loss = confidence_loss + depth_loss * 10 + rotation_loss
             elif depth_loss > 0.001:
                 print('loss function2')
-                loss = confidence_loss + depth_loss * 100 + rotation_loss
+                loss = confidence_loss + depth_loss * 1000 + rotation_loss
             else:
                 print('loss function3')
-                loss = confidence_loss + depth_loss * 1000 + rotation_loss
+                loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
 
             loss.backward()
 
@@ -332,7 +332,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 pos_weight = pos_weight[:, 0, ...]
                 zeroidx = np.where(pos_weight < 0.5)
                 nonzeroidx = np.where(pos_weight >= 0.5)
-                pos_weight[zeroidx] = 0.5
+                pos_weight[zeroidx] = 1.0
                 pos_weight[nonzeroidx] = 1.0
                 pos_weight = torch.from_numpy(pos_weight)
                 pos_weight = pos_weight.to(device)
@@ -366,11 +366,14 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 # rotation_loss *= 1
 
                 if depth_loss > 0.01:
-                    loss = confidence_loss + depth_loss + rotation_loss
+                    print('loss function1')
+                    loss = confidence_loss + depth_loss * 10 + rotation_loss
                 elif depth_loss > 0.001:
-                    loss = confidence_loss + depth_loss * 100 + rotation_loss
-                else:
+                    print('loss function2')
                     loss = confidence_loss + depth_loss * 1000 + rotation_loss
+                else:
+                    print('loss function3')
+                    loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
 
                 loss_for_record = confidence_loss + depth_loss + rotation_loss
                 iter_loss = loss_for_record.item()
@@ -581,7 +584,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200526_1635.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0149.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,

@@ -48,9 +48,9 @@ class HangingPointsNet():
         self.camera_info_topic = rospy.get_param(
             '~camera_info',
             '/apply_mask_image/output/camera_info')
-        # self.camera_info_raw_topic = rospy.get_param(
-        #     '~camera_info',
-        #     '/camera/aligned_depth_to_color/camera_info')
+        self.camera_info_adepth_topic = rospy.get_param(
+            '~camera_info',
+            '/camera/aligned_depth_to_color/camera_info')
         self.input_image_raw = rospy.get_param(
             '~image',
             'camera/color/image_rect_color')
@@ -64,7 +64,8 @@ class HangingPointsNet():
             'cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0258.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
+
         # '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
         # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
 
@@ -76,7 +77,7 @@ class HangingPointsNet():
             'feature_compress': 1 / 16,
             'num_class': 6,
             'pool_out_size': 8,
-            'confidence_thresh': 0.3,
+            'confidence_thresh': 0.5,
         }
         self.model = HPNET(config).to(device)
         if osp.exists(pretrained_model):
@@ -124,11 +125,19 @@ class HangingPointsNet():
 
     def load_camera_info(self):
         print('load camera info')
-        self.camera_info = rospy.wait_for_message(self.camera_info_topic, CameraInfo)
+        self.camera_info = rospy.wait_for_message(
+            self.camera_info_topic, CameraInfo)
         print(self.camera_info)
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
+
+
+        self.camera_info_adepth = rospy.wait_for_message(
+            self.camera_info_adepth_topic, CameraInfo)
+        self.camera_model_adepth \
+            = cameramodels.PinholeCameraModel.from_camera_info(
+                self.camera_info_adepth)
         # import image_geometry
         # self.camera_model = image_geometry.cameramodels.PinholeCameraModel()
         # self.camera_model.fromCameraInfo(camera_info)
@@ -149,10 +158,12 @@ class HangingPointsNet():
         print("depth min", np.min(depth))
         print("depth mean", np.mean(depth))
         print("depth max", np.max(depth))
-        depth_bgr = colorize_depth(depth, 100, 1500)
+        depth = cv2.resize(depth, (256, 256))
+        # depth_bgr = colorize_depth(depth, 100, 1500)
+        depth_bgr = colorize_depth(depth, 300, 700)
 
         bgr = cv2.resize(bgr, (256, 256))
-        depth_bgr = cv2.resize(depth_bgr, (256, 256))
+        # depth_bgr = cv2.resize(depth_bgr, (256, 256))
         depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
         # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
@@ -170,7 +181,7 @@ class HangingPointsNet():
         confidence, depth_and_rotation = self.model(in_feature)
         confidence = confidence[0, 0:1, ...]
         confidence_np = confidence.cpu().detach().numpy().copy() * 255
-        confidence_np = confidence_np.transpose(1, 2, 0) * 2
+        confidence_np = confidence_np.transpose(1, 2, 0)
         confidence_np[confidence_np <= 0] = 0
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
@@ -192,6 +203,17 @@ class HangingPointsNet():
             roi = roi.cpu().detach().numpy().copy()
             cx = int((roi[0] + roi[2]) / 2)
             cy = int((roi[1] + roi[3]) / 2)
+
+            depth_roi_clip =  depth[int(roi[1]):int(roi[3]),
+                                    int(roi[0]):int(roi[2])]
+
+            # dep_roi_clip = depth_roi_clip
+            dep_roi_clip = depth_roi_clip[np.where(
+                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 500))]
+
+            depth_roi_clip_bgr = colorize_depth(depth_roi_clip, 300, 600)
+            # print(np.max(dep_roi_clip), np.mean(dep_roi_clip), np.median(dep_roi_clip), np.min(dep_roi_clip))
+            dep_roi_clip = np.median(dep_roi_clip) * 0.001
             dep = depth_and_rotation[i, 0]
             # dep_pred.append(float(dep))
 
@@ -200,22 +222,32 @@ class HangingPointsNet():
 
             pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                            int(cy * (ymax - ymin) / float(256) + ymin)]
+            cv2.circle(axis_pred_raw, tuple(pixel_point), 2, (0, 0, 0), 1)
 
             hanging_point = np.array(
                 self.camera_model.project_pixel_to_3d_ray(
-                # self.camera_model.projectPixelTo3dRay(
                     pixel_point))
-            # length = float(dep) / hanging_point[2]
-            length = 0.5 / hanging_point[2]
+
+            hanging_point_adepth = np.array(
+                self.camera_model_adepth.project_pixel_to_3d_ray(
+                    pixel_point))
+
+            length = float(dep) / hanging_point[2]
+            # length = 0.5 / hanging_point[2]
             hanging_point *= length
 
-            print(hanging_point, float(dep))
+            length = float(dep_roi_clip) / hanging_point_adepth[2]
+            hanging_point_adepth *= length
+            # hanging_point_adepth *= dep_roi_clip
+
+
+            print(hanging_point, float(dep), dep_roi_clip)
             # print(dep)
 
             hanging_point_pose = Pose()
-            hanging_point_pose.position.x = hanging_point[0]
-            hanging_point_pose.position.y = hanging_point[1]
-            hanging_point_pose.position.z = hanging_point[2]
+            hanging_point_pose.position.x = hanging_point_adepth[0]
+            hanging_point_pose.position.y = hanging_point_adepth[1]
+            hanging_point_pose.position.z = hanging_point_adepth[2]
             hanging_point_pose.orientation.w = q[0]
             hanging_point_pose.orientation.x = q[1]
             hanging_point_pose.orientation.y = q[2]
@@ -281,9 +313,6 @@ class HangingPointsNet():
         self.pub_axis.publish(axis_pred_msg)
         self.pub_axis_raw.publish(axis_pred_raw_msg)
         self.pub_hanging_points.publish(hanging_points_pose_array)
-
-
-
 
 
 def main(args):

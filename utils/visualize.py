@@ -29,7 +29,7 @@ def colorize_depth(depth, min_value=None, max_value=None):
     gray_depth[gray_depth > 255] = 255
     gray_depth = gray_depth.astype(np.uint8)
     colorized = cv2.applyColorMap(gray_depth, cv2.COLORMAP_JET)
-    # colorized[nan_mask] = (0, 0, 0)
+    colorized[nan_mask] = (0, 0, 0)
 
     return colorized
 
