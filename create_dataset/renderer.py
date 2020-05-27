@@ -18,15 +18,15 @@ import xml.etree.ElementTree as ET
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
-
-for path in sys.path:
-    if 'opt/ros/' in path:
-        print('sys.path.remove({})'.format(path))
-        sys.path.remove(path)
-        import cv2
-        sys.path.append(path)
-    else:
-        import cv2
+try:
+    import cv2
+except ImportError:
+    for path in sys.path:
+        if '/opt/ros/' in path:
+            print('sys.path.remove({})'.format(path))
+            sys.path.remove(path)
+            import cv2
+            sys.path.append(path)
 
 np.set_printoptions(precision=3, suppress=True)
 
@@ -58,9 +58,7 @@ def create_depth_circle(img, cy, cx, value, radius=50):
     img[circlular_mask_idx] = value
 
 
-def create_gradient_circle(img, cy, cx, radius=50):
-    sig = 500.
-    gain = 30.
+def create_gradient_circle(img, cy, cx, sig=50., gain=100.):
     h, w = img.shape
     Y, X = np.ogrid[:h, :w]
     g = np.exp(-((X - cx)**2 + (Y - cy)**2) / (2. * sig)) * gain
@@ -259,8 +257,6 @@ class Renderer:
     def get_depth_metres(self, noise=0.001):
         d = self.render()[3]
         # Linearise to metres
-        # return 2 * self.far_plane * self.near_plane / (self.far_plane + self.near_plane - (
-        #     self.far_plane - self.near_plane) * (2 * d - 1))
         return 2 * self.far_plane * self.near_plane / (self.far_plane + self.near_plane - (
             self.far_plane - self.near_plane) * (2 * d - 1)) + np.random.randn(self.im_height, self.im_width) * noise
 
@@ -337,7 +333,8 @@ class RotationMap():
 
 if __name__ == '__main__':
     # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup'
-    save_dir = 'Hanging-ObjectNet3D-DoubleFaces/rotations_0514_1000'
+    print('Start')
+    save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528'
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'intrinsics'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'color'), exist_ok=True)
@@ -350,6 +347,8 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(save_dir, 'heatmap'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'clip_info'), exist_ok=True)
+
+    # category_name_list = ['cup', 'key', 'scissors']
 
     im_w = 1920
     im_h = 1080
@@ -371,35 +370,39 @@ if __name__ == '__main__':
     width = 256
     height = 256
 
-    files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD/urdf/*/*/*")
+    files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD.selected/urdf/*/*/*")
+
+    print(files)
     data_id = 0
-    for file in files:
-        dirname, filename = os.path.split(file)
-        filename_without_ext, ext = os.path.splitext(filename)
-        category_name = dirname.split("/")[-2]
-        idx = dirname.split("/")[-1]
-        if category_name != "cup":
-            continue
-        # indices = ['01', '02', '03']
-        indices = ['01']
-        if idx not in indices:
-            continue
-        if filename == "base.urdf":
-            tree = ET.parse(os.path.join(dirname, "base.urdf"))
-            root = tree.getroot()
+    try:
+        for file in files:
+            dirname, filename = os.path.split(file)
+            filename_without_ext, ext = os.path.splitext(filename)
+            category_name = dirname.split("/")[-2]
+            idx = dirname.split("/")[-1]
+            # if category_name not in category_name_list:
+                # continue
+            # if category_name != "cup":
+            #     continue
+            # indices = ['01', '02', '03']
+            # indices = ['01']
+            # if idx not in indices:
+            #     continue
+            if filename == "base.urdf":
+                tree = ET.parse(os.path.join(dirname, "base.urdf"))
+                root = tree.getroot()
 
-            center = np.array([float(i) for i in root[0].find(
-                "inertial").find("origin").attrib['xyz'].split(' ')])
+                center = np.array([float(i) for i in root[0].find(
+                    "inertial").find("origin").attrib['xyz'].split(' ')])
 
-            contact_points_dict = json.load(
-                open(os.path.join(dirname, 'contact_points.json'), 'r'))
-            contact_points = contact_points_dict['contact_points']
+                contact_points_dict = json.load(
+                    open(os.path.join(dirname, 'contact_points.json'), 'r'))
+                contact_points = contact_points_dict['contact_points']
 
-            r.step(1)
-            r.look_at([0, 0, 2])
+                r.step(1)
+                r.look_at([0, 0, 2])
 
-            try:
-                for _ in range(1000):
+                for _ in range(100):
                     # if data_id > 0 and np.mod(data_id, 5) == 0:
                     #     data_id += 1
                     #     break
@@ -429,9 +432,11 @@ if __name__ == '__main__':
                     color.append(1)
                     pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
-                    newpos = [(np.random.rand() - 0.5),
-                              (np.random.rand() - 0.5),
-                              (np.random.rand() - 0.5)]
+                    newpos = [0, 0, 0]
+                    while np.linalg.norm(newpos) < 0.3:
+                        newpos = [(np.random.rand() - 0.5),
+                                  (np.random.rand() - 0.5),
+                                  (np.random.rand() - 0.5)]
 
                     r.move_to(newpos)
 
@@ -650,7 +655,7 @@ if __name__ == '__main__':
 
                     # raise
 
-                    # cv2.imshow('annotation', annotation_img)
+                    cv2.imshow('annotation', annotation_img)
                     # cv2.imshow('bgr', bgr_annotation)
                     # cv2.imshow('bgr_axis', bgr_axis)
                     # cv2.imshow('depth_bgr', depth_bgr)
@@ -658,7 +663,7 @@ if __name__ == '__main__':
                     #            hanging_points_depth_bgr)
                     # cv2.imshow('depth', depth)
                     # cv2.imshow('hanging_points_depth', hanging_points_depth)
-                    # cv2.waitKey(1)
+                    cv2.waitKey(1)
 
                     clip_info = np.array([xmin, xmax, ymin, ymax])
                     # clip_dict = {'xmin': xmin,
@@ -717,5 +722,5 @@ if __name__ == '__main__':
                     data_id += 1
                     r.remove_all_objects()
                 r.remove_all_objects()
-            except KeyboardInterrupt:
-                pass
+    except KeyboardInterrupt:
+        pass

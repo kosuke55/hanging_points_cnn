@@ -64,7 +64,9 @@ class HangingPointsNet():
             'cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
+            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
+            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
 
         # '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
         # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
@@ -77,7 +79,7 @@ class HangingPointsNet():
             'feature_compress': 1 / 16,
             'num_class': 6,
             'pool_out_size': 8,
-            'confidence_thresh': 0.5,
+            'confidence_thresh': 0.3,
         }
         self.model = HPNET(config).to(device)
         if osp.exists(pretrained_model):
@@ -107,21 +109,6 @@ class HangingPointsNet():
             slop=0.1)
         sync.registerCallback(self.callback)
 
-    # def colorize_depth(self, depth, min_value=None, max_value=None):
-    #     min_value = np.nanmin(depth) if min_value is None else min_value
-    #     max_value = np.nanmax(depth) if max_value is None else max_value
-
-    #     gray_depth = depth.copy()
-    #     nan_mask = np.isnan(gray_depth)
-    #     gray_depth[nan_mask] = 0
-    #     gray_depth = 255 * (gray_depth - min_value) / (max_value - min_value)
-    #     gray_depth[gray_depth < 0] = 0
-    #     gray_depth[gray_depth > 255] = 255
-    #     gray_depth = gray_depth.astype(np.uint8)
-    #     colorized = cv2.applyColorMap(gray_depth, cv2.COLORMAP_JET)
-    #     colorized[nan_mask] = (0, 0, 0)
-
-    #     return colorized
 
     def load_camera_info(self):
         print('load camera info')

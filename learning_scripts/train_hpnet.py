@@ -53,7 +53,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         'feature_compress': 1 / 16,
         'num_class': 6,
         'pool_out_size': 8,
-        'confidence_thresh': 0.5,
+        'confidence_thresh': 0.3,
     }
 
     hpnet_model = HPNET(config).to(device)
@@ -85,7 +85,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             pos_weight = pos_weight[:, 0, ...]
             zeroidx = np.where(pos_weight < 0.5)
             nonzeroidx = np.where(pos_weight >= 0.5)
-            pos_weight[zeroidx] = 1.0
+            pos_weight[zeroidx] = 0.5
             pos_weight[nonzeroidx] = 1.0
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(device)
@@ -115,19 +115,21 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 = criterion(confidence, hp_data_gt, pos_weight,
                             depth_and_rotation, annotated_rois)
 
-            if depth_loss > 0.01:
-                print('loss function1')
-                loss = confidence_loss + depth_loss * 10 + rotation_loss
-            elif depth_loss > 0.001:
-                print('loss function2')
-                loss = confidence_loss + depth_loss * 1000 + rotation_loss
-            else:
-                print('loss function3')
-                loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
+            loss = confidence_loss + rotation_loss
+            # if depth_loss > 0.01:
+            #     print('loss function1')
+            #     loss = confidence_loss + depth_loss * 10 + rotation_loss
+            # elif depth_loss > 0.001:
+            #     print('loss function2')
+            #     loss = confidence_loss + depth_loss * 1000 + rotation_loss
+            # else:
+            #     print('loss function3')
+            #     loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
 
             loss.backward()
 
-            loss_for_record = confidence_loss + depth_loss + rotation_loss
+            # loss_for_record = confidence_loss + depth_loss + rotation_loss
+            loss_for_record = confidence_loss + rotation_loss
             iter_loss = loss_for_record.item()
             train_loss += iter_loss
             confidence_train_loss += confidence_loss.item()
@@ -220,20 +222,31 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 roi = roi.cpu().detach().numpy().copy()
                 cx = int((roi[0] + roi[2]) / 2)
                 cy = int((roi[1] + roi[3]) / 2)
-                dep = depth_and_rotation[i, 0] * 1000
-                dep_pred.append(float(dep))
+                # dep = depth_and_rotation[i, 0] * 1000
+                # dep_pred.append(float(dep))
+                dep =  depth[int(roi[1]):int(roi[3]),
+                             int(roi[0]):int(roi[2])]
+                dep = np.median(dep[np.where(
+                    np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
+
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
-                create_depth_circle(depth, cy, cx, dep.cpu().detach())
+                # create_depth_circle(depth, cy, cx, dep.cpu().detach())
+                create_depth_circle(depth, cy, cx, dep)
 
                 q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                 q /= np.linalg.norm(q)
-                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+                pixel_point = [int(cx * (xmax - xmin) / float(256
+
+) + xmin),
                                int(cy * (ymax - ymin) / float(256) + ymin)]
+                # hanging_point_pose = np.array(
+                #     cameramodel.project_pixel_to_3d_ray(
+                #         pixel_point)) * float(dep * 0.001)
                 hanging_point_pose = np.array(
                     cameramodel.project_pixel_to_3d_ray(
-                        pixel_point)) * float(dep * 0.001)
+                        pixel_point)) * float(dep)
                 try:
                     draw_axis(axis_large_pred,
                               # skrobot.coordinates.math.quaternion2matrix(
@@ -244,7 +257,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     print('Fail to draw axis')
                     pass
 
-            print('dep_pred', dep_pred)
+            # print('dep_pred', dep_pred)
 
             axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
                                    (256, 256)).astype(np.uint8)
@@ -332,7 +345,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 pos_weight = pos_weight[:, 0, ...]
                 zeroidx = np.where(pos_weight < 0.5)
                 nonzeroidx = np.where(pos_weight >= 0.5)
-                pos_weight[zeroidx] = 1.0
+                pos_weight[zeroidx] = 0.5
                 pos_weight[nonzeroidx] = 1.0
                 pos_weight = torch.from_numpy(pos_weight)
                 pos_weight = pos_weight.to(device)
@@ -365,17 +378,19 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 # depth_loss *= 100
                 # rotation_loss *= 1
 
-                if depth_loss > 0.01:
-                    print('loss function1')
-                    loss = confidence_loss + depth_loss * 10 + rotation_loss
-                elif depth_loss > 0.001:
-                    print('loss function2')
-                    loss = confidence_loss + depth_loss * 1000 + rotation_loss
-                else:
-                    print('loss function3')
-                    loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
+                loss = confidence_loss + rotation_loss
+                # if depth_loss > 0.01:
+                #     print('loss function1')
+                #     loss = confidence_loss + depth_loss * 10 + rotation_loss
+                # elif depth_loss > 0.001:
+                #     print('loss function2')
+                #     loss = confidence_loss + depth_loss * 1000 + rotation_loss
+                # else:
+                #     print('loss function3')
+                #     loss = confidence_loss + depth_loss * 1000 + rotation_loss * 10
 
-                loss_for_record = confidence_loss + depth_loss + rotation_loss
+                # loss_for_record = confidence_loss + depth_loss + rotation_loss
+                loss_for_record = confidence_loss + rotation_loss
                 iter_loss = loss_for_record.item()
                 val_loss += iter_loss
 
@@ -463,12 +478,22 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     roi = roi.cpu().detach().numpy().copy()
                     cx = int((roi[0] + roi[2]) / 2)
                     cy = int((roi[1] + roi[3]) / 2)
-                    dep = depth_and_rotation[i, 0] * 1000
+
+                    # Use pred value
+                    # dep = depth_and_rotation[i, 0] * 1000
+
+                    dep =  depth[int(roi[1]):int(roi[3]),
+                                 int(roi[0]):int(roi[2])]
+                    dep = np.median(dep[np.where(
+                        np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
+                    # print(dep)
+
                     dep_pred.append(float(dep))
                     confidence_vis = cv2.rectangle(
                         confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                         (0, 255, 0), 3)
-                    create_depth_circle(depth, cy, cx, dep.cpu().detach())
+                    # create_depth_circle(depth, cy, cx, dep.cpu().detach())
+                    create_depth_circle(depth, cy, cx, dep)
 
                     q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                     q /= np.linalg.norm(q)
@@ -477,6 +502,9 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     hanging_point_pose = np.array(
                         cameramodel.project_pixel_to_3d_ray(
                             pixel_point)) * float(dep * 0.001)
+                    # hanging_point_pose = np.array(
+                    #     cameramodel.project_pixel_to_3d_ray(
+                    #         pixel_point)) * float(dep)
                     try:
                         draw_axis(axis_large_pred,
                                   # skrobot.coordinates.math.quaternion2matrix(
@@ -554,7 +582,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                val_loss / len(val_dataloader),
                best_loss,
                time_str))
-        if best_loss > val_loss / len(val_dataloader) and epo > 30:
+        if best_loss > val_loss / len(val_dataloader) and epo > 5:
             print('update best model {} -> {}'.format(
                 best_loss, val_loss / len(val_dataloader)))
             best_loss = val_loss / len(val_dataloader)
@@ -571,11 +599,11 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/rotations_0514_1000')
+        default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
-                        default=32)
+                        default=8)
     parser.add_argument('--max_epoch', '-me', type=int,
                         help='max epoch',
                         default=1000000)
@@ -584,7 +612,8 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0149.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
+        # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,

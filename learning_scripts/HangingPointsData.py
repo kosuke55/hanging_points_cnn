@@ -60,6 +60,14 @@ class HangingPointsDataset(Dataset):
             os.path.join(self.data_path, "depth/",
                          os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
 
+        r = np.random.randint(20)
+        kernel = np.ones((r, r), np.uint8)
+        depth = cv2.dilate(depth, kernel, iterations=1)
+
+        r = np.random.randint(20)
+        r = r if np.mod(r, 2) else r + 1
+        depth = cv2.GaussianBlur(depth, (r, r), 10)
+
         clip_info = np.load(
             os.path.join(self.data_path, "clip_info/",
                          os.path.splitext(data_name)[0]) + ".npy")
