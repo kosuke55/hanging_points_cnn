@@ -15,8 +15,11 @@ import pybullet_data
 # import skrobot
 
 import xml.etree.ElementTree as ET
+from hanging_points_generator.hanging_points_generator \
+    import cluster_hanging_points
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
+
 
 try:
     import cv2
@@ -334,7 +337,12 @@ class RotationMap():
 if __name__ == '__main__':
     # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup'
     print('Start')
-    save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528'
+    # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528'
+    save_dir = 'ycb_hanging_object/0601'
+    # files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD.selected/urdf/*/*/*")
+    files = glob.glob("ycb_hanging_object/urdf/*/*")
+    urdf_name = 'textured.urdf'
+
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'intrinsics'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'color'), exist_ok=True)
@@ -355,8 +363,8 @@ if __name__ == '__main__':
     im_fov = 42.5
     nf = 0.1
     ff = 2.0
-    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
-    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
+    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
+    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
     np.save(
         os.path.join(
             save_dir, 'intrinsics', 'intrinsics'), r.camera_model.K)
@@ -369,8 +377,6 @@ if __name__ == '__main__':
 
     width = 256
     height = 256
-
-    files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD.selected/urdf/*/*/*")
 
     print(files)
     data_id = 0
@@ -399,14 +405,14 @@ if __name__ == '__main__':
                     open(os.path.join(dirname, 'contact_points.json'), 'r'))
                 contact_points = contact_points_dict['contact_points']
 
+                contact_points = cluster_hanging_points(
+                    contact_points, eps=0.005, min_samples=2)
+
                 r.step(1)
                 r.look_at([0, 0, 2])
 
                 for _ in range(100):
-                    # if data_id > 0 and np.mod(data_id, 5) == 0:
-                    #     data_id += 1
-                    #     break
-                    print(file + '  {}'.format(data_id))
+
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
                         baseCollisionShapeIndex=camera_object,
@@ -414,24 +420,24 @@ if __name__ == '__main__':
                         baseOrientation=[0, 0, 0, 1.])
                     r.objects.append(camera_id)
 
-                    tree = ET.parse(os.path.join(dirname, "base.urdf"))
-                    root = tree.getroot()
-
-                    # mesh_scale_list = [(np.random.rand() - 0.5) * 0.5 + 1,
-                    #                    (np.random.rand() - 0.5) * 0.5 + 1,
-                    #                    (np.random.rand() - 0.5) * 0.5 + 1]
+                    # tree = ET.parse(os.path.join(dirname, "base.urdf"))
+                    # root = tree.getroot()
+                    # # mesh_scale_list = [(np.random.rand() - 0.5) * 0.5 + 1,
+                    # #                    (np.random.rand() - 0.5) * 0.5 + 1,
+                    # #                    (np.random.rand() - 0.5) * 0.5 + 1]
                     mesh_scale_list = [1, 1, 1]
+                    # mesh_scale = ''.join(str(i) + ' ' for i in mesh_scale_list).strip()
+                    # root[0].find('visual').find('geometry').find('mesh').attrib['scale'] = mesh_scale
+                    # root[0].find('collision').find('geometry').find('mesh').attrib['scale'] = mesh_scale
+                    # tree.write(os.path.join(dirname, 'rescale_base.urdf'),
+                    #            encoding='utf-8', xml_declaration=True)
+                    # object_id = r.load_urdf(os.path.join(dirname, "rescale_base.urdf"))
 
-                    mesh_scale = ''.join(str(i) + ' ' for i in mesh_scale_list).strip()
-                    root[0].find('visual').find('geometry').find('mesh').attrib['scale'] = mesh_scale
-                    root[0].find('collision').find('geometry').find('mesh').attrib['scale'] = mesh_scale
-                    tree.write(os.path.join(dirname, 'rescale_base.urdf'),
-                               encoding='utf-8', xml_declaration=True)
-                    object_id = r.load_urdf(os.path.join(dirname, "rescale_base.urdf"))
-                    color = np.random.rand(3).tolist()
-                    color.append(1)
-                    pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
+                    # color = np.random.rand(3).tolist()
+                    # color.append(1)
+                    # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
+                    object_id = r.load_urdf(os.path.join(dirname, "base.urdf"))
                     newpos = [0, 0, 0]
                     while np.linalg.norm(newpos) < 0.3:
                         newpos = [(np.random.rand() - 0.5),
@@ -552,7 +558,7 @@ if __name__ == '__main__':
                         r.remove_all_objects()
                         continue
                     dbscan = DBSCAN(
-                        eps=0.005, min_samples=1).fit(
+                        eps=0.005, min_samples=2).fit(
                             [hp.worldpos() for hp in
                              hanging_point_in_camera_coords_list])
 
