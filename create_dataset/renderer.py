@@ -394,8 +394,8 @@ if __name__ == '__main__':
             # indices = ['01']
             # if idx not in indices:
             #     continue
-            if filename == "base.urdf":
-                tree = ET.parse(os.path.join(dirname, "base.urdf"))
+            if filename == urdf_name:
+                tree = ET.parse(os.path.join(dirname, urdf_name))
                 root = tree.getroot()
 
                 center = np.array([float(i) for i in root[0].find(
@@ -420,7 +420,7 @@ if __name__ == '__main__':
                         baseOrientation=[0, 0, 0, 1.])
                     r.objects.append(camera_id)
 
-                    # tree = ET.parse(os.path.join(dirname, "base.urdf"))
+                    # tree = ET.parse(os.path.join(dirname, urdf_name))
                     # root = tree.getroot()
                     # # mesh_scale_list = [(np.random.rand() - 0.5) * 0.5 + 1,
                     # #                    (np.random.rand() - 0.5) * 0.5 + 1,
@@ -437,7 +437,7 @@ if __name__ == '__main__':
                     # color.append(1)
                     # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
-                    object_id = r.load_urdf(os.path.join(dirname, "base.urdf"))
+                    object_id = r.load_urdf(os.path.join(dirname, urdf_name))
                     newpos = [0, 0, 0]
                     while np.linalg.norm(newpos) < 0.3:
                         newpos = [(np.random.rand() - 0.5),
@@ -659,9 +659,7 @@ if __name__ == '__main__':
                     hanging_points_depth \
                         = cv2.resize(hanging_points_depth, (width, height))
 
-                    # raise
-
-                    cv2.imshow('annotation', annotation_img)
+                    # cv2.imshow('annotation', annotation_img)
                     # cv2.imshow('bgr', bgr_annotation)
                     # cv2.imshow('bgr_axis', bgr_axis)
                     # cv2.imshow('depth_bgr', depth_bgr)
@@ -669,13 +667,9 @@ if __name__ == '__main__':
                     #            hanging_points_depth_bgr)
                     # cv2.imshow('depth', depth)
                     # cv2.imshow('hanging_points_depth', hanging_points_depth)
-                    cv2.waitKey(1)
+                    # cv2.waitKey(1)
 
                     clip_info = np.array([xmin, xmax, ymin, ymax])
-                    # clip_dict = {'xmin': xmin,
-                    #              'xmax': xmax,
-                    #              'ymin': ymin,
-                    #              'ymax': ymax}
 
                     # if data_id == 0:
                     #     cv2.moveWindow('bgr', 100, 100)
