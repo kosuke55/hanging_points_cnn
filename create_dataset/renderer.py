@@ -379,7 +379,22 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'clip_info'), exist_ok=True)
 
-    # category_name_list = ['cup', 'key', 'scissors']
+    if 'ycb' in args.input_files:
+        category_name_list = [
+            "019_pitcher_base",
+            "022_windex_bottle",
+            "025_mug",
+            "033_spatula",
+            "035_power_drill",
+            "042_adjustable_wrench",
+            "048_hammer",
+            "050_medium_clamp",
+            "051_large_clamp",
+            "052_extra_large_clamp"
+        ]
+    elif 'ObjectNet3D' in args.input_files:
+        category_name_list = ['cup', 'key', 'scissors']
+
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
     r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
     np.save(
@@ -398,13 +413,16 @@ if __name__ == '__main__':
         for file in files:
             dirname, filename = os.path.split(file)
             filename_without_ext, ext = os.path.splitext(filename)
-            category_name = dirname.split("/")[-2]
-            idx = dirname.split("/")[-1]
+            if 'ycb' in args.input_files:
+                category_name = dirname.split("/")[-1]
+            elif 'ObjectNet3D' in args.input_files:
+                category_name = dirname.split("/")[-2]
+                idx = dirname.split("/")[-1]
             print(category_name)
             # if category_name not in category_name_list:
             # continue
-            # if category_name != "cup":
-            #     continue
+            if category_name == "033_spatula":
+                continue
             # indices = ['01', '02', '03']
             # indices = ['01']
             # if idx not in indices:
