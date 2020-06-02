@@ -94,7 +94,6 @@ def draw_axis(img, R, t, K):
     img = cv2.line(
         img, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()),
         (0, 0, 255), 1)
-        # (255, 0, 0), 1)
     img = cv2.line(
         img,
         tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()),
@@ -103,7 +102,6 @@ def draw_axis(img, R, t, K):
         img,
         tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()),
         (255, 0, 0), 1)
-        # (0, 0, 255), 1)
     return img
 
 
@@ -232,7 +230,8 @@ class Renderer:
         up = self.camera_coords.rotate_vector([0, -1.0, 0])
         # up = self.camera_coords.copy().rotate_vector([0, 1.0, 0])
 
-        vm = pybullet.computeViewMatrix(self.camera_coords.worldpos(), target, up)
+        vm = pybullet.computeViewMatrix(
+            self.camera_coords.worldpos(), target, up)
 
         i_arr = pybullet.getCameraImage(
             self.im_width, self.im_height, vm, self.pm,
@@ -334,7 +333,7 @@ if __name__ == '__main__':
         '-s',
         type=str,
         help='save dir',
-        default='ycb_hanging_object/0601')
+        default='ycb_hanging_object/0603')
     parser.add_argument(
         '--input_files',
         '-i',
@@ -381,8 +380,8 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(save_dir, 'clip_info'), exist_ok=True)
 
     # category_name_list = ['cup', 'key', 'scissors']
-    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
-    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
+    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
+    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
     np.save(
         os.path.join(
             save_dir, 'intrinsics', 'intrinsics'), r.camera_model.K)
@@ -393,7 +392,6 @@ if __name__ == '__main__':
         halfExtents=[camera_length, camera_length, camera_length])
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
-
     print(files)
     data_id = 0
     try:
@@ -402,8 +400,9 @@ if __name__ == '__main__':
             filename_without_ext, ext = os.path.splitext(filename)
             category_name = dirname.split("/")[-2]
             idx = dirname.split("/")[-1]
+            print(category_name)
             # if category_name not in category_name_list:
-                # continue
+            # continue
             # if category_name != "cup":
             #     continue
             # indices = ['01', '02', '03']
@@ -427,8 +426,10 @@ if __name__ == '__main__':
                 r.step(1)
                 r.look_at([0, 0, 2])
 
-                for _ in range(100):
-
+                data_count = 0
+                # for _ in range(1000):
+                while data_count < 100:
+                    print('{}: {} sum: {}'.format(file, data_count, data_id))
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
                         baseCollisionShapeIndex=camera_object,
@@ -735,6 +736,7 @@ if __name__ == '__main__':
                             save_dir, 'clip_info', '{:05}'.format(data_id)),
                         clip_info)
 
+                    data_count += 1
                     data_id += 1
                     r.remove_all_objects()
                 r.remove_all_objects()
