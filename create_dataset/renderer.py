@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import argparse
 import copy
 import glob
 import json
@@ -187,16 +188,6 @@ class Renderer:
         for i in range(n):
             pybullet.stepSimulation()
 
-    @property
-    def camera_intrinsic(self):
-        # Thanks
-        # http://kgeorge.github.io/2014/03/08/calculating-opengl-perspective-matrix-from-opencv-intrinsic-matrix
-        return np.array([
-            [self.pm[0] * self.im_width / 2, 0, self.im_width / 2],
-            [0, self.pm[5] * self.im_height / 2, self.im_height / 2],
-            [0, 0, 1]
-        ])
-
     def _rotation_matrix(self, rpy):
         r, p, y = rpy
 
@@ -335,13 +326,46 @@ class RotationMap():
 
 
 if __name__ == '__main__':
-    # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup'
     print('Start')
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        '--save_dir',
+        '-s',
+        type=str,
+        help='save dir',
+        default='ycb_hanging_object/0601')
+    parser.add_argument(
+        '--input_files',
+        '-i',
+        type=str,
+        help='input files',
+        default='ycb_hanging_object/urdf/*/*')
+    parser.add_argument(
+        '--urdf_name',
+        '-u',
+        type=str,
+        help='save dir',
+        default='textured.urdf')
+    args = parser.parse_args()
+
+    save_dir = args.save_dir
+    urdf_name = args.urdf_name
+    files = glob.glob(args.input_files)
+
+    im_w = 1920
+    im_h = 1080
+    im_fov = 42.5
+    nf = 0.1
+    ff = 2.0
+    width = 256
+    height = 256
+
     # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528'
-    save_dir = 'ycb_hanging_object/0601'
+    # save_dir = 'ycb_hanging_object/0601'
     # files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD.selected/urdf/*/*/*")
-    files = glob.glob("ycb_hanging_object/urdf/*/*")
-    urdf_name = 'textured.urdf'
+    # files = glob.glob("ycb_hanging_object/urdf/*/*")
+    # urdf_name = 'textured.urdf'
 
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'intrinsics'), exist_ok=True)
@@ -357,12 +381,6 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(save_dir, 'clip_info'), exist_ok=True)
 
     # category_name_list = ['cup', 'key', 'scissors']
-
-    im_w = 1920
-    im_h = 1080
-    im_fov = 42.5
-    nf = 0.1
-    ff = 2.0
     r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
     np.save(
@@ -375,8 +393,6 @@ if __name__ == '__main__':
         halfExtents=[camera_length, camera_length, camera_length])
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
-    width = 256
-    height = 256
 
     print(files)
     data_id = 0
