@@ -36,7 +36,19 @@ if __name__ == '__main__':
     os.makedirs(args.out_dir, exist_ok=True)
 
     subprocess.call(
-        ['sudo cp -r ' + args.input_dir_1 + '/* ' + args.out_dir],
+        ['sudo cp -r ' + args.input_dir_1 + '/clip_info ' + args.out_dir],
+        shell=True)
+    subprocess.call(
+        ['sudo cp -r ' + args.input_dir_1 + '/debug_axis ' + args.out_dir],
+        shell=True)
+    subprocess.call(
+        ['sudo cp -r ' + args.input_dir_1 + '/depth ' + args.out_dir],
+        shell=True)
+    subprocess.call(
+        ['sudo cp -r ' + args.input_dir_1 + '/heatmap ' + args.out_dir],
+        shell=True)
+    subprocess.call(
+        ['sudo cp -r ' + args.input_dir_1 + '/rotations ' + args.out_dir],
         shell=True)
 
     files_1 = glob.glob(osp.join(args.input_dir_1, 'color', '*'))
