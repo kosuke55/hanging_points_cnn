@@ -142,7 +142,7 @@ def expand_box(box, img_shape, scale=1.5):
 def find_rois(confidence,
               confidence_gt=None,
               confidence_thresh=0.5,
-              area_thresh=300):
+              area_thresh=100):
     """Find rois
 
     gtとの比較はlossの方で行う.ここではconfidenceの推論からroiを提案すればよい.
@@ -207,7 +207,7 @@ def find_rois(confidence,
             except Exception:
                 continue
 
-            box = expand_box(box, confidence_mask.shape, scale=1.5)
+            box = expand_box(box, confidence_mask.shape, scale=2.0)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],
