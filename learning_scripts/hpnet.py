@@ -21,8 +21,8 @@ except ImportError:
             import cv2
             sys.path.append(path)
 
-from utils.rois_tools import find_rois
 from learning_scripts.resnet import resnet18
+from utils.rois_tools import find_rois
 
 
 class Conv2DBatchNormRelu(nn.Module):
@@ -81,7 +81,8 @@ class HPNET(nn.Module):
                 'confidence_thresh': 0.1,
             }
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
         self.feature_compress = config['feature_compress']
         self.pool_out_size = config['pool_out_size']
         self.n_class = config['num_class']
@@ -116,9 +117,9 @@ class HPNET(nn.Module):
 
         confidence = self.decoder(feature)
 
-        self.rois_list = find_rois(confidence, confidence_thresh=self.confidence_thresh)
+        self.rois_list = find_rois(
+            confidence, confidence_thresh=self.confidence_thresh)
         if self.rois_list is None:
-
             self.rois_list = [torch.tensor(
                 [[0, 0, 0, 0]], dtype=torch.float32).to(
                     self.device) for _ in range(confidence.shape[0])]

@@ -9,18 +9,17 @@ from datetime import datetime
 
 import cameramodels
 import numpy as np
-# import skrobot
 import torch
 import torch.optim as optim
 import visdom
 from skrobot.coordinates.math import quaternion2matrix
 
-sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
-from utils.rois_tools import annotate_rois, find_rois
-from utils.visualize import colorize_depth, create_depth_circle, draw_axis
-from HangingPointsData import load_dataset
-from HPNETLoss import HPNETLoss
+sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hpnet import HPNET
+from HPNETLoss import HPNETLoss
+from HangingPointsData import load_dataset
+from utils.visualize import colorize_depth, create_depth_circle, draw_axis
+from utils.rois_tools import annotate_rois, find_rois
 
 try:
     import cv2
@@ -224,8 +223,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 cy = int((roi[1] + roi[3]) / 2)
                 # dep = depth_and_rotation[i, 0] * 1000
                 # dep_pred.append(float(dep))
-                dep =  depth[int(roi[1]):int(roi[3]),
-                             int(roi[0]):int(roi[2])]
+                dep = depth[int(roi[1]):int(roi[3]),
+                            int(roi[0]):int(roi[2])]
                 dep = np.median(dep[np.where(
                     np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
 
@@ -239,7 +238,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 q /= np.linalg.norm(q)
                 pixel_point = [int(cx * (xmax - xmin) / float(256
 
-) + xmin),
+                                                              ) + xmin),
                                int(cy * (ymax - ymin) / float(256) + ymin)]
                 # hanging_point_pose = np.array(
                 #     cameramodel.project_pixel_to_3d_ray(
@@ -361,7 +360,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 rois_list_gt = find_rois(confidence_gt)
 
                 confidence, depth_and_rotation = hpnet_model(hp_data)
-                confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
+                confidence_np = confidence[0, ...].cpu(
+                ).detach().numpy().copy()
                 confidence_np[confidence_np >= 1] = 1.
                 confidence_np[confidence_np <= 0] = 0.
                 confidence_vis = cv2.cvtColor(confidence_np[0, ...] * 255,
@@ -428,7 +428,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     cx = int((roi[0] + roi[2]) / 2)
                     cy = int((roi[1] + roi[3]) / 2)
 
-                    # expand roiしたらなどしたらdep = 0になる場合はある. そしたら弾きたい.
+
                     dep = hanging_point_depth_gt[0, cy, cx]
                     dep_gt.append(dep)
 
@@ -482,8 +482,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     # Use pred value
                     # dep = depth_and_rotation[i, 0] * 1000
 
-                    dep =  depth[int(roi[1]):int(roi[3]),
-                                 int(roi[0]):int(roi[2])]
+                    dep = depth[int(roi[1]):int(roi[3]),
+                                int(roi[0]):int(roi[2])]
                     dep = np.median(dep[np.where(
                         np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
                     # print(dep)
@@ -589,6 +589,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             torch.save(
                 hpnet_model.state_dict(),
                 os.path.join(save_dir, 'hpnet_bestmodel_' + now + '.pt'))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

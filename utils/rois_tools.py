@@ -122,9 +122,7 @@ def reshape_rois_list(rois_list):
 
 
 def expand_box(box, img_shape, scale=1.5):
-    """
-    これをすると中心座標が変化してdepthやrotationのgtを取り出しに問題がでる.他のピクセルの値をとってしまう.
-    depth=0になる場合もあり問題. expand前のcenterも保存しておきたい.
+    """Expand roi box.
     """
 
     x, y, w, h = box
@@ -144,7 +142,7 @@ def expand_box(box, img_shape, scale=1.5):
 def find_rois(confidence,
               confidence_gt=None,
               confidence_thresh=0.5,
-              area_thresh=1000):
+              area_thresh=300):
     """Find rois
 
     gtとの比較はlossの方で行う.ここではconfidenceの推論からroiを提案すればよい.
@@ -209,7 +207,7 @@ def find_rois(confidence,
             except Exception:
                 continue
 
-            box = expand_box(box, confidence_mask.shape, scale=1)
+            box = expand_box(box, confidence_mask.shape, scale=1.5)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],
