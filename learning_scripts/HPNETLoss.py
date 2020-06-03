@@ -38,10 +38,12 @@ class HPNETLoss(Module):
                 weight, depth_and_rotation, annotated_rois):
 
         confidence_diff = confidence[:, 0, ...] - confidence_gt[:, 0, ...]
-        confidence_loss = torch.sum((weight * confidence_diff) ** 2) / (256 ** 2)
+        confidence_loss = torch.sum(
+            (weight * confidence_diff) ** 2) / (256 ** 2)
         # confidence_loss = torch.sum((weight * confidence_diff) ** 2)
 
-        depth_loss, rotation_loss = torch.tensor(0.).to('cuda'), torch.tensor(0.).to('cuda')
+        depth_loss, rotation_loss = torch.tensor(
+            0.).to('cuda'), torch.tensor(0.).to('cuda')
 
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
@@ -61,8 +63,8 @@ class HPNETLoss(Module):
         # depth_loss *= 10000
         # rotation_loss *= 10000
 
-        # print('confidence_loss', float(confidence_loss))
+        print('confidence_loss', float(confidence_loss))
         # print('depth_loss', float(depth_loss))
-        # print('rotation_loss', float(rotation_loss))
+        print('rotation_loss', float(rotation_loss))
 
         return confidence_loss, depth_loss, rotation_loss

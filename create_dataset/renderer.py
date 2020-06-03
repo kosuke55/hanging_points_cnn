@@ -333,7 +333,7 @@ if __name__ == '__main__':
         '-s',
         type=str,
         help='save dir',
-        default='ycb_hanging_object/0603')
+        default='ycb_hanging_object/per500')
     parser.add_argument(
         '--input_files',
         '-i',
@@ -446,7 +446,7 @@ if __name__ == '__main__':
 
                 data_count = 0
                 # for _ in range(1000):
-                while data_count < 100:
+                while data_count < 500:
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,

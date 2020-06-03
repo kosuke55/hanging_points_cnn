@@ -32,6 +32,7 @@ except ImportError:
             import cv2
             sys.path.append(path)
 
+
 class HangingPointsNet():
     def __init__(self):
         self.bridge = CvBridge()
@@ -64,9 +65,10 @@ class HangingPointsNet():
             'cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200603_1843.pt')
+        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
+        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
+        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
 
         # '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
         # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
@@ -109,7 +111,6 @@ class HangingPointsNet():
             slop=0.1)
         sync.registerCallback(self.callback)
 
-
     def load_camera_info(self):
         print('load camera info')
         self.camera_info = rospy.wait_for_message(
@@ -118,7 +119,6 @@ class HangingPointsNet():
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
-
 
         self.camera_info_adepth = rospy.wait_for_message(
             self.camera_info_adepth_topic, CameraInfo)
@@ -193,8 +193,8 @@ class HangingPointsNet():
             cx = int((roi[0] + roi[2]) / 2)
             cy = int((roi[1] + roi[3]) / 2)
 
-            depth_roi_clip =  depth[int(roi[1]):int(roi[3]),
-                                    int(roi[0]):int(roi[2])]
+            depth_roi_clip = depth[int(roi[1]):int(roi[3]),
+                                   int(roi[0]):int(roi[2])]
 
             # dep_roi_clip = depth_roi_clip
             dep_roi_clip = depth_roi_clip[np.where(
@@ -228,7 +228,6 @@ class HangingPointsNet():
             length = float(dep_roi_clip) / hanging_point_adepth[2]
             hanging_point_adepth *= length
             # hanging_point_adepth *= dep_roi_clip
-
 
             print(hanging_point, float(dep), dep_roi_clip)
             # print(dep)

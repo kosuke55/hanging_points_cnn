@@ -179,9 +179,9 @@ def find_rois(confidence,
 
         _, confidence_mask = cv2.threshold(
             confidence_mask, int(255 * confidence_thresh), 255, 0)
-        contours, hierarchy = cv2.findContours(confidence_mask,
-                                               cv2.RETR_TREE,
-                                               cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, hierarchy = cv2.findContours(confidence_mask,
+                                                  cv2.RETR_TREE,
+                                                  cv2.CHAIN_APPROX_SIMPLE)
         # _, contours, hierarchy = cv2.findContours(confidence_mask,
         #                                           cv2.RETR_TREE,
         #                                           cv2.CHAIN_APPROX_SIMPLE)
