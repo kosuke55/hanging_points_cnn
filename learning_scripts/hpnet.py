@@ -117,8 +117,9 @@ class HPNET(nn.Module):
 
         confidence = self.decoder(feature)
 
-        self.rois_list = find_rois(
+        self.rois_list, self.rois_center_list = find_rois(
             confidence, confidence_thresh=self.confidence_thresh)
+
         if self.rois_list is None:
             self.rois_list = [torch.tensor(
                 [[0, 0, 0, 0]], dtype=torch.float32).to(

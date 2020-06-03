@@ -52,7 +52,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         'feature_compress': 1 / 16,
         'num_class': 6,
         'pool_out_size': 8,
-        'confidence_thresh': 0.3,
+        'confidence_thresh': 0.5,
     }
 
     hpnet_model = HPNET(config).to(device)
@@ -98,7 +98,12 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             hp_data_gt = hp_data_gt.to(device)
             ground_truth = hp_data_gt.cpu().detach().numpy().copy()
             confidence_gt = hp_data_gt[:, 0:1, ...]
-            rois_list_gt = find_rois(confidence_gt)
+            rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
+            # print('rois_list_gt.shape')
+            # print(len(rois_list_gt), rois_list_gt[0].shape, rois_list_gt[0])
+            # print('rois_center_list_gt.shape')
+            # print(len(rois_center_list_gt),
+            #       rois_center_list_gt[0].shape, rois_center_list_gt[0])
 
             confidence, depth_and_rotation = hpnet_model(hp_data)
             confidence_np = confidence[0, ...].cpu().detach().numpy().copy()
@@ -108,6 +113,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                                           cv2.COLOR_GRAY2BGR)
 
             depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
+            if hpnet_model.rois_list is None or rois_list_gt is None:
+                continue
             annotated_rois = annotate_rois(
                 hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
@@ -169,12 +176,14 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # Visualize gt axis and roi
             rois_gt_filtered = []
             dep_gt = []
-            for roi in rois_list_gt[0]:
+            for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
                 roi = roi.cpu().detach().numpy().copy()
-                cx = int((roi[0] + roi[2]) / 2)
-                cy = int((roi[1] + roi[3]) / 2)
+                # cx = int((roi[0] + roi[2]) / 2)
+                # cy = int((roi[1] + roi[3]) / 2)
+                cx = roi_c[0]
+                cy = roi_c[1]
 
                 # dep = hanging_point_depth_gt[0, cy, cx]
                 dep = depth[int(roi[1]):int(roi[3]),
@@ -374,7 +383,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 hp_data_gt = hp_data_gt.to(device)
                 ground_truth = hp_data_gt.cpu().detach().numpy().copy()
                 confidence_gt = hp_data_gt[:, 0:1, ...]
-                rois_list_gt = find_rois(confidence_gt)
+                rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
 
                 confidence, depth_and_rotation = hpnet_model(hp_data)
                 confidence_np = confidence[0, ...].cpu(
@@ -385,6 +394,8 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                                               cv2.COLOR_GRAY2BGR)
 
                 depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
+                if hpnet_model.rois_list is None or rois_list_gt is None:
+                    continue
                 annotated_rois = annotate_rois(
                     hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
@@ -443,12 +454,14 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 # Visualize gt axis and roi
                 rois_gt_filtered = []
                 dep_gt = []
-                for roi in rois_list_gt[0]:
+                for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
                     if roi.tolist() == [0, 0, 0, 0]:
                         continue
                     roi = roi.cpu().detach().numpy().copy()
-                    cx = int((roi[0] + roi[2]) / 2)
-                    cy = int((roi[1] + roi[3]) / 2)
+                    # cx = int((roi[0] + roi[2]) / 2)
+                    # cy = int((roi[1] + roi[3]) / 2)
+                    cx = roi_c[0]
+                    cy = roi_c[1]
 
                     dep = hanging_point_depth_gt[0, cy, cx]
                     dep_gt.append(dep)
@@ -636,7 +649,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0603')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/per500')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
@@ -650,7 +663,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200603_1843.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_lavalmodel_20200603_2323.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
     # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')

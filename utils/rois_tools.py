@@ -169,6 +169,7 @@ def find_rois(confidence,
     confidence = confidence.cpu().detach().numpy().copy()
 
     rois = []
+    rois_center = []
     for n in range(confidence.shape[0]):
         rois_n = None
         confidence_mask = confidence[n, ...].transpose(1, 2, 0)
@@ -191,12 +192,15 @@ def find_rois(confidence,
                 [[0, 0, 0, 0]], dtype=torch.float32).to('cuda')
             try:
                 rois.append(rois_n)
+                rois_center.append(np.array([0, 0]))
+
             except Exception:
                 print('rois_n', rois_n)
                 raise
             continue
 
         box = None
+
         for i, cnt in enumerate(contours):
             try:
                 area = cv2.contourArea(cnt)
@@ -207,25 +211,32 @@ def find_rois(confidence,
             except Exception:
                 continue
 
+            box_center = [int(box[0] + box[2] / 2), int(box[1] + box[3] / 2)]
             box = expand_box(box, confidence_mask.shape, scale=2.0)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],
                       box[0] + box[2], box[1] + box[3]]],
                     dtype=torch.float32).to('cuda')
+                rois_n_c = np.array([box_center])
+
             else:
                 rois_n = torch.cat((rois_n, torch.tensor(
                     [[box[0], box[1],
                       box[0] + box[2], box[1] + box[3]]],
                     dtype=torch.float32).to('cuda')))
+                rois_n_c = np.concatenate([rois_n_c, [box_center]])
 
         if rois_n is None:
             rois_n = torch.tensor(
                 [[0, 0, 0, 0]], dtype=torch.float32).to('cuda')
+            rois_n_c = np.array([[0, 0]])
         try:
             rois.append(rois_n)
+            rois_center.append(rois_n_c)
         except Exception:
             print('rois_n', rois_n)
+            print('rois_n_c', rois_n_c)
             raise
-
-    return None if rois == [] else rois
+    # return None, None
+    return (None, None) if rois == [] else (rois, rois_center)
