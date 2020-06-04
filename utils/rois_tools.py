@@ -22,7 +22,7 @@ except ImportError:
             sys.path.append(path)
 
 
-def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.5):
+def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.3):
     """rois_listに対して正しいgt_roiをiouを計算することによって見つける.
 
     Parametersa

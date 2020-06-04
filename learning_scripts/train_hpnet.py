@@ -122,7 +122,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 = criterion(confidence, hp_data_gt, pos_weight,
                             depth_and_rotation, annotated_rois)
 
-            loss = confidence_loss + rotation_loss
+            loss = confidence_loss * 0.1 + rotation_loss
 
             # if depth_loss > 0.01:
             #     print('loss function1')
@@ -212,10 +212,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 rois_gt_filtered.append(roi)
             print('dep_gt', dep_gt)
 
-            axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
-                                 (256, 256)).astype(np.uint8)
-            axis_gt = cv2.cvtColor(
-                axis_gt, cv2.COLOR_BGR2RGB)
+            axis_gt = cv2.resize(
+                cv2.cvtColor(
+                    axis_large_gt[ymin:ymax, xmin:xmax].astype(
+                        np.uint8), cv2.COLOR_BGR2RGB), (256, 256))
 
             # draw gt rois
             for roi in rois_gt_filtered:
@@ -229,7 +229,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
             axis_large_pred = np.zeros((1080, 1920, 3))
-            axis_large_pred[ymin:ymax, xmin:xmax] \
+            axis_large_pred[ymin:ymax, xmin:xmax]\
                 = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
             dep_pred = []
             for i, roi in enumerate(hpnet_model.rois_list[0]):
@@ -248,6 +248,11 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
+                if annotated_rois[i][2]:
+                    confidence_vis = cv2.rectangle(
+                        confidence_vis, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                            int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+
                 # create_depth_circle(depth, cy, cx, dep.cpu().detach())
                 create_depth_circle(depth, cy, cx, dep)
 
@@ -285,12 +290,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             # draw pred rois
-            for roi in hpnet_model.rois_list[0]:
+            for i, roi in enumerate(hpnet_model.rois_list[0]):
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
                 axis_pred = cv2.rectangle(
                     axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
+                if annotated_rois[i][2]:
+                    confidence_vis = cv2.rectangle(
+                        axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                            int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
             if np.mod(index, 1) == 0:
                 print('epoch {}, {}/{},train loss is confidence:{} rotation:{}'.format(
@@ -323,12 +332,12 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
         if len(train_dataloader) > 0:
             avg_train_loss = train_loss / len(train_dataloader)
-            avg_confidence_train_loss \
+            avg_confidence_train_loss\
                 = confidence_train_loss / len(train_dataloader)
             # avg_depth_trannin_loss \
             #     = depth_train_loss / len(train_dataloader)
             if rotation_train_loss_count > 0:
-                avg_rotation_train_loss \
+                avg_rotation_train_loss\
                     = rotation_train_loss / rotation_train_loss_count
                 rotation_train_loss_count += 1
 
@@ -399,7 +408,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 annotated_rois = annotate_rois(
                     hpnet_model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
-                confidence_loss, depth_loss, rotation_loss \
+                confidence_loss, depth_loss, rotation_loss\
                     = criterion(confidence, hp_data_gt, pos_weight,
                                 depth_and_rotation, annotated_rois)
                 # confidence_loss *= 1
@@ -433,11 +442,11 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 # depth_rgb = cv2.cvtColor(
                 #     depth_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
-                hanging_point_depth_gt \
+                hanging_point_depth_gt\
                     = ground_truth[:, 1, ...].astype(np.float32) * 1000
                 rotations_gt = ground_truth[0, 2:, ...]
                 rotations_gt = rotations_gt.transpose(1, 2, 0)
-                hanging_point_depth_gt_bgr \
+                hanging_point_depth_gt_bgr\
                     = colorize_depth(hanging_point_depth_gt[0, ...], 100, 1500)
                 hanging_point_depth_gt_rgb = cv2.cvtColor(
                     hanging_point_depth_gt_bgr,
@@ -445,7 +454,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
                 axis_gt = depth_bgr.copy()
                 axis_large_gt = np.zeros((1080, 1920, 3))
-                axis_large_gt[ymin:ymax, xmin:xmax] \
+                axis_large_gt[ymin:ymax, xmin:xmax]\
                     = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
 
                 confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
@@ -486,10 +495,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     rois_gt_filtered.append(roi)
                 print('dep_gt', dep_gt)
 
-                axis_gt = cv2.resize(axis_large_gt[ymin:ymax, xmin:xmax],
-                                     (256, 256)).astype(np.uint8)
-                axis_gt = cv2.cvtColor(
-                    axis_gt, cv2.COLOR_BGR2RGB)
+                axis_gt = cv2.resize(
+                    cv2.cvtColor(
+                        axis_large_gt[ymin:ymax, xmin:xmax].astype(
+                            np.uint8), cv2.COLOR_BGR2RGB), (256, 256))
 
                 # draw gt rois
                 for roi in rois_gt_filtered:
@@ -503,7 +512,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 # Visualize pred axis and roi
                 axis_pred = depth_bgr.copy()
                 axis_large_pred = np.zeros((1080, 1920, 3))
-                axis_large_pred[ymin:ymax, xmin:xmax] \
+                axis_large_pred[ymin:ymax, xmin:xmax]\
                     = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
                 dep_pred = []
                 for i, roi in enumerate(hpnet_model.rois_list[0]):
@@ -520,12 +529,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                                 int(roi[0]):int(roi[2])]
                     dep = np.median(dep[np.where(
                         np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
-                    # print(dep)
+                    # print(dep)xo
 
                     dep_pred.append(float(dep))
                     confidence_vis = cv2.rectangle(
                         confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                         (0, 255, 0), 3)
+                    if annotated_rois[i][2]:
+                        confidence_vis = cv2.rectangle(
+                            confidence_vis, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                                int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
                     # create_depth_circle(depth, cy, cx, dep.cpu().detach())
                     create_depth_circle(depth, cy, cx, dep)
 
@@ -561,12 +574,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
                 # draw pred rois
-                for roi in hpnet_model.rois_list[0]:
+                for i, roi in enumerate(hpnet_model.rois_list[0]):
                     if roi.tolist() == [0, 0, 0, 0]:
                         continue
                     axis_pred = cv2.rectangle(
                         axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
                         (0, 255, 0), 3)
+                    if annotated_rois[i][2]:
+                        confidence_vis = cv2.rectangle(
+                            axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                                int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
                 if np.mod(index, 1) == 0:
                     # print('epoch {}, {}/{},val loss is {}'.format(
@@ -596,10 +613,10 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
             if len(val_dataloader) > 0:
                 # avg_val_loss = val_loss / len(val_dataloader)
-                avg_confidence_val_loss \
+                avg_confidence_val_loss\
                     = confidence_val_loss / len(val_dataloader)
                 if rotation_val_loss_count > 0:
-                    avg_rotation_val_loss \
+                    avg_rotation_val_loss\
                         = rotation_val_loss / rotation_val_loss_count
                 else:
                     avg_rotation_val_loss = rotation_val_loss
@@ -649,7 +666,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/per500')
+        default='/media/kosuke/SANDISK/meshdata/ycb_o3-cupkey')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
@@ -663,7 +680,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_lavalmodel_20200603_2323.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_lavalmodel_20200604_1320.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
     # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
