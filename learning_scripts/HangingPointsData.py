@@ -61,7 +61,6 @@ class HangingPointsDataset(Dataset):
         depth = np.load(
             os.path.join(self.data_path, "depth/",
                          os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
-
         r = np.random.randint(20)
         kernel = np.ones((r, r), np.uint8)
         depth = cv2.dilate(depth, kernel, iterations=1)

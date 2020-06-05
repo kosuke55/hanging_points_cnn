@@ -52,7 +52,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         'feature_compress': 1 / 16,
         'num_class': 6,
         'pool_out_size': 8,
-        'confidence_thresh': 0.5,
+        'confidence_thresh': 0.3,
     }
 
     hpnet_model = HPNET(config).to(device)
@@ -297,7 +297,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
                 if annotated_rois[i][2]:
-                    confidence_vis = cv2.rectangle(
+                    axis_pred = cv2.rectangle(
                         axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
                             int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
@@ -307,7 +307,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     index,
                     len(train_dataloader),
                     confidence_train_loss,
-                    rotation_train_loss,
+                    rotation_train_loss
                 ))
                 # iter_loss))
                 vis.images([hanging_point_depth_gt_rgb,
@@ -331,7 +331,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 break
 
         if len(train_dataloader) > 0:
-            avg_train_loss = train_loss / len(train_dataloader)
+            # avg_train_loss = train_loss / len(train_dataloader)
             avg_confidence_train_loss\
                 = confidence_train_loss / len(train_dataloader)
             # avg_depth_trannin_loss \
@@ -339,12 +339,17 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             if rotation_train_loss_count > 0:
                 avg_rotation_train_loss\
                     = rotation_train_loss / rotation_train_loss_count
-                rotation_train_loss_count += 1
+                avg_train_loss\
+                    = train_loss / rotation_train_loss_count
+                # train_loss = train_loss + confidence_loss.item() + rotation_loss.item()
+                # rotation_train_loss_count += 1
+            else:
+                avg_rotation_train_loss = rotation_train_loss
 
         else:
-            avg_train_loss = train_loss
+            # avg_train_loss = train_loss
             avg_confidence_train_loss = confidence_train_loss
-            avg_depth_train_loss = depth_train_loss
+            # avg_depth_train_loss = depth_train_loss
             avg_rotation_train_loss = rotation_train_loss
 
         # vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]),
@@ -355,7 +360,9 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         #          win='loss', name='avg_depth_train_loss', update='append')
         if rotation_train_loss_count > 0:
             vis.line(X=np.array([epo]), Y=np.array([avg_rotation_train_loss]),
-                     win='loss', name='avg_rotation_train_loss', update='append')
+                     win='loss', name='rotation_train_loss', update='append')
+            vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]),
+                     win='loss', name='train_loss', update='append')
 
         scheduler.step()
 
@@ -493,7 +500,6 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                         pass
 
                     rois_gt_filtered.append(roi)
-                print('dep_gt', dep_gt)
 
                 axis_gt = cv2.resize(
                     cv2.cvtColor(
@@ -581,16 +587,18 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                         axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
                         (0, 255, 0), 3)
                     if annotated_rois[i][2]:
-                        confidence_vis = cv2.rectangle(
+                        axis_pred = cv2.rectangle(
                             axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
                                 int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
                 if np.mod(index, 1) == 0:
-                    # print('epoch {}, {}/{},val loss is {}'.format(
-                    #     epo,
-                    #     index,
-                    #     len(val_dataloader),
-                    #     iter_loss))
+                    print('epoch {}, {}/{},val loss is confidence:{} rotation:{}'.format(
+                        epo,
+                        index,
+                        len(val_dataloader),
+                        confidence_val_loss,
+                        rotation_val_loss
+                    ))
                     vis.images([hanging_point_depth_gt_rgb,
                                 depth_pred_rgb],
                                win='val hanging_point_depth_gt_rgb',
@@ -611,27 +619,30 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                     print("Finish val {} data. So start val.".format(index))
                     break
 
-            if len(val_dataloader) > 0:
-                # avg_val_loss = val_loss / len(val_dataloader)
-                avg_confidence_val_loss\
-                    = confidence_val_loss / len(val_dataloader)
-                if rotation_val_loss_count > 0:
-                    avg_rotation_val_loss\
-                        = rotation_val_loss / rotation_val_loss_count
-                else:
-                    avg_rotation_val_loss = rotation_val_loss
-
-            else:
-                # avg_val_loss = val_loss
-                avg_confidence_val_loss = confidence_val_loss
-
-            # vis.line(X=np.array([epo]), Y=np.array([avg_val_loss]), win='loss',
-            #          name='avg_val_loss', update='append')
-            vis.line(X=np.array([epo]), Y=np.array([avg_confidence_val_loss]),
-                     win='loss', name='avg_confidence_val_loss', update='append')
+        if len(val_dataloader) > 0:
+            # avg_val_loss = val_loss / len(val_dataloader)
+            avg_confidence_val_loss\
+                = confidence_val_loss / len(val_dataloader)
             if rotation_val_loss_count > 0:
-                vis.line(X=np.array([epo]), Y=np.array([avg_rotation_val_loss]),
-                         win='loss', name='avg_rotation_val_loss', update='append')
+                avg_rotation_val_loss\
+                    = rotation_val_loss / rotation_val_loss_count
+                avg_val_loss\
+                    = val_loss / rotation_val_loss_count
+            else:
+                avg_rotation_val_loss = rotation_val_loss
+        else:
+            # avg_val_loss = val_loss
+            avg_confidence_val_loss = confidence_val_loss
+            avg_rotation_val_loss = rotation_val_loss
+        # vis.line(X=np.array([epo]), Y=np.array([avg_val_loss]), win='loss',
+        #          name='avg_val_loss', update='append')
+        vis.line(X=np.array([epo]), Y=np.array([avg_confidence_val_loss]),
+                 win='loss', name='confidence_val_loss', update='append')
+        if rotation_val_loss_count > 0:
+            vis.line(X=np.array([epo]), Y=np.array([avg_rotation_val_loss]),
+                     win='loss', name='rotation_val_loss', update='append')
+            vis.line(X=np.array([epo]), Y=np.array([avg_val_loss]),
+                     win='loss', name='val_loss', update='append')
 
         cur_time = datetime.now()
         h, remainder = divmod((cur_time - prev_time).seconds, 3600)
@@ -639,16 +650,20 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
         time_str = "Time %02d:%02d:%02d" % (h, m, s)
         prev_time = cur_time
 
-        if np.mod(epo, 10) == 0 and epo > 10:
+        print('----save latest model  2-----')
+        torch.save(hpnet_model.state_dict(),
+                   os.path.join(save_dir, 'hpnet_latestmodel_' + now + '.pt'))
+        if np.mod(epo, 1) == 0 and epo > 1:
+            print('----save latest model-----')
             torch.save(hpnet_model.state_dict(),
-                       os.path.join(save_dir, 'hpnet_lavalmodel_' + now + '.pt'))
+                       os.path.join(save_dir, 'hpnet_latestmodel_' + now + '.pt'))
         print('epoch val loss = %f, epoch val loss = %f, best_loss = %f, %s' %
               (val_loss / len(val_dataloader),
                val_loss / len(val_dataloader),
                best_loss,
                time_str))
         if rotation_val_loss_count > 0:
-            if best_loss > val_loss / rotation_val_loss_count and epo > 5:
+            if best_loss > val_loss / rotation_val_loss_count and epo > 1:
                 print('update best model {} -> {}'.format(
                     best_loss, val_loss / rotation_val_loss_count))
                 best_loss = val_loss / rotation_val_loss_count
@@ -666,7 +681,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_o3-cupkey')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/per2000')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
@@ -680,7 +695,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_lavalmodel_20200604_1320.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200605_0010.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
     # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')

@@ -39,7 +39,7 @@ class HPNETLoss(Module):
 
         confidence_diff = confidence[:, 0, ...] - confidence_gt[:, 0, ...]
         confidence_loss = torch.sum(
-            (weight * confidence_diff) ** 2) / (256 ** 2)
+            weight * confidence_diff ** 2) / (256 ** 2)
         # confidence_loss = torch.sum((weight * confidence_diff) ** 2)
 
         depth_loss, rotation_loss = torch.tensor(

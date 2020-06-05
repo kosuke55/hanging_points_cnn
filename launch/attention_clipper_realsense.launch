@@ -15,6 +15,9 @@
   <arg name="INPUT_BOX" value="/box" />
   <arg name="RESOLUTION" default="0.01" />
 
+  <arg name="manager" default="hpg_manager" />
+  <!-- <arg name="MACHINE" default="localhost"/> -->
+
   <node name="gripper_box_publisher"
         pkg="box_publisher" type="pub_box.py">
     <remap from="~output" to="$(arg INPUT_BOX)"/>
@@ -41,9 +44,48 @@
         pkg="jsk_pcl_ros" type="extract_indices">
     <remap from="~input" to="$(arg INPUT_CLOUD)" />
     <remap from="~indices" to="attention_clipper_gripper/output/point_indices" />
+    <rosparam>
+      keep_organized: true
+    </rosparam>
   </node>
 
-  <node name="point_indices_to_mask_image"
+  <node name="euclidean_clustering"
+        pkg="jsk_pcl_ros" type="euclidean_clustering">
+      <remap from="~input" to="extract_indices_gripper/output" />
+    <rosparam>
+      tolerance: 0.005
+    </rosparam>
+  </node>
+
+  <node name="cluster_point_indices_decomposer"
+        pkg="jsk_pcl_ros" type="cluster_point_indices_decomposer">
+    <remap from="~input" to="extract_indices_gripper/output" />
+    <remap from="~target" to="euclidean_clustering/output" />
+    <rosparam>
+      approximate_sync: true
+      align_boxes: false
+      align_boxes_with_plane: false
+      publish_clouds: true
+      target_frame_id: camera_link
+      use_pca: true
+      queue_size: 200
+    </rosparam>
+  </node>
+
+    <!-- <node name="colorize_labels"
+        pkg="jsk_perception" type="colorize_labels">
+    <remap from="~input" to="/cluster_point_indices_decomposer/label"/>
+  </node> -->
+
+  <node name="label_to_mask_image"
+        pkg="jsk_perception" type="label_to_mask_image">
+    <remap from="~input" to="/cluster_point_indices_decomposer/label"/>
+      <rosparam>
+        label_value: 1
+      </rosparam>
+  </node>
+
+ <!-- <node name="point_indices_to_mask_image"
         pkg="jsk_pcl_ros_utils" type="point_indices_to_mask_image" >
     <remap from="~input" to="attention_clipper_gripper/output/point_indices" />
     <remap from="~input/image" to="$(arg INPUT_IMAGE)" />
@@ -51,7 +93,7 @@
       approximate_sync: true
       static_image_size: false
     </rosparam>
-  </node>
+  </node> -->
 
   <!-- <node name="dilate_mask_image" -->
   <!--       pkg="jsk_perception" type="dilate_mask_image" > -->
@@ -66,7 +108,8 @@
         pkg="nodelet" type="nodelet"
         args="standalone jsk_perception/ApplyMaskImage">
     <remap from="~input" to="$(arg INPUT_IMAGE)" />
-    <remap from="~input/mask" to="/point_indices_to_mask_image/output" />
+    <remap from="~input/mask" to="/label_to_mask_image/output" />
+    <!-- <remap from="~input/mask" to="/point_indices_to_mask_image/output" /> -->
     <!-- <remap from="~input/mask" to="/dilate_mask_image/output" /> -->
     <remap from="~input/camera_info" to="$(arg CAMERA_INFO)" />
     <rosparam>
@@ -79,13 +122,14 @@
         pkg="nodelet" type="nodelet"
         args="standalone jsk_perception/ApplyMaskImage">
     <remap from="~input" to="$(arg INPUT_DEPTH)" />
-    <remap from="~input/mask" to="/point_indices_to_mask_image/output" />
+    <remap from="~input/mask" to="/label_to_mask_image/output" />
+    <!-- <remap from="~input/mask" to="/point_indices_to_mask_image/output" /> -->
     <!-- <remap from="~input/mask" to="/dilate_mask_image/output" /> -->
     <remap from="~input/camera_info" to="$(arg CAMERA_INFO)" />
     <rosparam>
       approximate_sync: true
       clip: true
     </rosparam>
-  </node>  
+  </node>
 
 </launch>

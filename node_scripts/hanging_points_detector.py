@@ -33,6 +33,14 @@ except ImportError:
             sys.path.append(path)
 
 
+def frame_img(img, frame=1):
+    height, width = img.shape[:2]
+    resized_img = cv2.resize(img, (width - frame * 2, height - frame * 2))
+    framed_img = np.zeros(img.shape)
+    framed_img[frame:height - frame, frame:width - frame] = resized_img
+    return framed_img
+
+
 class HangingPointsNet():
     def __init__(self):
         self.bridge = CvBridge()
@@ -65,7 +73,7 @@ class HangingPointsNet():
             'cuda' if torch.cuda.is_available() else 'cpu')
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200603_1843.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200605_0010.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
@@ -116,13 +124,13 @@ class HangingPointsNet():
         self.camera_info = rospy.wait_for_message(
             self.camera_info_topic, CameraInfo)
         print(self.camera_info)
-        self.camera_model \
+        self.camera_model\
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
 
         self.camera_info_adepth = rospy.wait_for_message(
             self.camera_info_adepth_topic, CameraInfo)
-        self.camera_model_adepth \
+        self.camera_model_adepth\
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info_adepth)
         # import image_geometry
@@ -149,14 +157,19 @@ class HangingPointsNet():
         depth[depth < 200] = 0
         depth[depth > 500] = 0
         # depth_bgr = colorize_depth(depth, 100, 1500)
-        depth_bgr = colorize_depth(depth, 300, 700)
 
         bgr = cv2.resize(bgr, (256, 256))
         # depth_bgr = cv2.resize(depth_bgr, (256, 256))
-        depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
+
         # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
         depth = cv2.resize(depth, (256, 256))
+        depth = frame_img(depth)
+        kernel = np.ones((10, 10), np.uint8)
+        depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
+        depth_bgr = colorize_depth(depth, 300, 700)
+        # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
+        depth_bgr[np.where(depth == 0)] = [0, 0, 0]
         in_feature = depth.copy().astype(np.float32) * 0.001
 
         # print('in_feature.shape)', in_feature.shape)

@@ -333,7 +333,7 @@ if __name__ == '__main__':
         '-s',
         type=str,
         help='save dir',
-        default='ycb_hanging_object/per500')
+        default='ycb_hanging_object/per2000')
     parser.add_argument(
         '--input_files',
         '-i',
@@ -446,7 +446,7 @@ if __name__ == '__main__':
 
                 data_count = 0
                 # for _ in range(1000):
-                while data_count < 500:
+                while data_count < 2000:
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
@@ -713,22 +713,22 @@ if __name__ == '__main__':
                     #     cv2.moveWindow('hanging_points_depth_bgr', 500, 200)
                     #     cv2.moveWindow('annotation', 900, 100)
 
-                    cv2.imwrite(
-                        os.path.join(
-                            save_dir, 'color', '{:05}.png'.format(
-                                data_id)), bgr)
-                    cv2.imwrite(
-                        os.path.join(
-                            save_dir, 'color_raw', '{:05}.png'.format(
-                                data_id)), bgr_raw)
+                    # cv2.imwrite(
+                    #     os.path.join(
+                    #         save_dir, 'color', '{:05}.png'.format(
+                    #             data_id)), bgr)
+                    # cv2.imwrite(
+                    #     os.path.join(
+                    #         save_dir, 'color_raw', '{:05}.png'.format(
+                    #             data_id)), bgr_raw)
                     cv2.imwrite(
                         os.path.join(
                             save_dir, 'debug_axis', '{:05}.png'.format(
                                 data_id)), bgr_axis)
-                    cv2.imwrite(
-                        os.path.join(
-                            save_dir, 'debug_heatmap', '{:05}.png'.format(
-                                data_id)), bgr_annotation)
+                    # cv2.imwrite(
+                    #     os.path.join(
+                    #         save_dir, 'debug_heatmap', '{:05}.png'.format(
+                    #             data_id)), bgr_annotation)
                     np.save(
                         os.path.join(
                             save_dir, 'depth', '{:05}'.format(data_id)), depth)
@@ -741,10 +741,10 @@ if __name__ == '__main__':
                         os.path.join(
                             save_dir, 'rotations', '{:05}'.format(data_id)),
                         rotations)
-                    cv2.imwrite(
-                        os.path.join(
-                            save_dir, 'depth_bgr', '{:05}.png'.format(
-                                data_id)), depth_bgr)
+                    # cv2.imwrite(
+                    #     os.path.join(
+                    #         save_dir, 'depth_bgr', '{:05}.png'.format(
+                    #             data_id)), depth_bgr)
                     cv2.imwrite(
                         os.path.join(
                             save_dir, 'heatmap', '{:05}.png'.format(
