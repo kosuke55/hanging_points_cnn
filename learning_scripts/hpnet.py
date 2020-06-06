@@ -46,7 +46,7 @@ class Decoder(nn.Module):
 
     def __init__(self, n_class=1):
         super(Decoder, self).__init__()
-        self.n_class = 1
+        self.n_class = n_class
 
         self.conv1 = Conv2DBatchNormRelu(
             512, 128, kernel_size=3, stride=1, padding=1)
@@ -76,7 +76,7 @@ class HPNET(nn.Module):
         if config is None:
             config = {
                 'feature_compress': 1 / 16,
-                'num_class': 6,
+                'num_class': 1,
                 'pool_out_size': 8,
                 'confidence_thresh': 0.1,
             }

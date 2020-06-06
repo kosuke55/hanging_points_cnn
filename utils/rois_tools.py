@@ -180,12 +180,12 @@ def find_rois(confidence,
 
         _, confidence_mask = cv2.threshold(
             confidence_mask, int(255 * confidence_thresh), 255, 0)
-        _, contours, hierarchy = cv2.findContours(confidence_mask,
-                                                  cv2.RETR_TREE,
-                                                  cv2.CHAIN_APPROX_SIMPLE)
         # _, contours, hierarchy = cv2.findContours(confidence_mask,
         #                                           cv2.RETR_TREE,
         #                                           cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(confidence_mask,
+                                               cv2.RETR_TREE,
+                                               cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             # set dummy rois. None にするとroi_alignでerrorが起きる.
             rois_n = torch.tensor(

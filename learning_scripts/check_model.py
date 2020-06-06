@@ -1,35 +1,20 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-from hpnet import HPNET
-from torchvision import transforms
-from torchsummary import summary
-import torch
-import numpy as np
-import cv2
 import os
+import os.path as osp
 import sys
 
-# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-# sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+from torchsummary import summary
 
-from utils.rois_tools import expand_box, find_rois
-
+sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
+from hpnet import HPNET
 
 config = {
-    'feature_stride': 16,
     'feature_compress': 1 / 16,
-    'num_feature_channel': 256,
-    'num_fc7_channel': 512,
-    'num_rpn_channel': 512,
-    'num_anchor': 9,
-    'score_top_n': 100,
-    'nms_top_n': 50,
-    'nms_thresh': 0.7,
-    'pool_out_size': 8,
     'num_class': 1,
-    'radios': (0.5, 1, 2),
-    'scales': (4, 8, 16),
+    'pool_out_size': 8,
+    'confidence_thresh': 0.3,
 }
 
 data_path = '/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/rotations_0514_1000'
@@ -49,7 +34,6 @@ for idx in range(1):
     #                  os.path.splitext(data_name)[0]) + ".npy").astype(np.float32) * 0.001
     # color = cv2.imread(os.path.join(data_path, "color/", data_name)).astype(np.float32)
 
-    
     # confidence_gt_img = cv2.imread(
     #     os.path.join(data_path, "heatmap/", data_name),
     #     cv2.IMREAD_GRAYSCALE).astype(np.float32)
@@ -91,5 +75,5 @@ for idx in range(1):
     # cv2.imwrite('debug/confidence{:03}.png'.format(idx), confidence_bgr)
     # cv2.imwrite('debug/color{:03}.png'.format(idx), color)
     # # cv2.imwrite('confidence.png', confidence)
-    
-    summary(model, (1, 256, 256)) # summary(model,(channels,H,W))
+
+    summary(model, (1, 256, 256))  # summary(model,(channels,H,W))

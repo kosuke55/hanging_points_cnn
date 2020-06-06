@@ -333,7 +333,7 @@ if __name__ == '__main__':
         '-s',
         type=str,
         help='save dir',
-        default='ycb_hanging_object/per2000')
+        default='ycb_hanging_object/per5000')
     parser.add_argument(
         '--input_files',
         '-i',
@@ -408,7 +408,7 @@ if __name__ == '__main__':
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
     print(files)
-    data_id = 0
+    data_id = 18000
     try:
         for file in files:
             dirname, filename = os.path.split(file)
@@ -446,7 +446,7 @@ if __name__ == '__main__':
 
                 data_count = 0
                 # for _ in range(1000):
-                while data_count < 2000:
+                while data_count < 3000:
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,

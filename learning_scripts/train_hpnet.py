@@ -50,7 +50,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
     config = {
         'feature_compress': 1 / 16,
-        'num_class': 6,
+        'num_class': 1,
         'pool_out_size': 8,
         'confidence_thresh': 0.3,
     }
@@ -681,7 +681,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/per2000')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/per5000')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
     # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
     parser.add_argument('--batch_size', '-bs', type=int,
@@ -695,7 +695,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200605_0010.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200606_0444.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
     # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
