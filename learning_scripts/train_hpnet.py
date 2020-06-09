@@ -258,9 +258,7 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
 
                 q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                 q /= np.linalg.norm(q)
-                pixel_point = [int(cx * (xmax - xmin) / float(256
-
-                                                              ) + xmin),
+                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                                int(cy * (ymax - ymin) / float(256) + ymin)]
                 hanging_point_pose = np.array(
                     cameramodel.project_pixel_to_3d_ray(
@@ -695,7 +693,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200606_0444.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200608_0311.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
     # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')

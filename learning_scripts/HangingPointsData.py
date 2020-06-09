@@ -17,7 +17,6 @@ for path in sys.path:
     else:
         import cv2
 
-
 def load_dataset(data_path, batch_size):
     transform = transforms.Compose([
         transforms.ToTensor()])
