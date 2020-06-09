@@ -54,6 +54,9 @@
       <remap from="~input" to="extract_indices_gripper/output" />
     <rosparam>
       tolerance: 0.005
+      label_tracking_tolerance: 0.2
+      max_size: 100000
+      min_size: 20
     </rosparam>
   </node>
 
