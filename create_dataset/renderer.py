@@ -93,15 +93,15 @@ def draw_axis(img, R, t, K):
     axisPoints, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
     img = cv2.line(
         img, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()),
-        (0, 0, 255), 1)
+        (0, 0, 255), 2)
     img = cv2.line(
         img,
         tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()),
-        (0, 255, 0), 1)
+        (0, 255, 0), 2)
     img = cv2.line(
         img,
         tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()),
-        (255, 0, 0), 1)
+        (255, 0, 0), 2)
     return img
 
 
@@ -405,6 +405,10 @@ if __name__ == '__main__':
     camera_object = pybullet.createCollisionShape(
         pybullet.GEOM_BOX,
         halfExtents=[camera_length, camera_length, camera_length])
+    camera_object_visual = pybullet.createVisualShape(
+        pybullet.GEOM_BOX,
+        halfExtents=[camera_length, camera_length, camera_length],
+        rgbaColor=[0, 0, 0, 1])
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
     print(files)
@@ -451,6 +455,7 @@ if __name__ == '__main__':
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
                         baseCollisionShapeIndex=camera_object,
+                        baseVisualShapeIndex=camera_object_visual,
                         basePosition=r.camera_coords.worldpos(),
                         baseOrientation=[0, 0, 0, 1.])
                     r.objects.append(camera_id)
@@ -565,9 +570,6 @@ if __name__ == '__main__':
                         hanging_point_worldcoords \
                             = r.object_coords.copy().transform(
                                 hanging_point_coords)
-                        pybullet.addUserDebugLine(
-                            hanging_point_worldcoords.worldpos(),
-                            r.camera_coords.worldpos(), [1, 1, 1], 2)
 
                         hanging_point_in_camera_coords \
                             = r.camera_coords.inverse_transformation(
@@ -584,10 +586,15 @@ if __name__ == '__main__':
                             hanging_point_in_camera_coords_list.append(
                                 hanging_point_in_camera_coords)
 
-                    # for hp in hanging_point_in_camera_coords_list:
-                    #     R = hp.worldrot()
-                    #     t = hp.worldpos()
-                    #     draw_axis(bgr_axis, R, t, r.camera_model.K)
+                            pybullet.addUserDebugLine(
+                                hanging_point_worldcoords.worldpos(),
+                                r.camera_coords.worldpos(), [1, 1, 1], 1)
+
+                        # occulsion
+                        else:
+                            pybullet.addUserDebugLine(
+                                hanging_point_worldcoords.worldpos(),
+                                r.camera_coords.worldpos(), [1, 0, 0], 1)
 
                     if len(hanging_point_in_camera_coords_list) == 0:
                         r.remove_all_objects()
@@ -702,7 +709,7 @@ if __name__ == '__main__':
                     #            hanging_points_depth_bgr)
                     # cv2.imshow('depth', depth)
                     # cv2.imshow('hanging_points_depth', hanging_points_depth)
-                    # cv2.waitKey(1)
+                    cv2.waitKey(10)
 
                     clip_info = np.array([xmin, xmax, ymin, ymax])
 
