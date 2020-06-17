@@ -232,12 +232,17 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
             axis_large_pred[ymin:ymax, xmin:xmax]\
                 = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
             dep_pred = []
-            for i, roi in enumerate(hpnet_model.rois_list[0]):
+            # for i, roi in enumerate(hpnet_model.rois_list[0]):
+            for i, (roi, roi_c) in enumerate(zip(hpnet_model.rois_list[0], hpnet_model.rois_center_list[0])):
+
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
                 roi = roi.cpu().detach().numpy().copy()
-                cx = int((roi[0] + roi[2]) / 2)
-                cy = int((roi[1] + roi[3]) / 2)
+                # cx = int((roi[0] + roi[2]) / 2)
+                # cy = int((roi[1] + roi[3]) / 2)
+                cx = roi_c[0]
+                cy = roi_c[1]
+
                 # dep = depth_and_rotation[i, 0] * 1000
                 # dep_pred.append(float(dep))
                 dep = depth[int(roi[1]):int(roi[3]),
@@ -519,12 +524,16 @@ def train(data_path, batch_size, max_epoch, pretrained_model,
                 axis_large_pred[ymin:ymax, xmin:xmax]\
                     = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
                 dep_pred = []
-                for i, roi in enumerate(hpnet_model.rois_list[0]):
+                # for i, roi in enumerate(hpnet_model.rois_list[0]):
+                for i, (roi, roi_c) in enumerate(
+                        zip(hpnet_model.rois_list[0], hpnet_model.rois_center_list[0])):
                     if roi.tolist() == [0, 0, 0, 0]:
                         continue
                     roi = roi.cpu().detach().numpy().copy()
-                    cx = int((roi[0] + roi[2]) / 2)
-                    cy = int((roi[1] + roi[3]) / 2)
+                    # cx = int((roi[0] + roi[2]) / 2)
+                    # cy = int((roi[1] + roi[3]) / 2)
+                    cx = roi_c[0]
+                    cy = roi_c[1]
 
                     # Use pred value
                     # dep = depth_and_rotation[i, 0] * 1000

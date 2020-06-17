@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset, random_split
+import torch
+import skrobot
+import numpy as np
+import cv2
+import cameramodels
 import os
 import sys
 
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-
-import cameramodels
-import cv2
-import numpy as np
-import skrobot
-import torch
-from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision import transforms
 
 
 def draw_axis(img, R, t, K):

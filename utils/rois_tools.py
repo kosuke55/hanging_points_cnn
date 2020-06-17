@@ -35,7 +35,7 @@ def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.3):
         rois_pair: list[pred_roi_list[], gt_roi_list[], bool, max_iou]
         len(rois_pair) = Total of all rois for all batches
 
-listを返す.
+    listを返す.
         gtがない場合もわかるように
     -------
     """
@@ -214,7 +214,7 @@ def find_rois(confidence,
                 continue
 
             box_center = [int(box[0] + box[2] / 2), int(box[1] + box[3] / 2)]
-            box = expand_box(box, confidence_mask.shape, scale=2.0)
+            box = expand_box(box, confidence_mask.shape, scale=2.5)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],

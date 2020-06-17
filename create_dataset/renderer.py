@@ -16,7 +16,7 @@ import pybullet_data
 # import skrobot
 
 import xml.etree.ElementTree as ET
-from hanging_points_generator.hanging_points_generator \
+from hanging_points_generator.hp_generator \
     import cluster_hanging_points
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
