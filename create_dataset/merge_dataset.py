@@ -8,7 +8,7 @@ import os.path as osp
 import subprocess
 
 
-def merge_two_daataset(input_dir_1, input_dir_2, out_dir):
+def merge_two_dataset(input_dir_1, input_dir_2, out_dir):
     '''
     Merge input_dir_1 and input_dir_2 into out_dir.
     '''
@@ -132,4 +132,4 @@ if __name__ == '__main__':
     input_dir_2 = args.input_dir_2
     out_dir = args.out_dir
 
-    merge_two_daataset(input_dir_1, input_dir_2, out_dir)
+    merge_two_dataset(input_dir_1, input_dir_2, out_dir)
