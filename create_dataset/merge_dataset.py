@@ -15,52 +15,63 @@ def merge_two_dataset(input_dir_1, input_dir_2, out_dir):
 
     os.makedirs(out_dir, exist_ok=True)
 
-    cmd = 'sudo cp -r ' + input_dir_1 + '/clip_info ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + '/debug_axis ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + '/depth ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + \
-        '/hanging_points_depth ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + '/heatmap ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + '/rotations ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
-    cmd = 'sudo cp -r ' + input_dir_1 + '/intrinsics ' + out_dir
-    print(cmd)
-    subprocess.call(
-        [cmd],
-        shell=True)
+    if input_dir_1 != out_dir:
+        cmd = 'sudo cp -r ' + input_dir_1 + '/clip_info ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + '/debug_axis ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + '/depth ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + \
+            '/hanging_points_depth ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + '/heatmap ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + '/rotations ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
+        cmd = 'sudo cp -r ' + input_dir_1 + '/intrinsics ' + out_dir
+        print(cmd)
+        subprocess.call(
+            [cmd],
+            shell=True)
 
     files_1 = glob.glob(osp.join(input_dir_1, 'depth', '*'))
     files_1.sort()
+
     dirname, filename = osp.split(files_1[len(files_1) - 1])
+
     files_1_last_idx, ext = osp.splitext(filename)
     files_1_last_idx = int(files_1_last_idx)
 
     files_2 = glob.glob(osp.join(input_dir_2, 'depth', '*'))
+    # Empty dir
+    if files_2 == []:
+        return
     files_2.sort()
-    dirname, filename = osp.split(files_2[len(files_2) - 1])
+
+    try:
+        dirname, filename = osp.split(files_2[len(files_2) - 1])
+    except:
+        import ipdb
+        ipdb.set_trace()
     files_2_last_idx, ext = osp.splitext(filename)
     files_2_last_idx = int(files_2_last_idx)
 
@@ -112,20 +123,18 @@ if __name__ == '__main__':
         type=str,
         help='input dir 1',
         default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/kosuke-mouse-2020-06-18-14-23-55-721091-5714')
-    # default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0603')
     parser.add_argument(
         '--input_dir_2',
         '-i2',
         type=str,
         help='input dir 2',
         default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/kosuke-mouse-2020-06-18-14-23-57-348757-5757')
-    # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528')
     parser.add_argument(
         '--out_dir',
         '-o',
         type=str,
         help='out dir',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/m')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/merged')
     args = parser.parse_args()
 
     input_dir_1 = args.input_dir_1
