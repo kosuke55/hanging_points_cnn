@@ -134,11 +134,11 @@ if __name__ == '__main__':
         '-o',
         type=str,
         help='out dir',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/merged')
-    args = parser.parse_args()
+        default='/ media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge/merged
+    args=parser.parse_args()
 
-    input_dir_1 = args.input_dir_1
-    input_dir_2 = args.input_dir_2
-    out_dir = args.out_dir
+    input_dir_1=args.input_dir_1
+    input_dir_2=args.input_dir_2
+    out_dir=args.out_dir
 
     merge_two_dataset(input_dir_1, input_dir_2, out_dir)
