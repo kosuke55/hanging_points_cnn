@@ -65,37 +65,37 @@ def merge_two_daataset(input_dir_1, input_dir_2, out_dir):
     files_2_last_idx = int(files_2_last_idx)
 
     for idx in range(files_2_last_idx + 1):
-        cmd = 'sudo cp ' + input_dir_1 + '/clip_info/{:05}.npy '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/clip_info/{:05}.npy '.format(idx) + osp.join(
             out_dir, 'clip_info', '{:05}.npy'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
             [cmd],
             shell=True)
-        cmd = 'sudo cp ' + input_dir_1 + 'debug_axis/{:05}.png '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/debug_axis/{:05}.png '.format(idx) + osp.join(
             out_dir, 'debug_axis', '{:05}.png'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
             [cmd],
             shell=True)
-        cmd = 'sudo cp ' + input_dir_1 + '/depth/{:05}.npy '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/depth/{:05}.npy '.format(idx) + osp.join(
             out_dir, 'depth', '{:05}.npy'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
             [cmd],
             shell=True)
-        cmd = 'sudo cp ' + input_dir_1 + '/hanging_points_depth/{:05}.npy '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/hanging_points_depth/{:05}.npy '.format(idx) + osp.join(
             out_dir, 'hanging_points_depth', '{:05}.npy'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
             [cmd],
             shell=True)
-        cmd = 'sudo cp ' + input_dir_1 + '/heatmap/{:05}.png '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/heatmap/{:05}.png '.format(idx) + osp.join(
             out_dir, 'heatmap', '{:05}.png'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
             [cmd],
             shell=True)
-        cmd = 'sudo cp ' + input_dir_1 + '/rotations/{:05}.npy '.format(idx) + osp.join(
+        cmd = 'sudo cp ' + input_dir_2 + '/rotations/{:05}.npy '.format(idx) + osp.join(
             out_dir, 'rotations', '{:05}.npy'.format(files_1_last_idx + idx + 1))
         print(cmd)
         subprocess.call(
