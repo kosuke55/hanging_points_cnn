@@ -45,10 +45,10 @@ class Trainer(object):
 
         self.max_epoch = max_epoch
 
-        intrinsics = np.load(
+        self.intrinsics = np.load(
             os.path.join(data_path, "intrinsics/intrinsics.npy"))
         self.cameramodel = cameramodels.PinholeCameraModel.from_intrinsic_matrix(
-            intrinsics, 1080, 1920)
+            self.intrinsics, 1080, 1920)
 
         self.vis = visdom.Visdom(port='6006')
 
@@ -70,18 +70,16 @@ class Trainer(object):
             self.model.load_state_dict(
                 torch.load(pretrained_model), strict=False)
 
+        self.best_loss = 1e10
         self.optimizer = optim.SGD(self.model.parameters(), lr=1e-3, momentum=0.9,
                                    weight_decay=1e-6)
         self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer,
                                                      lr_lambda=lambda epo: 0.9 ** epo)
+        self.now = datetime.now().strftime('%Y%m%d_%H%M')
 
     def train(self):
-        now = datetime.now().strftime('%Y%m%d_%H%M')
-        best_loss = 1e10
-        # Train
         self.model.train()
-        prev_time = datetime.now()
-        for epo in range(self.max_epoch):
+        for self.epo in range(self.max_epoch):
             train_loss = 0
             confidence_train_loss = 0
             depth_train_loss = 0
@@ -192,10 +190,9 @@ class Trainer(object):
 
                     try:
                         draw_axis(axis_large_gt,
-                                  # skrobot.coordinates.math.quaternion2matrix(
                                   quaternion2matrix(rotation),
                                   hanging_point_pose,
-                                  intrinsics)
+                                  self.intrinsics)
                     except Exception:
                         print('Fail to draw axis')
                         pass
@@ -258,7 +255,7 @@ class Trainer(object):
                         draw_axis(axis_large_pred,
                                   quaternion2matrix(q),
                                   hanging_point_pose,
-                                  intrinsics)
+                                  self.intrinsics)
                     except Exception:
                         print('Fail to draw axis')
                         pass
@@ -286,7 +283,7 @@ class Trainer(object):
 
                 if np.mod(index, 1) == 0:
                     print('epoch {}, {}/{},train loss is confidence:{} rotation:{}'.format(
-                        epo,
+                        self.epo,
                         index,
                         len(self.train_dataloader),
                         confidence_train_loss,
@@ -329,289 +326,283 @@ class Trainer(object):
                 avg_confidence_train_loss = confidence_train_loss
                 avg_rotation_train_loss = rotation_train_loss
 
-            self.vis.line(X=np.array([epo]), Y=np.array([avg_confidence_train_loss]),
+            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_confidence_train_loss]),
                           win='loss', name='confidence_train_loss', update='append')
             if rotation_train_loss_count > 0:
-                self.vis.line(X=np.array([epo]), Y=np.array([avg_rotation_train_loss]),
+                self.vis.line(X=np.array([self.epo]), Y=np.array([avg_rotation_train_loss]),
                               win='loss', name='rotation_train_loss', update='append')
-                self.vis.line(X=np.array([epo]), Y=np.array([avg_train_loss]),
+                self.vis.line(X=np.array([self.epo]), Y=np.array([avg_train_loss]),
                               win='loss', name='train_loss', update='append')
 
             self.scheduler.step()
 
-            # validation
-            val_loss = 0
-            confidence_val_loss = 0
-            rotation_val_loss = 0
-            rotation_val_loss_count = 0
-            self.model.eval()
-            print("start val.")
-            with torch.no_grad():
-                for index, (hp_data, clip_info, hp_data_gt) in enumerate(
-                        self.val_dataloader):
+            self.validate()
 
-                    xmin = clip_info[0, 0]
-                    xmax = clip_info[0, 1]
-                    ymin = clip_info[0, 2]
-                    ymax = clip_info[0, 3]
+    def validate(self):
+        print("start val.")
+        val_loss = 0
+        confidence_val_loss = 0
+        rotation_val_loss = 0
+        rotation_val_loss_count = 0
 
-                    pos_weight = hp_data_gt.detach().numpy().copy()
-                    pos_weight = pos_weight[:, 0, ...]
-                    zeroidx = np.where(pos_weight < 0.5)
-                    nonzeroidx = np.where(pos_weight >= 0.5)
-                    pos_weight[zeroidx] = 0.5
-                    pos_weight[nonzeroidx] = 1.0
-                    pos_weight = torch.from_numpy(pos_weight)
-                    pos_weight = pos_weight.to(self.device)
+        self.model.eval()
+        with torch.no_grad():
+            for index, (hp_data, clip_info, hp_data_gt) in enumerate(
+                    self.val_dataloader):
 
-                    criterion = HPNETLoss().to(self.device)
-                    hp_data = hp_data.to(self.device)
+                xmin = clip_info[0, 0]
+                xmax = clip_info[0, 1]
+                ymin = clip_info[0, 2]
+                ymax = clip_info[0, 3]
 
-                    # self.optimizer.zero_grad()
+                pos_weight = hp_data_gt.detach().numpy().copy()
+                pos_weight = pos_weight[:, 0, ...]
+                zeroidx = np.where(pos_weight < 0.5)
+                nonzeroidx = np.where(pos_weight >= 0.5)
+                pos_weight[zeroidx] = 0.5
+                pos_weight[nonzeroidx] = 1.0
+                pos_weight = torch.from_numpy(pos_weight)
+                pos_weight = pos_weight.to(self.device)
 
-                    hp_data_gt = hp_data_gt.to(self.device)
-                    ground_truth = hp_data_gt.cpu().detach().numpy().copy()
-                    confidence_gt = hp_data_gt[:, 0:1, ...]
-                    rois_list_gt, rois_center_list_gt = find_rois(
-                        confidence_gt)
+                criterion = HPNETLoss().to(self.device)
+                hp_data = hp_data.to(self.device)
 
-                    confidence, depth_and_rotation = self.model(hp_data)
-                    confidence_np = confidence[0, ...].cpu(
-                    ).detach().numpy().copy()
-                    confidence_np[confidence_np >= 1] = 1.
-                    confidence_np[confidence_np <= 0] = 0.
-                    confidence_vis = cv2.cvtColor(confidence_np[0, ...] * 255,
-                                                  cv2.COLOR_GRAY2BGR)
+                hp_data_gt = hp_data_gt.to(self.device)
+                ground_truth = hp_data_gt.cpu().detach().numpy().copy()
+                confidence_gt = hp_data_gt[:, 0:1, ...]
+                rois_list_gt, rois_center_list_gt = find_rois(
+                    confidence_gt)
 
-                    depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
-                    if self.model.rois_list is None or rois_list_gt is None:
+                confidence, depth_and_rotation = self.model(hp_data)
+                confidence_np = confidence[0, ...].cpu(
+                ).detach().numpy().copy()
+                confidence_np[confidence_np >= 1] = 1.
+                confidence_np[confidence_np <= 0] = 0.
+                confidence_vis = cv2.cvtColor(confidence_np[0, ...] * 255,
+                                              cv2.COLOR_GRAY2BGR)
+
+                depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
+                if self.model.rois_list is None or rois_list_gt is None:
+                    continue
+                annotated_rois = annotate_rois(
+                    self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
+
+                confidence_loss, depth_loss, rotation_loss\
+                    = criterion(confidence, hp_data_gt, pos_weight,
+                                depth_and_rotation, annotated_rois)
+
+                confidence_val_loss += confidence_loss.item()
+                if rotation_loss > 0:
+                    rotation_val_loss += rotation_loss.item()
+                    val_loss = val_loss + confidence_loss.item() + rotation_loss.item()
+                    rotation_val_loss_count += 1
+
+                depth = hp_data.cpu().detach().numpy(
+                ).copy()[0, 0, ...] * 1000
+                depth_bgr = colorize_depth(depth.copy(), 100, 1500)
+
+                hanging_point_depth_gt\
+                    = ground_truth[:, 1, ...].astype(np.float32) * 1000
+                rotations_gt = ground_truth[0, 2:, ...]
+                rotations_gt = rotations_gt.transpose(1, 2, 0)
+                hanging_point_depth_gt_bgr\
+                    = colorize_depth(hanging_point_depth_gt[0, ...], 100, 1500)
+                hanging_point_depth_gt_rgb = cv2.cvtColor(
+                    hanging_point_depth_gt_bgr,
+                    cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+
+                axis_gt = depth_bgr.copy()
+                axis_large_gt = np.zeros((1080, 1920, 3))
+                axis_large_gt[ymin:ymax, xmin:xmax]\
+                    = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
+
+                confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
+                ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
+
+                # Visualize gt axis and roi
+                rois_gt_filtered = []
+                dep_gt = []
+                for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
+                    if roi.tolist() == [0, 0, 0, 0]:
                         continue
-                    annotated_rois = annotate_rois(
-                        self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
+                    roi = roi.cpu().detach().numpy().copy()
+                    cx = roi_c[0]
+                    cy = roi_c[1]
 
-                    confidence_loss, depth_loss, rotation_loss\
-                        = criterion(confidence, hp_data_gt, pos_weight,
-                                    depth_and_rotation, annotated_rois)
+                    dep = hanging_point_depth_gt[0, cy, cx]
+                    dep_gt.append(dep)
 
-                    confidence_val_loss += confidence_loss.item()
-                    if rotation_loss > 0:
-                        rotation_val_loss += rotation_loss.item()
-                        val_loss = val_loss + confidence_loss.item() + rotation_loss.item()
-                        rotation_val_loss_count += 1
+                    rotation = rotations_gt[cy, cx, :]
+                    pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+                                   int(cy * (ymax - ymin) / float(256) + ymin)]
+                    hanging_point_pose = np.array(
+                        self.cameramodel.project_pixel_to_3d_ray(
+                            pixel_point)) * dep * 0.001
 
-                    depth = hp_data.cpu().detach().numpy(
-                    ).copy()[0, 0, ...] * 1000
-                    depth_bgr = colorize_depth(depth.copy(), 100, 1500)
+                    try:
+                        draw_axis(axis_large_gt,
+                                  # skrobot.coordinates.math.quaternion2matrix(
+                                  quaternion2matrix(rotation),
+                                  hanging_point_pose,
+                                  self.intrinsics)
+                    except Exception:
+                        print('Fail to draw axis')
+                        pass
 
-                    hanging_point_depth_gt\
-                        = ground_truth[:, 1, ...].astype(np.float32) * 1000
-                    rotations_gt = ground_truth[0, 2:, ...]
-                    rotations_gt = rotations_gt.transpose(1, 2, 0)
-                    hanging_point_depth_gt_bgr\
-                        = colorize_depth(hanging_point_depth_gt[0, ...], 100, 1500)
-                    hanging_point_depth_gt_rgb = cv2.cvtColor(
-                        hanging_point_depth_gt_bgr,
-                        cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+                    rois_gt_filtered.append(roi)
 
-                    axis_gt = depth_bgr.copy()
-                    axis_large_gt = np.zeros((1080, 1920, 3))
-                    axis_large_gt[ymin:ymax, xmin:xmax]\
-                        = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
+                axis_gt = cv2.resize(
+                    cv2.cvtColor(
+                        axis_large_gt[ymin:ymax, xmin:xmax].astype(
+                            np.uint8), cv2.COLOR_BGR2RGB), (256, 256))
 
-                    confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
-                    ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
+                # draw gt rois
+                for roi in rois_gt_filtered:
+                    confidence_gt_vis = cv2.rectangle(
+                        confidence_gt_vis, (roi[0],
+                                            roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
+                    axis_gt = cv2.rectangle(
+                        axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
 
-                    # Visualize gt axis and roi
-                    rois_gt_filtered = []
-                    dep_gt = []
-                    for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
-                        if roi.tolist() == [0, 0, 0, 0]:
-                            continue
-                        roi = roi.cpu().detach().numpy().copy()
-                        cx = roi_c[0]
-                        cy = roi_c[1]
+                # Visualize pred axis and roi
+                axis_pred = depth_bgr.copy()
+                axis_large_pred = np.zeros((1080, 1920, 3))
+                axis_large_pred[ymin:ymax, xmin:xmax]\
+                    = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
+                dep_pred = []
+                # for i, roi in enumerate(self.model.rois_list[0]):
+                for i, (roi, roi_c) in enumerate(
+                        zip(self.model.rois_list[0], self.model.rois_center_list[0])):
+                    if roi.tolist() == [0, 0, 0, 0]:
+                        continue
+                    roi = roi.cpu().detach().numpy().copy()
+                    cx = roi_c[0]
+                    cy = roi_c[1]
 
-                        dep = hanging_point_depth_gt[0, cy, cx]
-                        dep_gt.append(dep)
+                    dep = depth[int(roi[1]):int(roi[3]),
+                                int(roi[0]):int(roi[2])]
+                    dep = np.median(dep[np.where(
+                        np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
 
-                        rotation = rotations_gt[cy, cx, :]
-                        pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                                       int(cy * (ymax - ymin) / float(256) + ymin)]
-                        hanging_point_pose = np.array(
-                            self.cameramodel.project_pixel_to_3d_ray(
-                                pixel_point)) * dep * 0.001
-
-                        try:
-                            draw_axis(axis_large_gt,
-                                      # skrobot.coordinates.math.quaternion2matrix(
-                                      quaternion2matrix(rotation),
-                                      hanging_point_pose,
-                                      intrinsics)
-                        except Exception:
-                            print('Fail to draw axis')
-                            pass
-
-                        rois_gt_filtered.append(roi)
-
-                    axis_gt = cv2.resize(
-                        cv2.cvtColor(
-                            axis_large_gt[ymin:ymax, xmin:xmax].astype(
-                                np.uint8), cv2.COLOR_BGR2RGB), (256, 256))
-
-                    # draw gt rois
-                    for roi in rois_gt_filtered:
-                        confidence_gt_vis = cv2.rectangle(
-                            confidence_gt_vis, (roi[0],
-                                                roi[1]), (roi[2], roi[3]),
-                            (0, 255, 0), 3)
-                        axis_gt = cv2.rectangle(
-                            axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
-                            (0, 255, 0), 3)
-
-                    # Visualize pred axis and roi
-                    axis_pred = depth_bgr.copy()
-                    axis_large_pred = np.zeros((1080, 1920, 3))
-                    axis_large_pred[ymin:ymax, xmin:xmax]\
-                        = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
-                    dep_pred = []
-                    # for i, roi in enumerate(self.model.rois_list[0]):
-                    for i, (roi, roi_c) in enumerate(
-                            zip(self.model.rois_list[0], self.model.rois_center_list[0])):
-                        if roi.tolist() == [0, 0, 0, 0]:
-                            continue
-                        roi = roi.cpu().detach().numpy().copy()
-                        cx = roi_c[0]
-                        cy = roi_c[1]
-
-                        dep = depth[int(roi[1]):int(roi[3]),
-                                    int(roi[0]):int(roi[2])]
-                        dep = np.median(dep[np.where(
-                            np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
-
-                        dep_pred.append(float(dep))
+                    dep_pred.append(float(dep))
+                    confidence_vis = cv2.rectangle(
+                        confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
+                    if annotated_rois[i][2]:
                         confidence_vis = cv2.rectangle(
-                            confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
-                            (0, 255, 0), 3)
-                        if annotated_rois[i][2]:
-                            confidence_vis = cv2.rectangle(
-                                confidence_vis, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
-                                    int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
-                        create_depth_circle(depth, cy, cx, dep)
+                            confidence_vis, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                                int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+                    create_depth_circle(depth, cy, cx, dep)
 
-                        q = depth_and_rotation[i, 1:].cpu(
-                        ).detach().numpy().copy()
-                        q /= np.linalg.norm(q)
-                        pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                                       int(cy * (ymax - ymin) / float(256) + ymin)]
-                        hanging_point_pose = np.array(
-                            self.cameramodel.project_pixel_to_3d_ray(
-                                pixel_point)) * float(dep * 0.001)
-                        try:
-                            draw_axis(axis_large_pred,
-                                      quaternion2matrix(q),
-                                      hanging_point_pose,
-                                      intrinsics)
-                        except Exception:
-                            print('Fail to draw axis')
-                            pass
+                    q = depth_and_rotation[i, 1:].cpu(
+                    ).detach().numpy().copy()
+                    q /= np.linalg.norm(q)
+                    pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
+                                   int(cy * (ymax - ymin) / float(256) + ymin)]
+                    hanging_point_pose = np.array(
+                        self.cameramodel.project_pixel_to_3d_ray(
+                            pixel_point)) * float(dep * 0.001)
+                    try:
+                        draw_axis(axis_large_pred,
+                                  quaternion2matrix(q),
+                                  hanging_point_pose,
+                                  self.intrinsics)
+                    except Exception:
+                        print('Fail to draw axis')
+                        pass
 
-                    print('dep_pred', dep_pred)
+                print('dep_pred', dep_pred)
 
-                    axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
-                                           (256, 256)).astype(np.uint8)
-                    axis_pred = cv2.cvtColor(
-                        axis_pred, cv2.COLOR_BGR2RGB)
+                axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
+                                       (256, 256)).astype(np.uint8)
+                axis_pred = cv2.cvtColor(
+                    axis_pred, cv2.COLOR_BGR2RGB)
 
-                    depth_pred_bgr = colorize_depth(depth, 100, 1500)
-                    depth_pred_rgb = cv2.cvtColor(
-                        depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+                depth_pred_bgr = colorize_depth(depth, 100, 1500)
+                depth_pred_rgb = cv2.cvtColor(
+                    depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
-                    # draw pred rois
-                    for i, roi in enumerate(self.model.rois_list[0]):
-                        if roi.tolist() == [0, 0, 0, 0]:
-                            continue
+                # draw pred rois
+                for i, roi in enumerate(self.model.rois_list[0]):
+                    if roi.tolist() == [0, 0, 0, 0]:
+                        continue
+                    axis_pred = cv2.rectangle(
+                        axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
+                    if annotated_rois[i][2]:
                         axis_pred = cv2.rectangle(
-                            axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
-                            (0, 255, 0), 3)
-                        if annotated_rois[i][2]:
-                            axis_pred = cv2.rectangle(
-                                axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
-                                    int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+                            axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
+                                int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
-                    if np.mod(index, 1) == 0:
-                        print('epoch {}, {}/{},val loss is confidence:{} rotation:{}'.format(
-                            epo,
-                            index,
-                            len(self.val_dataloader),
-                            confidence_val_loss,
-                            rotation_val_loss
-                        ))
-                        self.vis.images([hanging_point_depth_gt_rgb,
-                                         depth_pred_rgb],
-                                        win='val hanging_point_depth_gt_rgb',
-                                        opts=dict(
-                            title='val hanging_point_depth (GT, pred)'))
-                        self.vis.images([axis_gt.transpose(2, 0, 1),
-                                         axis_pred.transpose(2, 0, 1)],
-                                        win='val axis',
-                                        opts=dict(
-                            title='val axis'))
-                        self.vis.images([confidence_gt_vis.transpose(2, 0, 1),
-                                         confidence_vis.transpose(2, 0, 1)],
-                                        win='val_confidence_roi',
-                                        opts=dict(
-                            title='val confidence(GT, Pred)'))
+                if np.mod(index, 1) == 0:
+                    print('epoch {}, {}/{},val loss is confidence:{} rotation:{}'.format(
+                        self.epo,
+                        index,
+                        len(self.val_dataloader),
+                        confidence_val_loss,
+                        rotation_val_loss
+                    ))
+                    self.vis.images([hanging_point_depth_gt_rgb,
+                                     depth_pred_rgb],
+                                    win='val hanging_point_depth_gt_rgb',
+                                    opts=dict(
+                        title='val hanging_point_depth (GT, pred)'))
+                    self.vis.images([axis_gt.transpose(2, 0, 1),
+                                     axis_pred.transpose(2, 0, 1)],
+                                    win='val axis',
+                                    opts=dict(
+                        title='val axis'))
+                    self.vis.images([confidence_gt_vis.transpose(2, 0, 1),
+                                     confidence_vis.transpose(2, 0, 1)],
+                                    win='val_confidence_roi',
+                                    opts=dict(
+                        title='val confidence(GT, Pred)'))
 
-                    if index == self.val_data_num - 1:
-                        print("Finish val {} data. So start val.".format(index))
-                        break
+                if index == self.val_data_num - 1:
+                    print("Finish val {} data. So start val.".format(index))
+                    break
 
-            if len(self.val_dataloader) > 0:
-                # avg_val_loss = val_loss / len(self.val_dataloader)
-                avg_confidence_val_loss\
-                    = confidence_val_loss / len(self.val_dataloader)
-                if rotation_val_loss_count > 0:
-                    avg_rotation_val_loss\
-                        = rotation_val_loss / rotation_val_loss_count
-                    avg_val_loss\
-                        = val_loss / rotation_val_loss_count
-                else:
-                    avg_rotation_val_loss = rotation_val_loss
+        if len(self.val_dataloader) > 0:
+            # avg_val_loss = val_loss / len(self.val_dataloader)
+            avg_confidence_val_loss\
+                = confidence_val_loss / len(self.val_dataloader)
+            if rotation_val_loss_count > 0:
+                avg_rotation_val_loss\
+                    = rotation_val_loss / rotation_val_loss_count
+                avg_val_loss\
+                    = val_loss / rotation_val_loss_count
             else:
-                avg_confidence_val_loss = confidence_val_loss
                 avg_rotation_val_loss = rotation_val_loss
-            self.vis.line(X=np.array([epo]), Y=np.array([avg_confidence_val_loss]),
-                          win='loss', name='confidence_val_loss', update='append')
-            if rotation_val_loss_count > 0:
-                self.vis.line(X=np.array([epo]), Y=np.array([avg_rotation_val_loss]),
-                              win='loss', name='rotation_val_loss', update='append')
-                self.vis.line(X=np.array([epo]), Y=np.array([avg_val_loss]),
-                              win='loss', name='val_loss', update='append')
+        else:
+            avg_confidence_val_loss = confidence_val_loss
+            avg_rotation_val_loss = rotation_val_loss
+        self.vis.line(X=np.array([self.epo]), Y=np.array([avg_confidence_val_loss]),
+                      win='loss', name='confidence_val_loss', update='append')
+        if rotation_val_loss_count > 0:
+            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_rotation_val_loss]),
+                          win='loss', name='rotation_val_loss', update='append')
+            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_val_loss]),
+                          win='loss', name='val_loss', update='append')
 
-            cur_time = datetime.now()
-            h, remainder = divmod((cur_time - prev_time).seconds, 3600)
-            m, s = divmod(remainder, 60)
-            time_str = "Time %02d:%02d:%02d" % (h, m, s)
-            prev_time = cur_time
-
-            if np.mod(epo, 1) == 0 and epo > 1:
-                print('----save latest model-----')
-                torch.save(self.model.state_dict(),
-                           os.path.join(self.save_dir, 'hpnet_latestmodel_' + now + '.pt'))
-            print('epoch val loss = %f, epoch val loss = %f, best_loss = %f, %s' %
-                  (val_loss / len(self.val_dataloader),
-                   val_loss / len(self.val_dataloader),
-                   best_loss,
-                   time_str))
-            if rotation_val_loss_count > 0:
-                if best_loss > val_loss / rotation_val_loss_count and epo > 1:
-                    print('update best model {} -> {}'.format(
-                        best_loss, val_loss / rotation_val_loss_count))
-                    best_loss = val_loss / rotation_val_loss_count
-                    print('----best latest model-----')
-                    torch.save(
-                        self.model.state_dict(),
-                        os.path.join(self.save_dir, 'hpnet_bestmodel_' + now + '.pt'))
+        if np.mod(self.epo, 1) == 0 and self.epo > 1:
+            print('----save latest model-----')
+            torch.save(self.model.state_dict(),
+                       os.path.join(self.save_dir, 'hpnet_latestmodel_' + self.now + '.pt'))
+        print('epoch val loss = %f, epoch val loss = %f, best_loss = %f' %
+              (val_loss / len(self.val_dataloader),
+               val_loss / len(self.val_dataloader),
+               self.best_loss))
+        if rotation_val_loss_count > 0:
+            if self.best_loss > val_loss / rotation_val_loss_count and self.epo > 1:
+                print('update best model {} -> {}'.format(
+                    self.best_loss, val_loss / rotation_val_loss_count))
+                self.best_loss = val_loss / rotation_val_loss_count
+                print('----best latest model-----')
+                torch.save(
+                    self.model.state_dict(),
+                    os.path.join(self.save_dir, 'hpnet_bestmodel_' + self.now + '.pt'))
 
 
 if __name__ == "__main__":
