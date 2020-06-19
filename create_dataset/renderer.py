@@ -14,6 +14,7 @@ import numpy as np
 import pybullet
 import pybullet_data
 # import skrobot
+from eos import make_fancy_output_dir
 
 import xml.etree.ElementTree as ET
 from hanging_points_generator.hp_generator \
@@ -366,7 +367,8 @@ if __name__ == '__main__':
     # files = glob.glob("ycb_hanging_object/urdf/*/*")
     # urdf_name = 'textured.urdf'
 
-    os.makedirs(save_dir, exist_ok=True)
+    # os.makedirs(save_dir, exist_ok=True)
+    save_dir = make_fancy_output_dir(save_dir)
     os.makedirs(os.path.join(save_dir, 'intrinsics'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'color'), exist_ok=True)
     os.makedirs(os.path.join(save_dir, 'color_raw'), exist_ok=True)
@@ -412,7 +414,7 @@ if __name__ == '__main__':
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
     print(files)
-    data_id = 18000
+    # data_id = 18000
     try:
         for file in files:
             dirname, filename = os.path.split(file)
@@ -450,8 +452,9 @@ if __name__ == '__main__':
 
                 data_count = 0
                 # for _ in range(1000):
-                while data_count < 3000:
-                    print('{}: {} sum: {}'.format(file, data_count, data_id))
+
+                while data_count < 1000:
+
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
                         baseCollisionShapeIndex=camera_object,
@@ -702,16 +705,22 @@ if __name__ == '__main__':
                         = cv2.resize(hanging_points_depth, (width, height))
 
                     # cv2.imshow('annotation', annotation_img)
-                    # cv2.imshow('bgr', bgr_annotation)
+                    # cv2.imshow('bgr', bgr)
+                    # cv2.imshow('bgr_annotation', bgr_annotation)
                     # cv2.imshow('bgr_axis', bgr_axis)
                     # cv2.imshow('depth_bgr', depth_bgr)
                     # cv2.imshow('hanging_points_depth_bgr',
                     #            hanging_points_depth_bgr)
                     # cv2.imshow('depth', depth)
                     # cv2.imshow('hanging_points_depth', hanging_points_depth)
-                    cv2.waitKey(10)
+                    # cv2.waitKey(10)
 
                     clip_info = np.array([xmin, xmax, ymin, ymax])
+
+                    data_id = len(
+                        glob.glob(os.path.join(save_dir, 'depth', '*')))
+                    print(data_id)
+                    print('{}: {} sum: {}'.format(file, data_count, data_id))
 
                     # if data_id == 0:
                     #     cv2.moveWindow('bgr', 100, 100)
@@ -722,47 +731,47 @@ if __name__ == '__main__':
 
                     # cv2.imwrite(
                     #     os.path.join(
-                    #         save_dir, 'color', '{:05}.png'.format(
+                    #         save_dir, 'color', '{:06}.png'.format(
                     #             data_id)), bgr)
                     # cv2.imwrite(
                     #     os.path.join(
-                    #         save_dir, 'color_raw', '{:05}.png'.format(
+                    #         save_dir, 'color_raw', '{:06}.png'.format(
                     #             data_id)), bgr_raw)
                     cv2.imwrite(
                         os.path.join(
-                            save_dir, 'debug_axis', '{:05}.png'.format(
+                            save_dir, 'debug_axis', '{:06}.png'.format(
                                 data_id)), bgr_axis)
                     # cv2.imwrite(
                     #     os.path.join(
-                    #         save_dir, 'debug_heatmap', '{:05}.png'.format(
+                    #         save_dir, 'debug_heatmap', '{:06}.png'.format(
                     #             data_id)), bgr_annotation)
                     np.save(
                         os.path.join(
-                            save_dir, 'depth', '{:05}'.format(data_id)), depth)
+                            save_dir, 'depth', '{:06}'.format(data_id)), depth)
                     np.save(
                         os.path.join(
                             save_dir,
-                            'hanging_points_depth', '{:05}'.format(data_id)),
+                            'hanging_points_depth', '{:06}'.format(data_id)),
                         hanging_points_depth)
                     np.save(
                         os.path.join(
-                            save_dir, 'rotations', '{:05}'.format(data_id)),
+                            save_dir, 'rotations', '{:06}'.format(data_id)),
                         rotations)
                     # cv2.imwrite(
                     #     os.path.join(
-                    #         save_dir, 'depth_bgr', '{:05}.png'.format(
+                    #         save_dir, 'depth_bgr', '{:06}.png'.format(
                     #             data_id)), depth_bgr)
                     cv2.imwrite(
                         os.path.join(
-                            save_dir, 'heatmap', '{:05}.png'.format(
+                            save_dir, 'heatmap', '{:06}.png'.format(
                                 data_id)), annotation_img)
                     np.save(
                         os.path.join(
-                            save_dir, 'clip_info', '{:05}'.format(data_id)),
+                            save_dir, 'clip_info', '{:06}'.format(data_id)),
                         clip_info)
 
                     data_count += 1
-                    data_id += 1
+                    # data_id += 1
                     r.remove_all_objects()
                 r.remove_all_objects()
     except KeyboardInterrupt:
