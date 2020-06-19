@@ -11,6 +11,7 @@ import cameramodels
 import numpy as np
 import torch
 import torch.optim as optim
+import tqdm
 import visdom
 from skrobot.coordinates.math import quaternion2matrix
 
@@ -94,7 +95,8 @@ class Trainer(object):
         rotation_loss_sum = 0
         rotation_loss_count = 0
 
-        for index, (hp_data, clip_info, hp_data_gt) in enumerate(dataloader):
+        for index, (hp_data, clip_info, hp_data_gt) in tqdm.tqdm(
+                enumerate(dataloader), total=len(dataloader), desc='{} epoch={}'.format(mode, self.epo), leave=False):
             xmin = clip_info[0, 0]
             xmax = clip_info[0, 1]
             ymin = clip_info[0, 2]
@@ -345,9 +347,8 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0603')
-    # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/all_0527')
-    # default='/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/cup')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany/merged')
+
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)
@@ -360,9 +361,6 @@ if __name__ == "__main__":
         type=str,
         help='Pretrained model',
         default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200617_1601.pt')
-    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
-    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
-    # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200522_0149_.pt')
 
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
