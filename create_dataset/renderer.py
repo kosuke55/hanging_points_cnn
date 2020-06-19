@@ -671,6 +671,9 @@ if __name__ == '__main__':
                                         px,
                                         hp.worldpos()[2] * 1000)
 
+                    if np.all(annotation_img == 0):
+                        continue
+
                     annotation_img[np.where(annotation_img >= 256)] = 255
                     annotation_img = annotation_img.astype(np.uint8)
                     annotation_color = np.zeros_like(bgr, dtype=np.uint8)
