@@ -425,9 +425,8 @@ if __name__ == '__main__':
                 category_name = dirname.split("/")[-2]
                 idx = dirname.split("/")[-1]
             print(category_name)
-            # if category_name not in category_name_list:
-            # continue
-            if category_name == "033_spatula":
+            if category_name not in category_name_list:
+                r.remove_all_objects()
                 continue
             # indices = ['01', '02', '03']
             # indices = ['01']
@@ -615,6 +614,7 @@ if __name__ == '__main__':
                     for label in range(np.max(dbscan.labels_) + 1):
                         if np.count_nonzero(dbscan.labels_ == label) <= 1:
                             # print("skip label ", label)
+                            r.remove_all_objects()
                             continue
                         q_base = None
                         for idx, hp in enumerate(
@@ -672,6 +672,7 @@ if __name__ == '__main__':
                                         hp.worldpos()[2] * 1000)
 
                     if np.all(annotation_img == 0):
+                        r.remove_all_objects()
                         continue
 
                     annotation_img[np.where(annotation_img >= 256)] = 255
