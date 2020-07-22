@@ -18,7 +18,8 @@ from eos import make_fancy_output_dir
 
 import xml.etree.ElementTree as ET
 from hanging_points_generator.hp_generator \
-    import cluster_hanging_points
+    import cluster_hanging_points, filter_penetration
+
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
@@ -154,6 +155,7 @@ class Renderer:
     def load_urdf(self, urdf):
         object_id = pybullet.loadURDF(urdf,
                                       [0, 0, 0.1], [0, 0, 0, 1])
+        pybullet.changeVisualShape(object_id, -1, rgbaColor=[1, 1, 1, 1])
         self.objects.append(object_id)
         return object_id
 
@@ -347,11 +349,20 @@ if __name__ == '__main__':
         type=str,
         help='save dir',
         default='textured.urdf')
+    parser.add_argument(
+        '--gui',
+        '-g',
+        type=int,
+        help='debug gui',
+        default=0)
     args = parser.parse_args()
 
     save_dir = args.save_dir
     urdf_name = args.urdf_name
     files = glob.glob(args.input_files)
+
+    texture_paths = glob.glob(
+        os.path.join('/media/kosuke/SANDISK/dtd', '**', '*.jpg'), recursive=True)
 
     im_w = 1920
     im_h = 1080
@@ -397,8 +408,9 @@ if __name__ == '__main__':
     elif 'ObjectNet3D' in args.input_files:
         category_name_list = ['cup', 'key', 'scissors']
 
-    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=True)
-    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
+    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
+    plane_id = pybullet.loadURDF('plane.urdf')
+
     np.save(
         os.path.join(
             save_dir, 'intrinsics', 'intrinsics'), r.camera_model.K)
@@ -413,7 +425,6 @@ if __name__ == '__main__':
         rgbaColor=[0, 0, 0, 1])
     # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
 
-    print(files)
     # data_id = 18000
     try:
         for file in files:
@@ -424,7 +435,6 @@ if __name__ == '__main__':
             elif 'ObjectNet3D' in args.input_files:
                 category_name = dirname.split("/")[-2]
                 idx = dirname.split("/")[-1]
-            print(category_name)
             if category_name not in category_name_list:
                 r.remove_all_objects()
                 continue
@@ -433,6 +443,7 @@ if __name__ == '__main__':
             # if idx not in indices:
             #     continue
             if filename == urdf_name:
+                print(category_name)
                 tree = ET.parse(os.path.join(dirname, urdf_name))
                 root = tree.getroot()
 
@@ -445,6 +456,9 @@ if __name__ == '__main__':
 
                 contact_points = cluster_hanging_points(
                     contact_points, eps=0.005, min_samples=2)
+                contact_points, _ = filter_penetration(
+                    os.path.join(dirname, urdf_name),
+                    contact_points, box_size=[0.1, 0.0001, 0.0001])
 
                 r.step(1)
                 r.look_at([0, 0, 2])
@@ -480,6 +494,17 @@ if __name__ == '__main__':
                     # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
                     object_id = r.load_urdf(os.path.join(dirname, urdf_name))
+
+                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
+                        0, len(texture_paths) - 1)])
+                    pybullet.changeVisualShape(
+                        object_id, -1, textureUniqueId=textureId)
+
+                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
+                        0, len(texture_paths) - 1)])
+                    pybullet.changeVisualShape(
+                        plane_id, -1, textureUniqueId=textureId)
+
                     newpos = [0, 0, 0]
                     while np.linalg.norm(newpos) < 0.3:
                         newpos = [(np.random.rand() - 0.5),
@@ -530,10 +555,20 @@ if __name__ == '__main__':
 
                     annotation_img = np.zeros_like(seg, dtype=np.uint8)
 
-                    ymin = np.min(object_mask[0])
-                    ymax = np.max(object_mask[0])
-                    xmin = np.min(object_mask[1])
-                    xmax = np.max(object_mask[1])
+                    # ymin = np.min(object_mask[0])
+                    # ymax = np.max(object_mask[0])
+                    # xmin = np.min(object_mask[1])
+                    # xmax = np.max(object_mask[1])
+
+                    ymin = np.max(
+                        [np.min(object_mask[0]) - np.random.randint(0, 50), 0])
+                    ymax = np.min(
+                        [np.max(object_mask[0]) + np.random.randint(0, 50), int(r.im_height - 1)])
+                    xmin = np.max(
+                        [np.min(object_mask[1]) - np.random.randint(0, 50), 0])
+                    xmax = np.min(
+                        [np.max(object_mask[1]) + np.random.randint(0, 50), int(r.im_width - 1)])
+
 
                     bgr_raw = bgr.copy()
                     bgr = bgr[ymin:ymax, xmin:xmax]
@@ -723,7 +758,6 @@ if __name__ == '__main__':
 
                     data_id = len(
                         glob.glob(os.path.join(save_dir, 'depth', '*')))
-                    print(data_id)
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
 
                     # if data_id == 0:
@@ -779,4 +813,4 @@ if __name__ == '__main__':
                     r.remove_all_objects()
                 r.remove_all_objects()
     except KeyboardInterrupt:
-        pass
+        sys.exit()

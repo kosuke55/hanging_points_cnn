@@ -43,8 +43,11 @@ class Trainer(object):
         self.train_data_num = train_data_num
         self.val_data_num = val_data_num
         self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
 
         self.max_epoch = max_epoch
+        self.time_now = datetime.now().strftime('%Y%m%d_%H%M')
+        self.best_loss = 1e10
 
         self.intrinsics = np.load(
             os.path.join(data_path, "intrinsics/intrinsics.npy"))
@@ -69,6 +72,7 @@ class Trainer(object):
             }
 
         self.model = HPNET(config).to(self.device)
+        self.save_model_interval = 1
         if os.path.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(
@@ -330,6 +334,19 @@ class Trainer(object):
                           win='loss', name='{}_rotation_loss'.format(mode), update='append')
             self.vis.line(X=np.array([self.epo]), Y=np.array([avg_loss]),
                           win='loss', name='{}_loss'.format(mode), update='append')
+
+        if mode == 'val':
+            if np.mod(self.epo, self.save_model_interval) == 0:
+                torch.save(
+                    self.model.state_dict(),
+                    osp.join(self.save_dir, 'hpnet_latestmodel_' + self.time_now + '.pt'))
+            if self.best_loss > avg_loss:
+                print('update best model {} -> {}'.format(
+                    self.best_loss, avg_loss))
+                self.best_loss = avg_loss
+                torch.save(
+                    self.model.state_dict(),
+                    osp.join(self.save_dir, 'hpnet_bestmodel_' + self.time_now + '.pt'))
 
     def train(self):
         for self.epo in range(self.max_epoch):
