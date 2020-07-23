@@ -161,7 +161,7 @@ class Renderer:
         if random_pose:
             roll = np.random.rand() * np.pi
             pitch = np.random.rand() * np.pi
-            yaw = np.random.rand() * np.pilo
+            yaw = np.random.rand() * np.pi
             object_id = pybullet.loadURDF(
                 urdf, [0, 0, 0], pybullet.getQuaternionFromEuler(
                     [roll, pitch, yaw]))
@@ -711,7 +711,7 @@ if __name__ == '__main__':
                                         int(scale[1] * (-xmin + px)),
                                         int(scale[0] * (-ymin + py)),
                                         hanging_point_in_camera_coords_list[
-                                            idx].quaternipon)
+                                            idx].quaternion)
 
                                     # create_depth_circle(
                                     #     hanging_points_depth,
