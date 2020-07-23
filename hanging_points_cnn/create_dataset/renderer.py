@@ -153,6 +153,7 @@ class Renderer:
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
 
         self.draw_camera_pos()
+        self.change_light()
         self._rendered = None
         self._rendered_pos = None
         self._rendered_rot = None
@@ -237,11 +238,20 @@ class Renderer:
         end_z = start + self.camera_coords.rotate_vector([0, 0, 0.1])
         pybullet.addUserDebugLine(start, end_z, [0, 0, 1], 3)
 
+    def change_light(self):
+        self.lightDirection = 10 * np.random.rand(3)
+        self.lightDistance = 0.9 + 0.2 * np.random.rand()
+        self.lightColor = 0.9 + 0.1 * np.random.rand(3)
+        self.lightAmbientCoeff = 0.1 + 0.2 * np.random.rand()
+        self.lightDiffuseCoeff = 0.85 + 0.1 * np.random.rand()
+        self.lightSpecularCoeff = 0.85 + 0.1 * np.random.rand()
+
     def render(self):
-        if np.all(
-                self._rendered_pos == self.camera_coords.worldpos()) and np.all(
-                self._rendered_rot == self.camera_coords.worldrot()):
-            return self._rendered
+        # If you comment this out, you cannot change the light state with the same pose.
+        # if np.all(
+        #         self._rendered_pos == self.camera_coords.worldpos()) and np.all(
+        #         self._rendered_rot == self.camera_coords.worldrot()):
+        #     return self._rendered
 
         target = self.camera_coords.worldpos() + \
             self.camera_coords.rotate_vector([0, 0, 1.])
@@ -254,7 +264,14 @@ class Renderer:
         i_arr = pybullet.getCameraImage(
             self.im_width, self.im_height, vm, self.pm,
             shadow=0,
-            renderer=pybullet.ER_TINY_RENDERER)
+            renderer=pybullet.ER_TINY_RENDERER,
+            lightDirection=self.lightDirection,
+            lightColor=self.lightColor,
+            lightDistance=self.lightDistance,
+            lightAmbientCoeff=self.lightAmbientCoeff,
+            lightDiffuseCoeff=self.lightDiffuseCoeff,
+            lightSpecularCoeff=self.lightSpecularCoeff
+        )
 
         self._rendered = i_arr
         self._rendered_pos = self.camera_coords.worldpos().copy()
@@ -566,7 +583,7 @@ if __name__ == '__main__':
                     object_mask = np.where(seg == object_id)
                     non_object_mask = np.where(seg != object_id)
                     depth[non_object_mask] = 0
-                    bgr[non_object_mask] = [0, 0, 0]
+                    # bgr[non_object_mask] = [0, 0, 0]
 
                     annotation_img = np.zeros_like(seg, dtype=np.uint8)
 
