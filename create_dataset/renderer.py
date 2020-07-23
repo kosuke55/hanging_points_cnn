@@ -157,9 +157,18 @@ class Renderer:
         self._rendered_pos = None
         self._rendered_rot = None
 
-    def load_urdf(self, urdf):
-        object_id = pybullet.loadURDF(urdf,
-                                      [0, 0, 0.1], [0, 0, 0, 1])
+    def load_urdf(self, urdf, random_pose=True):
+        if random_pose:
+            roll = np.random.rand() * np.pi
+            pitch = np.random.rand() * np.pi
+            yaw = np.random.rand() * np.pilo
+            object_id = pybullet.loadURDF(
+                urdf, [0, 0, 0], pybullet.getQuaternionFromEuler(
+                    [roll, pitch, yaw]))
+        else:
+            object_id = pybullet.loadURDF(
+                urdf, [0, 0, 0], [0, 0, 0, 1])
+
         pybullet.changeVisualShape(object_id, -1, rgbaColor=[1, 1, 1, 1])
         self.objects.append(object_id)
         return object_id
@@ -451,6 +460,7 @@ if __name__ == '__main__':
                 while data_count < 100:
                     r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
                     pybullet.setPhysicsEngineParameter(enableFileCaching=0)
+                    planeId = pybullet.loadURDF("plane.urdf", [0, 0, -0.5])
 
                     if not os.path.isfile(
                             os.path.join(save_dir, 'intrinsics', 'intrinsics.npy')):
@@ -492,27 +502,31 @@ if __name__ == '__main__':
                     # color.append(1)
                     # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
-                    object_id = r.load_urdf(os.path.join(dirname, urdf_name))
+                    object_id = r.load_urdf(os.path.join(dirname, urdf_name),
+                                            random_pose=True)
 
                     textureId = pybullet.loadTexture(texture_paths[np.random.randint(
                         0, len(texture_paths) - 1)])
                     pybullet.changeVisualShape(
                         object_id, -1, textureUniqueId=textureId)
 
-                    # textureId = pybullet.loadTexture(texture_paths[np.random.randint(
-                    #     0, len(texture_paths) - 1)])
-                    # pybullet.changeVisualShape(
-                    #     plane_id, -1, textureUniqueId=textureId)
+                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
+                        0, len(texture_paths) - 1)])
+                    pybullet.changeVisualShape(
+                        planeId, -1, textureUniqueId=textureId)
 
                     newpos = [0, 0, 0]
                     while np.linalg.norm(newpos) < 0.3:
-                        newpos = [(np.random.rand() - 0.5),
-                                  (np.random.rand() - 0.5),
-                                  (np.random.rand() - 0.5)]
+                        # newpos = [(np.random.rand() - 0.5),
+                        #           (np.random.rand() - 0.5),
+                        #           (np.random.rand() - 0.5)]
+                        newpos = [(np.random.rand() - 0.5) * 0.1,
+                                  (np.random.rand() - 0.5) * 0.1,
+                                  np.random.rand() * 0.2 + 0.3]
 
                     r.move_to(newpos)
 
-                    pos, rot \
+                    pos, rot\
                         = pybullet.getBasePositionAndOrientation(object_id)
                     r.object_coords = coordinates.Coordinates(
                         pos=pos,
@@ -604,11 +618,11 @@ if __name__ == '__main__':
 
                         # hanging_point_coords.translate([0, 0.01, 0])
 
-                        hanging_point_worldcoords \
+                        hanging_point_worldcoords\
                             = r.object_coords.copy().transform(
                                 hanging_point_coords)
 
-                        hanging_point_in_camera_coords \
+                        hanging_point_in_camera_coords\
                             = r.camera_coords.inverse_transformation(
                             ).transform(hanging_point_worldcoords)
 
@@ -662,7 +676,7 @@ if __name__ == '__main__':
                             if dbscan.labels_[idx] == label:
                                 if q_base is None:
                                     q_base = hp.quaternion
-                                q_distance \
+                                q_distance\
                                     = coordinates.math.quaternion_distance(
                                         q_base, hp.quaternion)
                                 # print(label, idx, np.rad2deg(q_distance))
@@ -697,7 +711,7 @@ if __name__ == '__main__':
                                         int(scale[1] * (-xmin + px)),
                                         int(scale[0] * (-ymin + py)),
                                         hanging_point_in_camera_coords_list[
-                                            idx].quaternion)
+                                            idx].quaternipon)
 
                                     # create_depth_circle(
                                     #     hanging_points_depth,
@@ -738,16 +752,16 @@ if __name__ == '__main__':
                     depth = depth[ymin:ymax, xmin:xmax]
                     depth = cv2.resize(depth, (width, height))
 
-                    hanging_points_depth_bgr \
+                    hanging_points_depth_bgr\
                         = colorize_depth(hanging_points_depth, 100, 1500)
                     hanging_points_depth_bgr = hanging_points_depth_bgr[
                         ymin:ymax, xmin:xmax]
-                    hanging_points_depth_bgr \
+                    hanging_points_depth_bgr\
                         = cv2.resize(hanging_points_depth_bgr, (width, height))
 
                     hanging_points_depth = hanging_points_depth[
                         ymin:ymax, xmin:xmax]
-                    hanging_points_depth \
+                    hanging_points_depth\
                         = cv2.resize(hanging_points_depth, (width, height))
 
                     # cv2.imshow('annotation', annotation_img)
@@ -774,10 +788,10 @@ if __name__ == '__main__':
                     #     cv2.moveWindow('hanging_points_depth_bgr', 500, 200)
                     #     cv2.moveWindow('annotation', 900, 100)
 
-                    # cv2.imwrite(
-                    #     os.path.join(
-                    #         save_dir, 'color', '{:06}.png'.format(
-                    #             data_id)), bgr)
+                    cv2.imwrite(
+                        os.path.join(
+                            save_dir, 'color', '{:06}.png'.format(
+                                data_id)), bgr)
                     # cv2.imwrite(
                     #     os.path.join(
                     #         save_dir, 'color_raw', '{:06}.png'.format(
