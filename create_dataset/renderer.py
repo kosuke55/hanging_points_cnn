@@ -142,6 +142,11 @@ class Renderer:
 
         if DEBUG:
             self.cid = pybullet.connect(pybullet.GUI)
+            pybullet.resetDebugVisualizerCamera(
+                cameraDistance=1,
+                cameraYaw=90,
+                cameraPitch=0,
+                cameraTargetPosition=[0, 0, 0.1])
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
 
@@ -166,8 +171,9 @@ class Renderer:
             self.objects.remove(o_id)
 
     def remove_all_objects(self):
-        objects = copy.copy(self.objects)
-        for o_id in objects:
+        # objects = copy.copy(self.objects)
+        # for o_id in objects:
+        for o_id in self.objects:
             self.remove_object(o_id, True)
         self.objects = []
 
@@ -408,24 +414,6 @@ if __name__ == '__main__':
     elif 'ObjectNet3D' in args.input_files:
         category_name_list = ['cup', 'key', 'scissors']
 
-    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
-    plane_id = pybullet.loadURDF('plane.urdf')
-
-    np.save(
-        os.path.join(
-            save_dir, 'intrinsics', 'intrinsics'), r.camera_model.K)
-
-    camera_length = 0.01
-    camera_object = pybullet.createCollisionShape(
-        pybullet.GEOM_BOX,
-        halfExtents=[camera_length, camera_length, camera_length])
-    camera_object_visual = pybullet.createVisualShape(
-        pybullet.GEOM_BOX,
-        halfExtents=[camera_length, camera_length, camera_length],
-        rgbaColor=[0, 0, 0, 1])
-    # r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=False)
-
-    # data_id = 18000
     try:
         for file in files:
             dirname, filename = os.path.split(file)
@@ -436,12 +424,8 @@ if __name__ == '__main__':
                 category_name = dirname.split("/")[-2]
                 idx = dirname.split("/")[-1]
             if category_name not in category_name_list:
-                r.remove_all_objects()
                 continue
-            # indices = ['01', '02', '03']
-            # indices = ['01']
-            # if idx not in indices:
-            #     continue
+
             if filename == urdf_name:
                 print(category_name)
                 tree = ET.parse(os.path.join(dirname, urdf_name))
@@ -460,13 +444,28 @@ if __name__ == '__main__':
                     os.path.join(dirname, urdf_name),
                     contact_points, box_size=[0.1, 0.0001, 0.0001])
 
-                r.step(1)
-                r.look_at([0, 0, 2])
+                if len(contact_points) == 0:
+                    continue
 
                 data_count = 0
-                # for _ in range(1000):
+                while data_count < 100:
+                    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
+                    pybullet.setPhysicsEngineParameter(enableFileCaching=0)
 
-                while data_count < 1000:
+                    if not os.path.isfile(
+                            os.path.join(save_dir, 'intrinsics', 'intrinsics.npy')):
+                        np.save(os.path.join(save_dir, 'intrinsics', 'intrinsics'),
+                                r.camera_model.K)
+
+                    camera_length = 0.01
+                    camera_object = pybullet.createCollisionShape(
+                        pybullet.GEOM_BOX,
+                        halfExtents=[camera_length, camera_length, camera_length])
+                    camera_object_visual = pybullet.createVisualShape(
+                        pybullet.GEOM_BOX,
+                        halfExtents=[camera_length,
+                                     camera_length, camera_length],
+                        rgbaColor=[0, 0, 0, 1])
 
                     camera_id = pybullet.createMultiBody(
                         baseMass=0.,
@@ -500,10 +499,10 @@ if __name__ == '__main__':
                     pybullet.changeVisualShape(
                         object_id, -1, textureUniqueId=textureId)
 
-                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
-                        0, len(texture_paths) - 1)])
-                    pybullet.changeVisualShape(
-                        plane_id, -1, textureUniqueId=textureId)
+                    # textureId = pybullet.loadTexture(texture_paths[np.random.randint(
+                    #     0, len(texture_paths) - 1)])
+                    # pybullet.changeVisualShape(
+                    #     plane_id, -1, textureUniqueId=textureId)
 
                     newpos = [0, 0, 0]
                     while np.linalg.norm(newpos) < 0.3:
@@ -547,6 +546,8 @@ if __name__ == '__main__':
                     if np.count_nonzero(seg == object_id) == 0:
                         print("continue")
                         r.remove_all_objects()
+                        pybullet.resetSimulation()
+                        pybullet.disconnect()
                         continue
                     object_mask = np.where(seg == object_id)
                     non_object_mask = np.where(seg != object_id)
@@ -568,7 +569,6 @@ if __name__ == '__main__':
                         [np.min(object_mask[1]) - np.random.randint(0, 50), 0])
                     xmax = np.min(
                         [np.max(object_mask[1]) + np.random.randint(0, 50), int(r.im_width - 1)])
-
 
                     bgr_raw = bgr.copy()
                     bgr = bgr[ymin:ymax, xmin:xmax]
@@ -614,7 +614,6 @@ if __name__ == '__main__':
 
                         px, py = r.camera_model.project3d_to_pixel(
                             hanging_point_in_camera_coords.worldpos())
-
                         rayInfo = pybullet.rayTest(
                             hanging_point_worldcoords.worldpos(),
                             r.camera_coords.worldpos())
@@ -635,7 +634,10 @@ if __name__ == '__main__':
 
                     if len(hanging_point_in_camera_coords_list) == 0:
                         r.remove_all_objects()
+                        pybullet.resetSimulation()
+                        pybullet.disconnect()
                         continue
+
                     dbscan = DBSCAN(
                         eps=0.005, min_samples=2).fit(
                             [hp.worldpos() for hp in
@@ -650,7 +652,10 @@ if __name__ == '__main__':
                         if np.count_nonzero(dbscan.labels_ == label) <= 1:
                             # print("skip label ", label)
                             r.remove_all_objects()
+                            pybullet.resetSimulation()
+                            pybullet.disconnect()
                             continue
+
                         q_base = None
                         for idx, hp in enumerate(
                                 hanging_point_in_camera_coords_list):
@@ -708,6 +713,8 @@ if __name__ == '__main__':
 
                     if np.all(annotation_img == 0):
                         r.remove_all_objects()
+                        pybullet.resetSimulation()
+                        pybullet.disconnect()
                         continue
 
                     annotation_img[np.where(annotation_img >= 256)] = 255
@@ -810,7 +817,14 @@ if __name__ == '__main__':
 
                     data_count += 1
                     # data_id += 1
+
                     r.remove_all_objects()
+                    pybullet.resetSimulation()
+                    pybullet.disconnect()
+
                 r.remove_all_objects()
+                pybullet.resetSimulation()
+                pybullet.disconnect()
+
     except KeyboardInterrupt:
         sys.exit()
