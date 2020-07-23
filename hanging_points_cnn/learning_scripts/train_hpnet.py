@@ -6,6 +6,7 @@ import os
 import os.path as osp
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import cameramodels
 import numpy as np
@@ -50,7 +51,7 @@ class Trainer(object):
         self.best_loss = 1e10
 
         self.intrinsics = np.load(
-            os.path.join(data_path, "intrinsics/intrinsics.npy"))
+            sorted(list(Path(data_path).glob("**/intrinsics.npy")))[0])
 
         self.height = 1080
         self.width = 1920
@@ -364,8 +365,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany/merged')
-
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)
