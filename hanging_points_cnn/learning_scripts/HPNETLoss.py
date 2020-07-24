@@ -36,10 +36,14 @@ class HPNETLoss(Module):
 
     def forward(self, confidence, confidence_gt,
                 weight, depth_and_rotation, annotated_rois):
-
+        sigma = 1.0  # huber
         confidence_diff = confidence[:, 0, ...] - confidence_gt[:, 0, ...]
         confidence_loss = torch.sum(
-            weight * confidence_diff ** 2) / (256 ** 2)
+            weight * torch.where(
+                confidence_diff <= sigma,
+                0.5 * (confidence_diff ** 2),
+                sigma * torch.abs(confidence_diff) - 0.5 * (sigma ** 2)
+            )) / (256 ** 2)
         # confidence_loss = torch.sum((weight * confidence_diff) ** 2)
 
         depth_loss, rotation_loss = torch.tensor(

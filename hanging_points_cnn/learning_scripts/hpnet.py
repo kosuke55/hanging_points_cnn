@@ -78,7 +78,8 @@ class HPNET(nn.Module):
                 'feature_compress': 1 / 16,
                 'num_class': 1,
                 'pool_out_size': 8,
-                'confidence_thresh': 0.1,
+                'confidence_thresh': 0.3,
+                'use_bgr': True,
             }
 
         self.device = torch.device(
@@ -89,8 +90,14 @@ class HPNET(nn.Module):
         self.confidence_thresh = config['confidence_thresh']
 
         resnet = resnet18()
+
+        if config['use_bgr']:
+            in_channnels = 6
+        else:
+            in_channnels = 1
+
         self.feature_extractor = nn.Sequential(
-            nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3),
+            nn.Conv2d(in_channnels, 64, kernel_size=7, stride=2, padding=3),
             resnet.bn1,
             resnet.relu,
             resnet.maxpool,

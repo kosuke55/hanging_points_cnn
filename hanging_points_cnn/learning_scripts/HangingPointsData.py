@@ -9,6 +9,8 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 
+from hanging_points_cnn.utils.visualize import colorize_depth
+
 for path in sys.path:
     if 'opt/ros/' in path:
         print('sys.path.remove({})'.format(path))
@@ -19,10 +21,10 @@ for path in sys.path:
         import cv2
 
 
-def load_dataset(data_path, batch_size):
+def load_dataset(data_path, batch_size, use_bgr):
     transform = transforms.Compose([
         transforms.ToTensor()])
-    hp_data = HangingPointsDataset(data_path, transform)
+    hp_data = HangingPointsDataset(data_path, transform, use_bgr)
 
     train_size = int(0.9 * len(hp_data))
     test_size = len(hp_data) - train_size
@@ -47,17 +49,19 @@ def onehot(data, n):
 
 
 class HangingPointsDataset(Dataset):
-    def __init__(self, data_path, transform=None):
+    def __init__(self, data_path, transform=None, use_bgr=True):
         self.data_path = data_path
         self.transform = transform
         self.file_paths = list(
             sorted(Path(self.data_path).glob("*/depth/*.npy")))
+        self.use_bgr = use_bgr
 
     def __len__(self):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
         depth_filepath = self.file_paths[idx]
+
         depth = np.load(depth_filepath).astype(np.float32) * 0.001
 
         r = np.random.randint(20)
@@ -67,7 +71,16 @@ class HangingPointsDataset(Dataset):
         r = np.random.randint(20)
         r = r if np.mod(r, 2) else r + 1
         depth = cv2.GaussianBlur(depth, (r, r), 10)
-        in_feature = depth
+
+        if self.use_bgr:
+            depth_bgr = colorize_depth(depth.copy()*1000, 100, 1500)
+            color = cv2.imread(
+                str(depth_filepath.parent.parent / 'color' /
+                    depth_filepath.with_suffix('.png').name),
+                cv2.IMREAD_COLOR)
+            in_feature = np.concatenate((depth_bgr, color), axis=2)
+        else:
+            in_feature = depth
 
         clip_info = np.load(
             depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
@@ -93,6 +106,7 @@ class HangingPointsDataset(Dataset):
 
         if self.transform:
             in_feature = self.transform(in_feature)
+            depth = self.transform(depth)
             ground_truth = self.transform(ground_truth)
 
-        return in_feature, clip_info, ground_truth
+        return in_feature, depth, clip_info, ground_truth

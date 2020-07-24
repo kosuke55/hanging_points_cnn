@@ -37,10 +37,20 @@ except ImportError:
 class Trainer(object):
 
     def __init__(self, data_path, batch_size, max_epoch, pretrained_model,
-                 train_data_num, val_data_num, save_dir, config=None):
+                 train_data_num, val_data_num, save_dir, config=None,  port=6006):
+
+        if config is None:
+            config = {
+                'feature_compress': 1 / 16,
+                'num_class': 1,
+                'pool_out_size': 8,
+                'confidence_thresh': 0.3,
+                'use_bgr': True,
+            }
+        self.config = config
 
         self.train_dataloader, self.val_dataloader = load_dataset(
-            data_path, batch_size)
+            data_path, batch_size, use_bgr=self.config['use_bgr'])
         self.train_data_num = train_data_num
         self.val_data_num = val_data_num
         self.save_dir = save_dir
@@ -58,19 +68,11 @@ class Trainer(object):
         self.cameramodel = cameramodels.PinholeCameraModel.from_intrinsic_matrix(
             self.intrinsics, self.height, self.width)
 
-        self.vis = visdom.Visdom(port='6006')
+        self.vis = visdom.Visdom(port=port)
 
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
         print('device is:{}'.format(self.device))
-
-        if config is None:
-            config = {
-                'feature_compress': 1 / 16,
-                'num_class': 1,
-                'pool_out_size': 8,
-                'confidence_thresh': 0.3,
-            }
 
         self.model = HPNET(config).to(self.device)
         self.save_model_interval = 1
@@ -80,7 +82,7 @@ class Trainer(object):
                 torch.load(pretrained_model), strict=False)
 
         self.best_loss = 1e10
-        self.optimizer = optim.SGD(self.model.parameters(), lr=1e-3, momentum=0.9,
+        self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9,
                                    weight_decay=1e-6)
         self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer,
                                                      lr_lambda=lambda epo: 0.9 ** epo)
@@ -100,7 +102,7 @@ class Trainer(object):
         rotation_loss_sum = 0
         rotation_loss_count = 0
 
-        for index, (hp_data, clip_info, hp_data_gt) in tqdm.tqdm(
+        for index, (hp_data, depth, clip_info, hp_data_gt) in tqdm.tqdm(
                 enumerate(dataloader), total=len(dataloader), desc='{} epoch={}'.format(mode, self.epo), leave=False):
             xmin = clip_info[0, 0]
             xmax = clip_info[0, 1]
@@ -111,13 +113,17 @@ class Trainer(object):
             pos_weight = pos_weight[:, 0, ...]
             zeroidx = np.where(pos_weight < 0.5)
             nonzeroidx = np.where(pos_weight >= 0.5)
-            pos_weight[zeroidx] = 0.5
+            pos_weight[zeroidx] = 0.1
             pos_weight[nonzeroidx] = 1.0
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(self.device)
 
             criterion = HPNETLoss().to(self.device)
             hp_data = hp_data.to(self.device)
+
+            depth = depth.numpy(
+            ).copy()[0, 0, ...] * 1000
+            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
 
             hp_data_gt = hp_data_gt.to(self.device)
             ground_truth = hp_data_gt.cpu().detach().numpy().copy()
@@ -143,14 +149,20 @@ class Trainer(object):
                             depth_and_rotation, annotated_rois)
 
             loss = confidence_loss * 0.1 + rotation_loss
+            # loss = confidence_loss + rotation_loss * 10
+            # loss = confidence_loss
             if mode == 'train':
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
-            depth = hp_data.cpu().detach().numpy(
-            ).copy()[0, 0, ...] * 1000
-            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
+            # if self.config['use_bgr']:
+            #     depth_bgr = hp_data.cpu().detach().numpy()[
+            #         0, 0:3, ...].transpose(1, 2, 0)
+            # else:
+            #     depth = hp_data.cpu().detach().numpy(
+            #     ).copy()[0, 0, ...] * 1000
+            #     depth_bgr = colorize_depth(depth.copy(), 100, 1500)
 
             hanging_point_depth_gt \
                 = ground_truth[:, 1, ...].astype(np.float32) * 1000
@@ -314,6 +326,16 @@ class Trainer(object):
                                 opts=dict(
                     title='{} confidence(GT, Pred)'.format(mode)))
 
+                if self.config['use_bgr']:
+                    in_bgr = hp_data.cpu().detach().numpy().copy()[
+                        0, 3:, ...].transpose(1, 2, 0)
+                    in_rgb = cv2.cvtColor(
+                        in_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+                    self.vis.images([in_rgb],
+                                    win='{} in_rgb'.format(mode),
+                                    opts=dict(
+                        title='{} in_rgb'.format(mode)))
+
         if len(dataloader) > 0:
             avg_confidence_loss\
                 = confidence_loss_sum / len(dataloader)
@@ -323,7 +345,8 @@ class Trainer(object):
                 avg_loss\
                     = loss_sum / rotation_loss_count
             else:
-                avg_rotation_loss = rotation_loss_sum
+                avg_rotation_loss = 1e10
+                avg_loss = 1e10
         else:
             avg_confidence_loss = confidence_loss_sum
             avg_rotation_loss = rotation_loss_sum
@@ -352,6 +375,7 @@ class Trainer(object):
     def train(self):
         for self.epo in range(self.max_epoch):
             self.step(self.train_dataloader, 'train')
+            # if np.mod(self.epo, 50) == 0:
             self.step(self.val_dataloader, 'val')
             self.scheduler.step()
 

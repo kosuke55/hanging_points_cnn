@@ -466,15 +466,22 @@ if __name__ == '__main__':
 
                 contact_points = cluster_hanging_points(
                     contact_points, eps=0.005, min_samples=2)
-                contact_points, _ = filter_penetration(
-                    os.path.join(dirname, urdf_name),
-                    contact_points, box_size=[0.1, 0.0001, 0.0001])
+
+                if 'ycb' in args.input_files:
+                    contact_points, _ = filter_penetration(
+                        os.path.join(dirname, 'base.urdf'),
+                        contact_points, box_size=[0.1, 0.0001, 0.0001])
+                else:
+                    contact_points, _ = filter_penetration(
+                        os.path.join(dirname, urdf_name),
+                        contact_points, box_size=[0.1, 0.0001, 0.0001])
 
                 if len(contact_points) == 0:
+                    print('num of hanging points: {}'.format(len(contact_points)))
                     continue
 
                 data_count = 0
-                while data_count < 100:
+                while data_count < 40:
                     r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
                     pybullet.setPhysicsEngineParameter(enableFileCaching=0)
                     planeId = pybullet.loadURDF("plane.urdf", [0, 0, -0.5])
@@ -664,6 +671,7 @@ if __name__ == '__main__':
                                 r.camera_coords.worldpos(), [1, 0, 0], 1)
 
                     if len(hanging_point_in_camera_coords_list) == 0:
+                        print('-- No visible hanging point --')
                         r.remove_all_objects()
                         pybullet.resetSimulation()
                         pybullet.disconnect()
@@ -853,9 +861,9 @@ if __name__ == '__main__':
                     pybullet.resetSimulation()
                     pybullet.disconnect()
 
-                r.remove_all_objects()
-                pybullet.resetSimulation()
-                pybullet.disconnect()
+                # r.remove_all_objects()
+                # pybullet.resetSimulation()
+                # pybullet.disconnect()
 
     except KeyboardInterrupt:
         sys.exit()
