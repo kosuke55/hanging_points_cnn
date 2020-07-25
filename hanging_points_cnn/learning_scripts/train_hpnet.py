@@ -41,9 +41,11 @@ class Trainer(object):
 
         if config is None:
             config = {
-                'feature_compress': 1 / 16,
-                'num_class': 1,
-                'pool_out_size': 8,
+                # 'feature_compress': 1 / 16,
+                # 'num_class': 1,
+                # 'pool_out_size': 8,
+                'output_channels': 1,
+                'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
                 'use_bgr': True,
                 'use_bgr2gray': True,
@@ -67,6 +69,7 @@ class Trainer(object):
         self.intrinsics = np.load(
             sorted(list(Path(data_path).glob("**/intrinsics.npy")))[0])
 
+        # for visualize
         self.height = 1080
         self.width = 1920
         self.cameramodel = cameramodels.PinholeCameraModel.from_intrinsic_matrix(
@@ -86,10 +89,11 @@ class Trainer(object):
                 torch.load(pretrained_model), strict=False)
 
         self.best_loss = 1e10
-        self.optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9,
-                                   weight_decay=1e-6)
-        self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer,
-                                                     lr_lambda=lambda epo: 0.9 ** epo)
+        self.optimizer = optim.SGD(
+            self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=1e-6)
+        self.scheduler = optim.lr_scheduler.LambdaLR(
+            self.optimizer, lr_lambda=lambda epo: 0.9 ** epo)
+
         self.now = datetime.now().strftime('%Y%m%d_%H%M')
 
     def step(self, dataloader, mode):
@@ -333,7 +337,7 @@ class Trainer(object):
                 if self.config['use_bgr']:
                     if self.config['use_bgr2gray']:
                         in_gray = hp_data.cpu().detach().numpy().copy()[
-                            0, 1:2, ...]* 255
+                            0, 1:2, ...] * 255
                         in_gray = in_gray.astype(np.uint8)
                         print(in_gray.shape)
                         self.vis.images([in_gray],

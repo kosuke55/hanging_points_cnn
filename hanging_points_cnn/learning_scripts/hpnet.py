@@ -9,6 +9,7 @@ import os.path as osp
 
 import torch
 import torch.nn as nn
+from torchvision import models
 from torchvision.ops import RoIAlign
 
 try:
@@ -44,25 +45,34 @@ class Conv2DBatchNormRelu(nn.Module):
 
 class Decoder(nn.Module):
 
-    def __init__(self, n_class=1):
+    def __init__(self, output_channels=1, feature_extractor_name='resnet50'):
         super(Decoder, self).__init__()
-        self.n_class = n_class
+        self.output_channels = output_channels
+        if feature_extractor_name == 'resnet50':
+            self.feature_extractor_out_channels = 2048
+        elif feature_extractor_name == 'resnet18':
+            self.feature_extractor_out_channels = 512
 
         self.conv1 = Conv2DBatchNormRelu(
-            512, 128, kernel_size=3, stride=1, padding=1)
+            self.feature_extractor_out_channels, 128, kernel_size=3, stride=1, padding=1)
 
         self.deconv2 = nn.ConvTranspose2d(
             128, 128, kernel_size=4, stride=2, padding=1)
         self.conv2 = Conv2DBatchNormRelu(
             128, 128, kernel_size=3, stride=1, padding=1)
 
-        self.deconv3 = nn.ConvTranspose2d(
-            128, self.n_class, kernel_size=16, stride=8, padding=4)
+        if feature_extractor_name == 'resnet50':
+            self.deconv3 = nn.ConvTranspose2d(
+                128, self.output_channels, kernel_size=32, stride=16, padding=8)  # *16
+        elif feature_extractor_name == 'resnet18':
+            self.deconv3 = nn.ConvTranspose2d(
+                128, self.output_channels, kernel_size=16, stride=8, padding=4)  # *8
         self.conv3 = Conv2DBatchNormRelu(
-            self.n_class, self.n_class, kernel_size=3, stride=1, padding=1)
+            self.output_channels, self.output_channels, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         h = x
+        # h = self.conv0(h)
         h = self.conv1(h)
         h = self.conv2(self.deconv2(h))
         h = self.conv3(self.deconv3(h))
@@ -75,9 +85,8 @@ class HPNET(nn.Module):
 
         if config is None:
             config = {
-                'feature_compress': 1 / 16,
-                'num_class': 1,
-                'pool_out_size': 8,
+                'output_channels': 1,
+                'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
                 'use_bgr': True,
                 'use_bgr2gray': True,
@@ -85,12 +94,19 @@ class HPNET(nn.Module):
 
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
-        self.feature_compress = config['feature_compress']
-        self.pool_out_size = config['pool_out_size']
-        self.n_class = config['num_class']
+        self.output_channels = config['output_channels']
         self.confidence_thresh = config['confidence_thresh']
 
-        resnet = resnet18()
+        if config['feature_extractor_name'] == 'resnet50':
+            resnet = models.resnet50(pretrained=True)
+            self.feature_extractor_out_channels = 2048
+            self.feature_extractor_out_size = 8
+            self.roi_align_spatial_scale = 1 / 32.
+        elif feature_extractor_name == 'resnet18':
+            resnet = resnet18()
+            self.feature_extractor_out_channels = 512
+            self.feature_extractor_out_size = 8
+            self.roi_align_spatial_scale = 1 / 16.
 
         if config['use_bgr']:
             if config['use_bgr2gray']:
@@ -111,21 +127,23 @@ class HPNET(nn.Module):
             resnet.layer4
         )
 
-        self.decoder = Decoder(self.n_class)
+        self.decoder = Decoder(self.output_channels)
 
         self.conv_to_head = nn.Sequential(
             Conv2DBatchNormRelu(
-                512, 128, kernel_size=3, stride=1, padding=1),
+                self.feature_extractor_out_channels, 128,
+                kernel_size=3, stride=1, padding=1),
             nn.Flatten(),
             nn.Linear(128 * 8 * 8, 128 * 8 * 8),
             nn.Linear(128 * 8 * 8, 5)
         )
-        self.roi_align = RoIAlign(8, 1 / 32, -1)
+
+        self.roi_align = RoIAlign(
+            self.feature_extractor_out_size, self.roi_align_spatial_scale, -1)
 
     def forward(self, x):
         h = x
         feature = self.feature_extractor(h)
-
         confidence = self.decoder(feature)
 
         self.rois_list, self.rois_center_list = find_rois(
