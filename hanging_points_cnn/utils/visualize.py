@@ -17,16 +17,23 @@ except ImportError:
             sys.path.append(path)
 
 
-def colorize_depth(depth, min_value=None, max_value=None):
+def normalize_depth(depth, min_value=None, max_value=None):
     min_value = np.nanmin(depth) if min_value is None else min_value
     max_value = np.nanmax(depth) if max_value is None else max_value
+    normalized_depth = depth.copy()
+    nan_mask = np.isnan(normalized_depth)
+    normalized_depth[nan_mask] = 0
+    normalized_depth = (normalized_depth - min_value) / (max_value - min_value)
+    normalized_depth[normalized_depth <= 0] = 0
+    normalized_depth[normalized_depth > 1] = 1
 
-    gray_depth = depth.copy()
-    nan_mask = np.isnan(gray_depth)
-    gray_depth[nan_mask] = 0
-    gray_depth = 255 * (gray_depth - min_value) / (max_value - min_value)
-    gray_depth[gray_depth <= 0] = 0
-    gray_depth[gray_depth > 255] = 255
+    return normalized_depth
+
+
+def colorize_depth(depth, min_value=None, max_value=None):
+    normalized_depth = normalize_depth(depth, min_value, max_value)
+    nan_mask = np.isnan(normalized_depth)
+    gray_depth = normalized_depth * 255
     gray_depth = gray_depth.astype(np.uint8)
     colorized = cv2.applyColorMap(gray_depth, cv2.COLORMAP_JET)
     colorized[nan_mask] = (0, 0, 0)

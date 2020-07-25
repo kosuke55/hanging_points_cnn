@@ -9,7 +9,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 
-from hanging_points_cnn.utils.visualize import colorize_depth
+from hanging_points_cnn.utils.visualize import colorize_depth, normalize_depth
 
 for path in sys.path:
     if 'opt/ros/' in path:
@@ -21,10 +21,11 @@ for path in sys.path:
         import cv2
 
 
-def load_dataset(data_path, batch_size, use_bgr):
+def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray):
     transform = transforms.Compose([
         transforms.ToTensor()])
-    hp_data = HangingPointsDataset(data_path, transform, use_bgr)
+    hp_data = HangingPointsDataset(
+        data_path, transform, use_bgr, use_bgr2gray)
 
     train_size = int(0.9 * len(hp_data))
     test_size = len(hp_data) - train_size
@@ -49,12 +50,15 @@ def onehot(data, n):
 
 
 class HangingPointsDataset(Dataset):
-    def __init__(self, data_path, transform=None, use_bgr=True):
+    def __init__(self, data_path, transform=None, use_bgr=True, use_bgr2gray=True):
         self.data_path = data_path
         self.transform = transform
         self.file_paths = list(
             sorted(Path(self.data_path).glob("*/depth/*.npy")))
         self.use_bgr = use_bgr
+        if use_bgr2gray:
+            self.use_bgr = True
+        self.use_bgr2gray = use_bgr2gray
 
     def __len__(self):
         return len(self.file_paths)
@@ -78,7 +82,19 @@ class HangingPointsDataset(Dataset):
                 str(depth_filepath.parent.parent / 'color' /
                     depth_filepath.with_suffix('.png').name),
                 cv2.IMREAD_COLOR)
-            in_feature = np.concatenate((depth_bgr, color), axis=2)
+            if self.use_bgr2gray:
+                # 0~1
+                gray = cv2.cvtColor(
+                    color, cv2.COLOR_BGR2GRAY)[..., None] / 255.
+                gray = gray.astype(np.float32)
+                normalized_depth = normalize_depth(depth)[..., None]
+                # -1~1
+                # gray = gray * 2 - 1
+                # depth = depth * 2 - 1
+
+                in_feature = np.concatenate((normalized_depth, gray), axis=2)
+            else:
+                in_feature = np.concatenate((depth_bgr, color), axis=2)
         else:
             in_feature = depth
 

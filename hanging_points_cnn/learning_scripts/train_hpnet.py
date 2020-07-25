@@ -46,11 +46,15 @@ class Trainer(object):
                 'pool_out_size': 8,
                 'confidence_thresh': 0.3,
                 'use_bgr': True,
+                'use_bgr2gray': True,
             }
         self.config = config
 
         self.train_dataloader, self.val_dataloader = load_dataset(
-            data_path, batch_size, use_bgr=self.config['use_bgr'])
+            data_path, batch_size,
+            use_bgr=self.config['use_bgr'],
+            use_bgr2gray=self.config['use_bgr2gray'])
+
         self.train_data_num = train_data_num
         self.val_data_num = val_data_num
         self.save_dir = save_dir
@@ -327,14 +331,24 @@ class Trainer(object):
                     title='{} confidence(GT, Pred)'.format(mode)))
 
                 if self.config['use_bgr']:
-                    in_bgr = hp_data.cpu().detach().numpy().copy()[
-                        0, 3:, ...].transpose(1, 2, 0)
-                    in_rgb = cv2.cvtColor(
-                        in_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-                    self.vis.images([in_rgb],
-                                    win='{} in_rgb'.format(mode),
-                                    opts=dict(
-                        title='{} in_rgb'.format(mode)))
+                    if self.config['use_bgr2gray']:
+                        in_gray = hp_data.cpu().detach().numpy().copy()[
+                            0, 1:2, ...]* 255
+                        in_gray = in_gray.astype(np.uint8)
+                        print(in_gray.shape)
+                        self.vis.images([in_gray],
+                                        win='{} in_gray'.format(mode),
+                                        opts=dict(
+                            title='{} in_gray'.format(mode)))
+                    else:
+                        in_bgr = hp_data.cpu().detach().numpy().copy()[
+                            0, 3:, ...].transpose(1, 2, 0)
+                        in_rgb = cv2.cvtColor(
+                            in_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+                        self.vis.images([in_rgb],
+                                        win='{} in_rgb'.format(mode),
+                                        opts=dict(
+                            title='{} in_rgb'.format(mode)))
 
         if len(dataloader) > 0:
             avg_confidence_loss\
@@ -424,5 +438,6 @@ if __name__ == "__main__":
                       pretrained_model=args.pretrained_model,
                       train_data_num=args.train_data_num,
                       val_data_num=args.val_data_num,
-                      save_dir=args.save_dir)
+                      save_dir=args.save_dir,
+                      port=args.port)
     trainer.train()

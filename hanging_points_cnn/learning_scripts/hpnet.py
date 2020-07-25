@@ -80,6 +80,7 @@ class HPNET(nn.Module):
                 'pool_out_size': 8,
                 'confidence_thresh': 0.3,
                 'use_bgr': True,
+                'use_bgr2gray': True,
             }
 
         self.device = torch.device(
@@ -92,7 +93,10 @@ class HPNET(nn.Module):
         resnet = resnet18()
 
         if config['use_bgr']:
-            in_channnels = 6
+            if config['use_bgr2gray']:
+                in_channnels = 2
+            else:
+                in_channnels = 6
         else:
             in_channnels = 1
 
