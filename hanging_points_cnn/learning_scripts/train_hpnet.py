@@ -36,8 +36,9 @@ except ImportError:
 
 class Trainer(object):
 
-    def __init__(self, data_path, batch_size, max_epoch, pretrained_model,
-                 train_data_num, val_data_num, save_dir, config=None,  port=6006):
+    def __init__(self, gpu, data_path, batch_size, max_epoch,
+                 pretrained_model, train_data_num, val_data_num,
+                 save_dir, lr, config=None, port=6006):
 
         if config is None:
             config = {
@@ -77,6 +78,7 @@ class Trainer(object):
 
         self.vis = visdom.Visdom(port=port)
 
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
         print('device is:{}'.format(self.device))
@@ -89,8 +91,12 @@ class Trainer(object):
                 torch.load(pretrained_model), strict=False)
 
         self.best_loss = 1e10
-        self.optimizer = optim.SGD(
-            self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=1e-6)
+        # self.optimizer = optim.SGD(
+        #     self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=args.lr,  betas=(0.9, 0.999),
+            eps=1e-08, weight_decay=0, amsgrad=False)
+
         self.scheduler = optim.lr_scheduler.LambdaLR(
             self.optimizer, lr_lambda=lambda epo: 0.9 ** epo)
 
@@ -111,7 +117,8 @@ class Trainer(object):
         rotation_loss_count = 0
 
         for index, (hp_data, depth, clip_info, hp_data_gt) in tqdm.tqdm(
-                enumerate(dataloader), total=len(dataloader), desc='{} epoch={}'.format(mode, self.epo), leave=False):
+                enumerate(dataloader), total=len(dataloader),
+                desc='{} epoch={}'.format(mode, self.epo), leave=False):
             xmin = clip_info[0, 0]
             xmax = clip_info[0, 1]
             ymin = clip_info[0, 2]
@@ -152,11 +159,13 @@ class Trainer(object):
             annotated_rois = annotate_rois(
                 self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
-            confidence_loss, depth_loss, rotation_loss \
-                = criterion(confidence, hp_data_gt, pos_weight,
-                            depth_and_rotation, annotated_rois)
+            confidence_loss, depth_loss, rotation_loss = criterion(
+                confidence, hp_data_gt, pos_weight, depth_and_rotation, annotated_rois)
 
-            loss = confidence_loss * 0.1 + rotation_loss
+            if confidence_loss > 10:
+                loss = confidence_loss
+            else:
+                loss = confidence_loss + rotation_loss
             # loss = confidence_loss + rotation_loss * 10
             # loss = confidence_loss
             if mode == 'train':
@@ -401,7 +410,7 @@ class Trainer(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
+    parser.add_argument('-g', '--gpu', type=int, required=True, help='gpu id')
     parser.add_argument(
         '--data_path',
         '-dp',
@@ -419,29 +428,37 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200617_1601.pt')
-
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge/hpnet_latestmodel_20200725_2302-.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
     parser.add_argument('--val_data_num', '-te', type=int,
                         help='How much data to use for validation',
                         default=1000000)
+    parser.add_argument('--port', type=int,
+                        help='port',
+                        default=6006)
+
     parser.add_argument(
         '--save_dir',
         '-sd',
         type=str,
         help='pt model save dir',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge')
+    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
+    parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
 
     args = parser.parse_args()
 
-    trainer = Trainer(data_path=args.data_path,
-                      batch_size=args.batch_size,
-                      max_epoch=args.max_epoch,
-                      pretrained_model=args.pretrained_model,
-                      train_data_num=args.train_data_num,
-                      val_data_num=args.val_data_num,
-                      save_dir=args.save_dir,
-                      port=args.port)
+    trainer = Trainer(
+        gpu=args.gpu,
+        data_path=args.data_path,
+        batch_size=args.batch_size,
+        max_epoch=args.max_epoch,
+        pretrained_model=args.pretrained_model,
+        train_data_num=args.train_data_num,
+        val_data_num=args.val_data_num,
+        save_dir=args.save_dir,
+        lr=args.lr,
+        port=args.port)
     trainer.train()
