@@ -9,7 +9,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
 
-from hanging_points_cnn.utils.visualize import colorize_depth, normalize_depth
+from hanging_points_cnn.utils.image import colorize_depth, normalize_depth
 
 for path in sys.path:
     if 'opt/ros/' in path:

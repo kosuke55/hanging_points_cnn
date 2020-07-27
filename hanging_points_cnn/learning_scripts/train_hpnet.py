@@ -20,7 +20,7 @@ sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hpnet import HPNET
 from HPNETLoss import HPNETLoss
 from HangingPointsData import load_dataset
-from utils.visualize import colorize_depth, create_depth_circle, draw_axis
+from utils.image import colorize_depth, create_depth_circle, draw_axis
 from utils.rois_tools import annotate_rois, find_rois
 
 try:
@@ -128,7 +128,7 @@ class Trainer(object):
             pos_weight = pos_weight[:, 0, ...]
             zeroidx = np.where(pos_weight < 0.5)
             nonzeroidx = np.where(pos_weight >= 0.5)
-            pos_weight[zeroidx] = 0.1
+            pos_weight[zeroidx] = 0.5
             pos_weight[nonzeroidx] = 1.0
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(self.device)
@@ -165,9 +165,8 @@ class Trainer(object):
             if confidence_loss > 10:
                 loss = confidence_loss
             else:
-                loss = confidence_loss + rotation_loss
-            # loss = confidence_loss + rotation_loss * 10
-            # loss = confidence_loss
+                loss = confidence_loss * 0.1 + rotation_loss
+
             if mode == 'train':
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -416,7 +415,9 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany')
+        # default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany')
+        # default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0722-only2')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0722')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)
@@ -428,7 +429,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge/hpnet_latestmodel_20200725_2302-.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge/hpnet_latestmodel_20200727_1438.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
