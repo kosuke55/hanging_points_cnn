@@ -169,6 +169,7 @@ class Renderer:
             self.object_id = pybullet.loadURDF(
                 urdf, [0, 0, 0], [0, 0, 0, 1])
 
+        self.object_center = get_urdf_center(urdf)
         self.objects.append(self.object_id)
         pybullet.changeVisualShape(self.object_id, -1, rgbaColor=[1, 1, 1, 1])
 
@@ -333,6 +334,37 @@ class Renderer:
         self.roi = [ymin, ymax, xmin, xmax]
 
         return self.roi
+
+    def get_visible_hp_coords(self, contact_points, debug_line=False):
+        self.hanging_point_in_camera_coords_list = []
+        for cp in contact_points:
+            hanging_point_coords = coordinates.Coordinates(
+                pos=(cp[0] - self.object_center), rot=cp[1:])
+            # hanging_point_coords.translate([0, 0.01, 0])
+            hanging_point_worldcoords\
+                = r.object_coords.copy().transform(
+                    hanging_point_coords)
+            hanging_point_in_camera_coords\
+                = r.camera_coords.inverse_transformation(
+                ).transform(hanging_point_worldcoords)
+            px, py = r.camera_model.project3d_to_pixel(
+                hanging_point_in_camera_coords.worldpos())
+            rayInfo = pybullet.rayTest(
+                hanging_point_worldcoords.worldpos(),
+                r.camera_coords.worldpos())
+            if rayInfo[0][0] == r.camera_id:
+                self.hanging_point_in_camera_coords_list.append(
+                    hanging_point_in_camera_coords)
+                pybullet.addUserDebugLine(
+                    hanging_point_worldcoords.worldpos(),
+                    r.camera_coords.worldpos(), [1, 1, 1], 1)
+            # occulsion
+            else:
+                pybullet.addUserDebugLine(
+                    hanging_point_worldcoords.worldpos(),
+                    r.camera_coords.worldpos(), [1, 0, 0], 1)
+
+        return self.hanging_point_in_camera_coords_list
 
     def move_to(self, T):
         self.camera_coords = coordinates.Coordinates(
@@ -577,7 +609,7 @@ if __name__ == '__main__':
 
             if filename == urdf_name:
                 print(category_name)
-                center = get_urdf_center(osp.join(dirname, urdf_name))
+                # center = get_urdf_center(osp.join(dirname, urdf_name))
                 contact_points = get_contact_points(
                     osp.join(dirname, 'contact_points.json'))
 
@@ -586,23 +618,6 @@ if __name__ == '__main__':
                     r = Renderer(DEBUG=args.gui)
                     r.get_plane()
 
-                    # tree = ET.parse(osp.join(dirname, urdf_name))
-                    # root = tree.getroot()
-                    # # mesh_scale_list = [(np.random.rand() - 0.5) * 0.5 + 1,
-                    # #                    (np.random.rand() - 0.5) * 0.5 + 1,
-                    # #                    (np.random.rand() - 0.5) * 0.5 + 1]
-                    mesh_scale_list = [1, 1, 1]
-                    # mesh_scale = ''.join(str(i) + ' ' for i in mesh_scale_list).strip()
-                    # root[0].find('visual').find('geometry').find('mesh').attrib['scale'] = mesh_scale
-                    # root[0].find('collision').find('geometry').find('mesh').attrib['scale'] = mesh_scale
-                    # tree.write(osp.join(dirname, 'rescale_base.urdf'),
-                    #            encoding='utf-8', xml_declaration=True)
-                    # object_id = r.load_urdf(osp.join(dirname, "rescale_base.urdf"))
-
-                    # color = np.random.rand(3).tolist()
-                    # color.append(1)
-                    # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
-
                     object_id = r.load_urdf(osp.join(dirname, urdf_name),
                                             random_pose=True)
 
@@ -610,7 +625,7 @@ if __name__ == '__main__':
                     r.change_texture(r.plane_id)
                     r.create_camera()
                     r.move_to_random_pos()
-                    r.look_at(r.object_coords.worldpos() - center)
+                    r.look_at(r.object_coords.worldpos() - r.object_center)
                     r.step(1)
 
                     bgr = r.get_bgr()
@@ -652,42 +667,8 @@ if __name__ == '__main__':
                     annotation_img = annotation_img.astype(np.uint32)
                     rotation_map = RotationMap(width, height)
 
-                    hanging_point_in_camera_coords_list = []
-
-                    for cp in contact_points:
-                        hanging_point_coords = coordinates.Coordinates(
-                            pos=(cp[0] - center) * mesh_scale_list, rot=cp[1:])
-
-                        # hanging_point_coords.translate([0, 0.01, 0])
-
-                        hanging_point_worldcoords\
-                            = r.object_coords.copy().transform(
-                                hanging_point_coords)
-
-                        hanging_point_in_camera_coords\
-                            = r.camera_coords.inverse_transformation(
-                            ).transform(hanging_point_worldcoords)
-
-                        px, py = r.camera_model.project3d_to_pixel(
-                            hanging_point_in_camera_coords.worldpos())
-                        rayInfo = pybullet.rayTest(
-                            hanging_point_worldcoords.worldpos(),
-                            r.camera_coords.worldpos())
-
-                        if rayInfo[0][0] == r.camera_id:
-                            hanging_point_in_camera_coords_list.append(
-                                hanging_point_in_camera_coords)
-
-                            pybullet.addUserDebugLine(
-                                hanging_point_worldcoords.worldpos(),
-                                r.camera_coords.worldpos(), [1, 1, 1], 1)
-
-                        # occulsion
-                        else:
-                            pybullet.addUserDebugLine(
-                                hanging_point_worldcoords.worldpos(),
-                                r.camera_coords.worldpos(), [1, 0, 0], 1)
-
+                    hanging_point_in_camera_coords_list \
+                        = r.get_visible_hp_coords(contact_points)
                     if len(hanging_point_in_camera_coords_list) == 0:
                         print('-- No visible hanging point --')
                         r.finish()
