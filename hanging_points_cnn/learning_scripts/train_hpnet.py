@@ -5,6 +5,7 @@ import argparse
 import os
 import os.path as osp
 import sys
+import yaml
 from datetime import datetime
 from pathlib import Path
 
@@ -20,8 +21,8 @@ sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hpnet import HPNET
 from HPNETLoss import HPNETLoss
 from HangingPointsData import load_dataset
-from utils.image import colorize_depth, create_depth_circle, draw_axis
-from utils.rois_tools import annotate_rois, find_rois
+from hanging_points_cnn.utils.image import colorize_depth, create_depth_circle, draw_axis
+from hanging_points_cnn.utils.rois_tools import annotate_rois, find_rois
 
 try:
     import cv2
@@ -42,9 +43,6 @@ class Trainer(object):
 
         if config is None:
             config = {
-                # 'feature_compress': 1 / 16,
-                # 'num_class': 1,
-                # 'pool_out_size': 8,
                 'output_channels': 1,
                 'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
@@ -436,6 +434,9 @@ if __name__ == "__main__":
     parser.add_argument('--val_data_num', '-te', type=int,
                         help='How much data to use for validation',
                         default=1000000)
+    parser.add_argument('--confing', '-c', type=str,
+                        help='config',
+                        default='config/gray_model.yaml')
     parser.add_argument('--port', type=int,
                         help='port',
                         default=6006)
@@ -445,11 +446,14 @@ if __name__ == "__main__":
         '-sd',
         type=str,
         help='pt model save dir',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
 
     args = parser.parse_args()
+
+    with open(args.confing) as f:
+        config = yaml.safe_load(f)
 
     trainer = Trainer(
         gpu=args.gpu,
@@ -461,5 +465,6 @@ if __name__ == "__main__":
         val_data_num=args.val_data_num,
         save_dir=args.save_dir,
         lr=args.lr,
+        config=config,
         port=args.port)
     trainer.train()
