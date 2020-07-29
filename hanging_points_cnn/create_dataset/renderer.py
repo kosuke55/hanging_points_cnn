@@ -7,6 +7,7 @@ import glob
 import json
 import numpy.matlib as npm
 import os
+import os.path as osp
 import sys
 
 import cameramodels
@@ -14,15 +15,14 @@ import numpy as np
 import pybullet
 import pybullet_data
 # import skrobot
-from eos import make_fancy_output_dir
-
 import xml.etree.ElementTree as ET
-from hanging_points_generator.hp_generator \
-    import cluster_hanging_points, filter_penetration
-
+from eos import make_fancy_output_dir
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
+from hanging_points_generator.hp_generator import cluster_hanging_points
+from hanging_points_generator.hp_generator import filter_penetration
+from hanging_points_generator.generator_utils import get_urdf_center
 
 try:
     import cv2
@@ -108,14 +108,8 @@ def draw_axis(img, R, t, K):
 
 
 class Renderer:
-    def __init__(
-            self,
-            im_width,
-            im_height,
-            fov,
-            near_plane,
-            far_plane,
-            DEBUG=False):
+    def __init__(self, im_width=1920, im_height=1080, fov=42.5,
+                 near_plane=0.1, far_plane=2.0, DEBUG=False):
         self.objects = []
         self.im_width = im_width
         self.im_height = im_height
@@ -150,7 +144,12 @@ class Renderer:
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
 
+        self.texture_paths = glob.glob(
+            osp.join('/media/kosuke/SANDISK/dtd', '**', '*.jpg'),
+            recursive=True)
+
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
+        pybullet.setPhysicsEngineParameter(enableFileCaching=0)
 
         self.draw_camera_pos()
         self.change_light()
@@ -288,16 +287,60 @@ class Renderer:
         return 2 * self.far_plane * self.near_plane / (self.far_plane + self.near_plane - (
             self.far_plane - self.near_plane) * (2 * d - 1)) + np.random.randn(self.im_height, self.im_width) * noise
 
+    def get_depth_milli_metres(self):
+        self.depth = (self.get_depth_metres() * 1000).astype(np.float32)
+        return self.depth
+
     def get_rgb(self):
-        return self.render()[2]
+        self.rgb = self.render()[2]
+        return self.rgb
+
+    def get_bgr(self):
+        self.bgr = cv2.cvtColor(self.get_rgb(), cv2.COLOR_RGB2BGR)
+        return self.bgr
 
     def get_seg(self):
-        return self.render()[4]
+        self.seg = self.render()[4]
+        return self.seg
+
+    def get_object_mask(self, object_id):
+        if np.count_nonzero(self.seg == object_id) == 0:
+            return None
+        self.object_mask = np.where(self.seg == object_id)
+        self.non_object_mask = np.where(self.seg != object_id)
+
+        return self.object_mask, self.non_object_mask
+
+    def get_object_depth(self):
+        self.object_depth = r.get_depth_milli_metres()
+        self.object_depth[self.non_object_mask] = 0
+        return self.object_depth
+
+    def get_roi(self, margin_size=0):
+        ymin = np.max([np.min(self.object_mask[0]) -
+                       np.random.randint(0, margin_size), 0])
+        ymax = np.min([np.max(self.object_mask[0]) +
+                       np.random.randint(0, margin_size), int(self.im_height - 1)])
+        xmin = np.max([np.min(self.object_mask[1]) -
+                       np.random.randint(0, margin_size), 0])
+        xmax = np.min([np.max(self.object_mask[1]) +
+                       np.random.randint(0, margin_size), int(self.im_width - 1)])
+        self.roi = [ymin, ymax, xmin, xmax]
+
+        return self.roi
 
     def move_to(self, T):
         self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
             rot=r.camera_coords.worldrot())
+
+    def move_to_random_pos(self):
+        # newpos = [0, 0, 0]
+        # while np.linalg.norm(newpos) < 0.3:
+        newpos = [(np.random.rand() - 0.5) * 0.1,
+                  (np.random.rand() - 0.5) * 0.1,
+                  np.random.rand() * 0.2 + 0.3]
+        self.move_to(newpos)
 
     def look_at(self, p):
         p = np.array(p)
@@ -307,6 +350,48 @@ class Renderer:
         coordinates.geo.orient_coords_to_axis(self.camera_coords, z)
 
         self.draw_camera_pos()
+
+    def get_plane(self):
+        self.plane_id = pybullet.loadURDF("plane.urdf", [0, 0, -0.5])
+        return self.plane_id
+
+    def save_intrinsics(self, save_dir):
+        if not osp.isfile(
+                osp.join(save_dir, 'intrinsics', 'intrinsics.npy')):
+            np.save(osp.join(
+                save_dir, 'intrinsics', 'intrinsics'), self.camera_model.K)
+
+    def create_camera(self):
+        camera_length = 0.01
+        camera_object = pybullet.createCollisionShape(
+            pybullet.GEOM_BOX,
+            halfExtents=[camera_length, camera_length, camera_length])
+        camera_object_visual = pybullet.createVisualShape(
+            pybullet.GEOM_BOX,
+            halfExtents=[camera_length,
+                         camera_length, camera_length],
+            rgbaColor=[0, 0, 0, 1])
+        self.camera_id = pybullet.createMultiBody(
+            baseMass=0.,
+            baseCollisionShapeIndex=camera_object,
+            baseVisualShapeIndex=camera_object_visual,
+            basePosition=r.camera_coords.worldpos(),
+            baseOrientation=[0, 0, 0, 1.])
+        r.objects.append(self.camera_id)
+
+        return self.camera_id
+
+    def change_texture(self, object_id):
+        textureId = pybullet.loadTexture(
+            self.texture_paths[np.random.randint(
+                0, len(self.texture_paths) - 1)])
+        pybullet.changeVisualShape(
+            object_id, -1, textureUniqueId=textureId)
+
+    def finish(self):
+        self.remove_all_objects()
+        pybullet.resetSimulation()
+        pybullet.disconnect()
 
 
 class RotationMap():
@@ -359,6 +444,49 @@ class RotationMap():
                     np.array(self.rotations_buffer[idx]))
 
 
+def get_contact_points(json_path, dataset_type='ycb',
+                       use_clustering=True, use_filter_penetration=True):
+
+    contact_points_dict = json.load(open(json_path, 'r'))
+    contact_points = contact_points_dict['contact_points']
+
+    if use_clustering:
+        contact_points = cluster_hanging_points(
+            contact_points, eps=0.005, min_samples=2)
+
+    if use_filter_penetration:
+        if dataset_type == 'ycb':
+            contact_points, _ = filter_penetration(
+                osp.join(dirname, 'base.urdf'),
+                contact_points, box_size=[0.1, 0.0001, 0.0001])
+        else:
+            contact_points, _ = filter_penetration(
+                osp.join(dirname, urdf_name),
+                contact_points, box_size=[0.1, 0.0001, 0.0001])
+
+    if len(contact_points) == 0:
+        print('num of hanging points: {}'.format(len(contact_points)))
+        return None
+
+    return contact_points
+
+
+def make_save_dirs(save_dir):
+    save_dir = make_fancy_output_dir(save_dir)
+    os.makedirs(osp.join(save_dir, 'intrinsics'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'color_raw'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'debug_heatmap'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'depth_bgr'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'clip_info'), exist_ok=True)
+    return save_dir
+
+
 if __name__ == '__main__':
     print('Start')
     parser = argparse.ArgumentParser(
@@ -368,13 +496,14 @@ if __name__ == '__main__':
         '-s',
         type=str,
         help='save dir',
-        default='ycb_hanging_object/per5000')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge')
+    # default='ycb_hanging_object/per5000')
     parser.add_argument(
         '--input_files',
         '-i',
         type=str,
         help='input files',
-        default='ycb_hanging_object/urdf/*/*')
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf/*/*')
     parser.add_argument(
         '--urdf_name',
         '-u',
@@ -393,36 +522,12 @@ if __name__ == '__main__':
     urdf_name = args.urdf_name
     files = glob.glob(args.input_files)
 
-    texture_paths = glob.glob(
-        os.path.join('/media/kosuke/SANDISK/dtd', '**', '*.jpg'), recursive=True)
-
-    im_w = 1920
-    im_h = 1080
-    im_fov = 42.5
-    nf = 0.1
-    ff = 2.0
     width = 256
     height = 256
 
-    # save_dir = 'Hanging-ObjectNet3D-DoubleFaces/cup_key_scissors_0528'
-    # save_dir = 'ycb_hanging_object/0601'
-    # files = glob.glob("Hanging-ObjectNet3D-DoubleFaces/CAD.selected/urdf/*/*/*")
-    # files = glob.glob("ycb_hanging_object/urdf/*/*")
-    # urdf_name = 'textured.urdf'
-
-    # os.makedirs(save_dir, exist_ok=True)
-    save_dir = make_fancy_output_dir(save_dir)
-    os.makedirs(os.path.join(save_dir, 'intrinsics'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'color'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'color_raw'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'debug_axis'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'debug_heatmap'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'depth'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'depth_bgr'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'hanging_points_depth'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'heatmap'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'rotations'), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, 'clip_info'), exist_ok=True)
+    save_dir = make_save_dirs(save_dir)
+    r = Renderer(DEBUG=args.gui)
+    r.save_intrinsics(save_dir)
 
     if 'ycb' in args.input_files:
         category_name_list = [
@@ -442,8 +547,8 @@ if __name__ == '__main__':
 
     try:
         for file in files:
-            dirname, filename = os.path.split(file)
-            filename_without_ext, ext = os.path.splitext(filename)
+            dirname, filename = osp.split(file)
+            filename_without_ext, ext = osp.splitext(filename)
             if 'ycb' in args.input_files:
                 category_name = dirname.split("/")[-1]
             elif 'ObjectNet3D' in args.input_files:
@@ -454,62 +559,16 @@ if __name__ == '__main__':
 
             if filename == urdf_name:
                 print(category_name)
-                tree = ET.parse(os.path.join(dirname, urdf_name))
-                root = tree.getroot()
-
-                center = np.array([float(i) for i in root[0].find(
-                    "inertial").find("origin").attrib['xyz'].split(' ')])
-
-                contact_points_dict = json.load(
-                    open(os.path.join(dirname, 'contact_points.json'), 'r'))
-                contact_points = contact_points_dict['contact_points']
-
-                contact_points = cluster_hanging_points(
-                    contact_points, eps=0.005, min_samples=2)
-
-                if 'ycb' in args.input_files:
-                    contact_points, _ = filter_penetration(
-                        os.path.join(dirname, 'base.urdf'),
-                        contact_points, box_size=[0.1, 0.0001, 0.0001])
-                else:
-                    contact_points, _ = filter_penetration(
-                        os.path.join(dirname, urdf_name),
-                        contact_points, box_size=[0.1, 0.0001, 0.0001])
-
-                if len(contact_points) == 0:
-                    print('num of hanging points: {}'.format(len(contact_points)))
-                    continue
+                center = get_urdf_center(osp.join(dirname, urdf_name))
+                contact_points = get_contact_points(
+                    osp.join(dirname, 'contact_points.json'))
 
                 data_count = 0
-                while data_count < 40:
-                    r = Renderer(im_w, im_h, im_fov, nf, ff, DEBUG=args.gui)
-                    pybullet.setPhysicsEngineParameter(enableFileCaching=0)
-                    planeId = pybullet.loadURDF("plane.urdf", [0, 0, -0.5])
+                while data_count < 1000:
+                    r = Renderer(DEBUG=args.gui)
+                    r.get_plane()
 
-                    if not os.path.isfile(
-                            os.path.join(save_dir, 'intrinsics', 'intrinsics.npy')):
-                        np.save(os.path.join(save_dir, 'intrinsics', 'intrinsics'),
-                                r.camera_model.K)
-
-                    camera_length = 0.01
-                    camera_object = pybullet.createCollisionShape(
-                        pybullet.GEOM_BOX,
-                        halfExtents=[camera_length, camera_length, camera_length])
-                    camera_object_visual = pybullet.createVisualShape(
-                        pybullet.GEOM_BOX,
-                        halfExtents=[camera_length,
-                                     camera_length, camera_length],
-                        rgbaColor=[0, 0, 0, 1])
-
-                    camera_id = pybullet.createMultiBody(
-                        baseMass=0.,
-                        baseCollisionShapeIndex=camera_object,
-                        baseVisualShapeIndex=camera_object_visual,
-                        basePosition=r.camera_coords.worldpos(),
-                        baseOrientation=[0, 0, 0, 1.])
-                    r.objects.append(camera_id)
-
-                    # tree = ET.parse(os.path.join(dirname, urdf_name))
+                    # tree = ET.parse(osp.join(dirname, urdf_name))
                     # root = tree.getroot()
                     # # mesh_scale_list = [(np.random.rand() - 0.5) * 0.5 + 1,
                     # #                    (np.random.rand() - 0.5) * 0.5 + 1,
@@ -518,37 +577,20 @@ if __name__ == '__main__':
                     # mesh_scale = ''.join(str(i) + ' ' for i in mesh_scale_list).strip()
                     # root[0].find('visual').find('geometry').find('mesh').attrib['scale'] = mesh_scale
                     # root[0].find('collision').find('geometry').find('mesh').attrib['scale'] = mesh_scale
-                    # tree.write(os.path.join(dirname, 'rescale_base.urdf'),
+                    # tree.write(osp.join(dirname, 'rescale_base.urdf'),
                     #            encoding='utf-8', xml_declaration=True)
-                    # object_id = r.load_urdf(os.path.join(dirname, "rescale_base.urdf"))
+                    # object_id = r.load_urdf(osp.join(dirname, "rescale_base.urdf"))
 
                     # color = np.random.rand(3).tolist()
                     # color.append(1)
                     # pybullet.changeVisualShape(object_id, -1, rgbaColor=color)
 
-                    object_id = r.load_urdf(os.path.join(dirname, urdf_name),
+                    object_id = r.load_urdf(osp.join(dirname, urdf_name),
                                             random_pose=True)
 
-                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
-                        0, len(texture_paths) - 1)])
-                    pybullet.changeVisualShape(
-                        object_id, -1, textureUniqueId=textureId)
-
-                    textureId = pybullet.loadTexture(texture_paths[np.random.randint(
-                        0, len(texture_paths) - 1)])
-                    pybullet.changeVisualShape(
-                        planeId, -1, textureUniqueId=textureId)
-
-                    newpos = [0, 0, 0]
-                    while np.linalg.norm(newpos) < 0.3:
-                        # newpos = [(np.random.rand() - 0.5),
-                        #           (np.random.rand() - 0.5),
-                        #           (np.random.rand() - 0.5)]
-                        newpos = [(np.random.rand() - 0.5) * 0.1,
-                                  (np.random.rand() - 0.5) * 0.1,
-                                  np.random.rand() * 0.2 + 0.3]
-
-                    r.move_to(newpos)
+                    r.change_texture(object_id)
+                    r.change_texture(r.plane_id)
+                    r.move_to_random_pos()
 
                     pos, rot\
                         = pybullet.getBasePositionAndOrientation(object_id)
@@ -560,11 +602,11 @@ if __name__ == '__main__':
                         pos=r.camera_coords.worldpos(),
                         rot=coordinates.math.matrix2quaternion(
                             r.camera_coords.worldrot()))
-
                     r.look_at(r.object_coords.worldpos() - center)
+                    r.create_camera()
 
                     pybullet.resetBasePositionAndOrientation(
-                        camera_id,
+                        r.camera_id,
                         r.camera_coords.worldpos(),
                         coordinates.math.wxyz2xyzw(
                             coordinates.math.matrix2quaternion(
@@ -572,41 +614,23 @@ if __name__ == '__main__':
 
                     r.step(1)
 
-                    depth = (r.get_depth_metres() * 1000).astype(np.float32)
-
-                    rgb = r.get_rgb()
+                    # depth = (r.get_depth_metres() * 1000).astype(np.float32)
+                    # depth = r.get_depth_milli_metres()
+                    bgr = r.get_bgr()
+                    # rgb = r.get_rgb()
                     # rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-                    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                    # bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                     bgr_axis = bgr.copy()
-
                     seg = r.get_seg()
 
-                    if np.count_nonzero(seg == object_id) == 0:
-                        print("continue")
-                        r.remove_all_objects()
-                        pybullet.resetSimulation()
-                        pybullet.disconnect()
+                    if r.get_object_mask(object_id) is None:
+                        r.finish()
                         continue
-                    object_mask = np.where(seg == object_id)
-                    non_object_mask = np.where(seg != object_id)
-                    depth[non_object_mask] = 0
-                    # bgr[non_object_mask] = [0, 0, 0]
 
+                    depth = r.get_object_depth()
                     annotation_img = np.zeros_like(seg, dtype=np.uint8)
 
-                    # ymin = np.min(object_mask[0])
-                    # ymax = np.max(object_mask[0])
-                    # xmin = np.min(object_mask[1])
-                    # xmax = np.max(object_mask[1])
-
-                    ymin = np.max(
-                        [np.min(object_mask[0]) - np.random.randint(0, 50), 0])
-                    ymax = np.min(
-                        [np.max(object_mask[0]) + np.random.randint(0, 50), int(r.im_height - 1)])
-                    xmin = np.max(
-                        [np.min(object_mask[1]) - np.random.randint(0, 50), 0])
-                    xmax = np.min(
-                        [np.max(object_mask[1]) + np.random.randint(0, 50), int(r.im_width - 1)])
+                    ymin, ymax, xmin, xmax = r.get_roi(margin_size=50)
 
                     bgr_raw = bgr.copy()
                     bgr = bgr[ymin:ymax, xmin:xmax]
@@ -656,7 +680,7 @@ if __name__ == '__main__':
                             hanging_point_worldcoords.worldpos(),
                             r.camera_coords.worldpos())
 
-                        if rayInfo[0][0] == camera_id:
+                        if rayInfo[0][0] == r.camera_id:
                             hanging_point_in_camera_coords_list.append(
                                 hanging_point_in_camera_coords)
 
@@ -672,9 +696,7 @@ if __name__ == '__main__':
 
                     if len(hanging_point_in_camera_coords_list) == 0:
                         print('-- No visible hanging point --')
-                        r.remove_all_objects()
-                        pybullet.resetSimulation()
-                        pybullet.disconnect()
+                        r.finish()
                         continue
 
                     dbscan = DBSCAN(
@@ -689,10 +711,7 @@ if __name__ == '__main__':
 
                     for label in range(np.max(dbscan.labels_) + 1):
                         if np.count_nonzero(dbscan.labels_ == label) <= 1:
-                            # print("skip label ", label)
-                            r.remove_all_objects()
-                            pybullet.resetSimulation()
-                            pybullet.disconnect()
+                            r.finish()
                             continue
 
                         q_base = None
@@ -751,9 +770,7 @@ if __name__ == '__main__':
                                         hp.worldpos()[2] * 1000)
 
                     if np.all(annotation_img == 0):
-                        r.remove_all_objects()
-                        pybullet.resetSimulation()
-                        pybullet.disconnect()
+                        r.finish()
                         continue
 
                     annotation_img[np.where(annotation_img >= 256)] = 255
@@ -803,7 +820,7 @@ if __name__ == '__main__':
                     clip_info = np.array([xmin, xmax, ymin, ymax])
 
                     data_id = len(
-                        glob.glob(os.path.join(save_dir, 'depth', '*')))
+                        glob.glob(osp.join(save_dir, 'depth', '*')))
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
 
                     # if data_id == 0:
@@ -814,52 +831,49 @@ if __name__ == '__main__':
                     #     cv2.moveWindow('annotation', 900, 100)
 
                     cv2.imwrite(
-                        os.path.join(
+                        osp.join(
                             save_dir, 'color', '{:06}.png'.format(
                                 data_id)), bgr)
                     # cv2.imwrite(
-                    #     os.path.join(
+                    #     osp.join(
                     #         save_dir, 'color_raw', '{:06}.png'.format(
                     #             data_id)), bgr_raw)
                     cv2.imwrite(
-                        os.path.join(
+                        osp.join(
                             save_dir, 'debug_axis', '{:06}.png'.format(
                                 data_id)), bgr_axis)
                     # cv2.imwrite(
-                    #     os.path.join(
+                    #     osp.join(
                     #         save_dir, 'debug_heatmap', '{:06}.png'.format(
                     #             data_id)), bgr_annotation)
                     np.save(
-                        os.path.join(
+                        osp.join(
                             save_dir, 'depth', '{:06}'.format(data_id)), depth)
                     np.save(
-                        os.path.join(
+                        osp.join(
                             save_dir,
                             'hanging_points_depth', '{:06}'.format(data_id)),
                         hanging_points_depth)
                     np.save(
-                        os.path.join(
+                        osp.join(
                             save_dir, 'rotations', '{:06}'.format(data_id)),
                         rotations)
-                    # cv2.imwrite(
-                    #     os.path.join(
-                    #         save_dir, 'depth_bgr', '{:06}.png'.format(
-                    #             data_id)), depth_bgr)
                     cv2.imwrite(
-                        os.path.join(
+                        osp.join(
+                            save_dir, 'depth_bgr', '{:06}.png'.format(
+                                data_id)), depth_bgr)
+                    cv2.imwrite(
+                        osp.join(
                             save_dir, 'heatmap', '{:06}.png'.format(
                                 data_id)), annotation_img)
                     np.save(
-                        os.path.join(
+                        osp.join(
                             save_dir, 'clip_info', '{:06}'.format(data_id)),
                         clip_info)
 
                     data_count += 1
                     # data_id += 1
-
-                    r.remove_all_objects()
-                    pybullet.resetSimulation()
-                    pybullet.disconnect()
+                    r.finish()
 
                 # r.remove_all_objects()
                 # pybullet.resetSimulation()
