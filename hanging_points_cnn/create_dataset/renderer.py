@@ -162,16 +162,21 @@ class Renderer:
             roll = np.random.rand() * np.pi
             pitch = np.random.rand() * np.pi
             yaw = np.random.rand() * np.pi
-            object_id = pybullet.loadURDF(
+            self.object_id = pybullet.loadURDF(
                 urdf, [0, 0, 0], pybullet.getQuaternionFromEuler(
                     [roll, pitch, yaw]))
         else:
-            object_id = pybullet.loadURDF(
+            self.object_id = pybullet.loadURDF(
                 urdf, [0, 0, 0], [0, 0, 0, 1])
 
-        pybullet.changeVisualShape(object_id, -1, rgbaColor=[1, 1, 1, 1])
-        self.objects.append(object_id)
-        return object_id
+        self.objects.append(self.object_id)
+        pybullet.changeVisualShape(self.object_id, -1, rgbaColor=[1, 1, 1, 1])
+
+        pos, rot = pybullet.getBasePositionAndOrientation(self.object_id)
+        self.object_coords = coordinates.Coordinates(
+            pos=pos, rot=coordinates.math.xyzw2wxyz(rot))
+
+        return self.object_id
 
     def remove_object(self, o_id, update=True):
         pybullet.removeBody(o_id)
@@ -333,6 +338,12 @@ class Renderer:
         self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
             rot=r.camera_coords.worldrot())
+        pybullet.resetBasePositionAndOrientation(
+            self.camera_id,
+            self.camera_coords.worldpos(),
+            coordinates.math.wxyz2xyzw(
+                coordinates.math.matrix2quaternion(
+                    self.camera_coords.worldrot())))
 
     def move_to_random_pos(self):
         # newpos = [0, 0, 0]
@@ -348,6 +359,13 @@ class Renderer:
             return
         z = p - self.camera_coords.worldpos()
         coordinates.geo.orient_coords_to_axis(self.camera_coords, z)
+
+        pybullet.resetBasePositionAndOrientation(
+            self.camera_id,
+            self.camera_coords.worldpos(),
+            coordinates.math.wxyz2xyzw(
+                coordinates.math.matrix2quaternion(
+                    self.camera_coords.worldrot())))
 
         self.draw_camera_pos()
 
@@ -590,36 +608,12 @@ if __name__ == '__main__':
 
                     r.change_texture(object_id)
                     r.change_texture(r.plane_id)
-                    r.move_to_random_pos()
-
-                    pos, rot\
-                        = pybullet.getBasePositionAndOrientation(object_id)
-                    r.object_coords = coordinates.Coordinates(
-                        pos=pos,
-                        rot=coordinates.math.xyzw2wxyz(rot))
-
-                    r.camera_coords = coordinates.Coordinates(
-                        pos=r.camera_coords.worldpos(),
-                        rot=coordinates.math.matrix2quaternion(
-                            r.camera_coords.worldrot()))
-                    r.look_at(r.object_coords.worldpos() - center)
                     r.create_camera()
-
-                    pybullet.resetBasePositionAndOrientation(
-                        r.camera_id,
-                        r.camera_coords.worldpos(),
-                        coordinates.math.wxyz2xyzw(
-                            coordinates.math.matrix2quaternion(
-                                r.camera_coords.worldrot())))
-
+                    r.move_to_random_pos()
+                    r.look_at(r.object_coords.worldpos() - center)
                     r.step(1)
 
-                    # depth = (r.get_depth_metres() * 1000).astype(np.float32)
-                    # depth = r.get_depth_milli_metres()
                     bgr = r.get_bgr()
-                    # rgb = r.get_rgb()
-                    # rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-                    # bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                     bgr_axis = bgr.copy()
                     seg = r.get_seg()
 
