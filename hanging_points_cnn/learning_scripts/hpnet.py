@@ -22,8 +22,8 @@ except ImportError:
             import cv2
             sys.path.append(path)
 
-from learning_scripts.resnet import resnet18
-from utils.rois_tools import find_rois
+from hanging_points_cnn.learning_scripts.resnet import resnet18
+from hanging_points_cnn.utils.rois_tools import find_rois
 
 
 class Conv2DBatchNormRelu(nn.Module):
@@ -102,7 +102,7 @@ class HPNET(nn.Module):
             self.feature_extractor_out_channels = 2048
             self.feature_extractor_out_size = 8
             self.roi_align_spatial_scale = 1 / 32.
-        elif feature_extractor_name == 'resnet18':
+        elif config['feature_extractor_name'] == 'resnet18':
             resnet = resnet18()
             self.feature_extractor_out_channels = 512
             self.feature_extractor_out_size = 8
@@ -127,7 +127,8 @@ class HPNET(nn.Module):
             resnet.layer4
         )
 
-        self.decoder = Decoder(self.output_channels)
+        self.decoder = Decoder(
+            self.output_channels, config['feature_extractor_name'])
 
         self.conv_to_head = nn.Sequential(
             Conv2DBatchNormRelu(

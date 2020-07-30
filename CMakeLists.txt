@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(hanging_points_net)
+project(hanging_points_cnn)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp

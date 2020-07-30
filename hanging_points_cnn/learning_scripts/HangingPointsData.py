@@ -87,13 +87,16 @@ class HangingPointsDataset(Dataset):
                 gray = cv2.cvtColor(
                     color, cv2.COLOR_BGR2GRAY)[..., None] / 255.
                 gray = gray.astype(np.float32)
-                normalized_depth = normalize_depth(depth)[..., None]
+                normalized_depth = normalize_depth(depth, 0.2, 0.7)[..., None]
+
                 # -1~1
                 # gray = gray * 2 - 1
                 # depth = depth * 2 - 1
 
+                # 2 channels
                 in_feature = np.concatenate((normalized_depth, gray), axis=2)
             else:
+                # 6 channels
                 in_feature = np.concatenate((depth_bgr, color), axis=2)
         else:
             in_feature = depth

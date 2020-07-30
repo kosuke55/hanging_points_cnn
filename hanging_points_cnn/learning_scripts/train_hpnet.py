@@ -160,10 +160,7 @@ class Trainer(object):
             confidence_loss, depth_loss, rotation_loss = criterion(
                 confidence, hp_data_gt, pos_weight, depth_and_rotation, annotated_rois)
 
-            if confidence_loss > 10:
-                loss = confidence_loss
-            else:
-                loss = confidence_loss * 0.1 + rotation_loss
+            loss = confidence_loss * 0.1 + rotation_loss
 
             if mode == 'train':
                 self.optimizer.zero_grad()

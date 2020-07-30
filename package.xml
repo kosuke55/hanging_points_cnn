@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>hanging_points_net</name>
+  <name>hanging_points_cnn</name>
   <version>0.0.0</version>
-  <description>The hanging_points_net package</description>
+  <description>The hanging_points_cnn package</description>
 
   <maintainer email="kosuke.tnp@gmail.com">kosuke</maintainer>
 

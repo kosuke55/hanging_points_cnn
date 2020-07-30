@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 from __future__ import division
 
+import os
 import os.path as osp
 import sys
 
@@ -19,8 +20,8 @@ from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 from skrobot.coordinates.math import quaternion2matrix
 
-from learning_scripts.hpnet import HPNET
-from utils.visualize import colorize_depth, draw_axis
+from hanging_points_cnn.learning_scripts.hpnet import HPNET
+from hanging_points_cnn.utils.image import colorize_depth, normalize_depth, draw_axis
 
 try:
     import cv2
@@ -61,16 +62,22 @@ class HangingPointsNet():
             '~camera_info',
             '/camera/aligned_depth_to_color/camera_info')
         self.input_image_raw = rospy.get_param(
-            '~image',
+            '~image_raw',
             'camera/color/image_rect_color')
         self.input_image = rospy.get_param(
             '~image',
             '/apply_mask_image/output')
         self.input_depth = rospy.get_param(
-            '~image',
+            '~depth',
             '/apply_mask_depth/output')
+        self.gpu_id = rospy.get_param('~gpu', 0)
+        # self.use_color = rospy.get_param('~use_color', False)
+        # self.use_gray = rospy.get_param('~use_gray', False)
+
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.gpu_id)
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
+
         pretrained_model = rospy.get_param(
             '~pretrained_model',
             '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200608_0311.pt')
@@ -85,13 +92,16 @@ class HangingPointsNet():
             transforms.ToTensor()])
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        config = {
-            'feature_compress': 1 / 16,
-            'num_class': 1,
-            'pool_out_size': 8,
+
+        self.config = {
+            'output_channels': 1,
+            'feature_extractor_name': 'resnet18',
             'confidence_thresh': 0.3,
+            'use_bgr': False,
+            'use_bgr2gray': False,
         }
-        self.model = HPNET(config).to(device)
+
+        self.model = HPNET(self.config).to(device)
         if osp.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(torch.load(pretrained_model))
@@ -128,11 +138,11 @@ class HangingPointsNet():
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
 
-        self.camera_info_adepth = rospy.wait_for_message(
-            self.camera_info_adepth_topic, CameraInfo)
-        self.camera_model_adepth\
+        self.camera_info_aligned_depth_to_color = rospy.wait_for_message(
+            self.camera_info_aligned_depth_to_color_topic, CameraInfo)
+        self.camera_model_aligned_depth_to_color\
             = cameramodels.PinholeCameraModel.from_camera_info(
-                self.camera_info_adepth)
+                self.camera_info_aligned_depth_to_color)
         # import image_geometry
         # self.camera_model = image_geometry.cameramodels.PinholeCameraModel()
         # self.camera_model.fromCameraInfo(camera_info)
@@ -145,6 +155,7 @@ class HangingPointsNet():
 
         bgr_raw = self.bridge.imgmsg_to_cv2(img_raw_msg, "bgr8")
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
+
         depth = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
 
         if depth is None or bgr is None:
@@ -153,9 +164,9 @@ class HangingPointsNet():
         print("depth min", np.min(depth))
         print("depth mean", np.mean(depth))
         print("depth max", np.max(depth))
-        depth = cv2.resize(depth, (256, 256))
+        # depth = cv2.resize(depth, (256, 256))
         depth[depth < 200] = 0
-        depth[depth > 500] = 0
+        depth[depth > 700] = 0
         # depth_bgr = colorize_depth(depth, 100, 1500)
 
         bgr = cv2.resize(bgr, (256, 256))
@@ -171,6 +182,13 @@ class HangingPointsNet():
         # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
         depth_bgr[np.where(depth == 0)] = [0, 0, 0]
         in_feature = depth.copy().astype(np.float32) * 0.001
+
+        if self.config['use_bgr2gray']:
+            gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+            gray = cv2.resize(gray, (256, 256))[..., None] / 255.
+            normalized_depth = normalize_depth(
+                depth, 0.2, 0.7)[..., None]
+            in_feature = np.concatenate((normalized_depth, gray), axis=2)
 
         # print('in_feature.shape)', in_feature.shape)
 
@@ -230,25 +248,25 @@ class HangingPointsNet():
                 self.camera_model.project_pixel_to_3d_ray(
                     pixel_point))
 
-            hanging_point_adepth = np.array(
-                self.camera_model_adepth.project_pixel_to_3d_ray(
+            hanging_point_aligned_depth_to_color = np.array(
+                se.camera_model_aligned_depth_to_color.project_pixel_to_3d_ray(
                     pixel_point))
 
             length = float(dep) / hanging_point[2]
             # length = 0.5 / hanging_point[2]
             hanging_point *= length
 
-            length = float(dep_roi_clip) / hanging_point_adepth[2]
-            hanging_point_adepth *= length
-            # hanging_point_adepth *= dep_roi_clip
+            length = float(dep_roi_clip) / hanging_point_aligned_depth_to_color[2]
+            hanging_point_aligned_depth_to_color *= length
+            # hanging_point_aligned_depth_to_color *= dep_roi_clip
 
             print(hanging_point, float(dep), dep_roi_clip)
             # print(dep)
 
             hanging_point_pose = Pose()
-            hanging_point_pose.position.x = hanging_point_adepth[0]
-            hanging_point_pose.position.y = hanging_point_adepth[1]
-            hanging_point_pose.position.z = hanging_point_adepth[2]
+            hanging_point_pose.position.x = hanging_point_aligned_depth_to_color[0]
+            hanging_point_pose.position.y = hanging_point_aligned_depth_to_color[1]
+            hanging_point_pose.position.z = hanging_point_aligned_depth_to_color[2]
             hanging_point_pose.orientation.w = q[0]
             hanging_point_pose.orientation.x = q[1]
             hanging_point_pose.orientation.y = q[2]
