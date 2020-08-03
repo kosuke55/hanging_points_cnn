@@ -249,7 +249,7 @@ class HangingPointsNet():
                     pixel_point))
 
             hanging_point_aligned_depth_to_color = np.array(
-                se.camera_model_aligned_depth_to_color.project_pixel_to_3d_ray(
+                self.camera_model_aligned_depth_to_color.project_pixel_to_3d_ray(
                     pixel_point))
 
             length = float(dep) / hanging_point[2]

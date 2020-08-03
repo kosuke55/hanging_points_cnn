@@ -30,6 +30,15 @@ def normalize_depth(depth, min_value=None, max_value=None):
     return normalized_depth
 
 
+def inverse_normalize_depth(normalized_depth, min_value, max_value):
+    depth = normalized_depth.copy()
+    nan_mask = np.isnan(depth)
+    depth[nan_mask] = 0
+    depth = depth * (max_value - min_value) + min_value
+
+    return depth
+
+
 def colorize_depth(depth, min_value=None, max_value=None):
     normalized_depth = normalize_depth(depth, min_value, max_value)
     nan_mask = np.isnan(normalized_depth)
@@ -64,6 +73,9 @@ def draw_axis(img, R, t, K):
     points = np.float32(
         [[0.01, 0, 0], [0, 0.01, 0], [0, 0, 0.01], [0, 0, 0]]).reshape(-1, 3)
     axisPoints, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
+    if np.count_nonzero(np.isnan([axisPoints])) > 0:
+        return img
+
     img = cv2.line(
         img, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()),
         (0, 0, 255), 2)
