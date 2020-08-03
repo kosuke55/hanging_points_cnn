@@ -63,9 +63,6 @@ class HangingPointsNet():
         self.camera_info_topic = rospy.get_param(
             '~camera_info',
             '/apply_mask_image/output/camera_info')
-        self.camera_info_adepth_topic = rospy.get_param(
-            '~camera_info',
-            '/camera/aligned_depth_to_color/camera_info')
         self.input_image_raw = rospy.get_param(
             '~image_raw',
             'camera/color/image_rect_color')
@@ -100,10 +97,10 @@ class HangingPointsNet():
 
         self.config = {
             'output_channels': 1,
-            'feature_extractor_name': 'resnet18',
+            'feature_extractor_name': 'resnet50',
             'confidence_thresh': 0.3,
-            'use_bgr': False,
-            'use_bgr2gray': False,
+            'use_bgr': True,
+            'use_bgr2gray': True,
         }
 
         self.model = HPNET(self.config).to(device)
@@ -195,7 +192,7 @@ class HangingPointsNet():
             gray = cv2.resize(gray, (256, 256))[..., None] / 255.
             normalized_depth = normalize_depth(
                 depth, 0.2, 0.7)[..., None]
-            in_feature = np.concatenate((normalized_depth, gray), axis=2)
+            in_feature = np.concatenate((normalized_depth, gray), axis=2).astype(np.float32)
 
         if self.transform:
             in_feature = self.transform(in_feature)
@@ -250,9 +247,7 @@ class HangingPointsNet():
             cv2.circle(axis_pred_raw, tuple(pixel_point), 10, (0, 0, 0), 3)
 
             hanging_point = np.array(
-                self.camera_model.project_pixel_to_3d_ray((
-                    cx * (xmax - xmin) / float(256),
-                    cy * (ymax - ymin) / float(256))))
+                self.camera_model_without_roi.project_pixel_to_3d_ray(pixel_point))
 
             length = float(dep_roi_clip) / \
                 hanging_point[2]
