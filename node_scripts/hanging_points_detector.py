@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 from __future__ import division
 
+import copy
 import os
 import os.path as osp
 import sys
@@ -21,7 +22,11 @@ from sensor_msgs.msg import Image
 from skrobot.coordinates.math import quaternion2matrix
 
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
-from hanging_points_cnn.utils.image import colorize_depth, normalize_depth, draw_axis
+from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import draw_axis
+from hanging_points_cnn.utils.image import normalize_depth
+from hanging_points_cnn.utils.image import remove_nan
+
 
 try:
     import cv2
@@ -129,23 +134,27 @@ class HangingPointsNet():
             slop=0.1)
         sync.registerCallback(self.callback)
 
+    def get_camera_info_without_roi(self, camera_info):
+        camera_info_without_roi = copy.copy(camera_info)
+        camera_info_without_roi.roi.x_offset = 0
+        camera_info_without_roi.roi.y_offset = 0
+        camera_info_without_roi.roi.height = 0
+        camera_info_without_roi.roi.width = 0
+
+        return camera_info_without_roi
+
     def load_camera_info(self):
         print('load camera info')
         self.camera_info = rospy.wait_for_message(
             self.camera_info_topic, CameraInfo)
-        print(self.camera_info)
         self.camera_model\
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
-
-        self.camera_info_aligned_depth_to_color = rospy.wait_for_message(
-            self.camera_info_aligned_depth_to_color_topic, CameraInfo)
-        self.camera_model_aligned_depth_to_color\
+        self.camera_info_without_roi = self.get_camera_info_without_roi(
+            self.camera_info)
+        self.camera_model_without_roi\
             = cameramodels.PinholeCameraModel.from_camera_info(
-                self.camera_info_aligned_depth_to_color)
-        # import image_geometry
-        # self.camera_model = image_geometry.cameramodels.PinholeCameraModel()
-        # self.camera_model.fromCameraInfo(camera_info)
+                self.camera_info_without_roi)
 
     def callback(self, camera_info_msg, img_raw_msg, img_msg, depth_msg):
         xmin = camera_info_msg.roi.x_offset
@@ -161,12 +170,10 @@ class HangingPointsNet():
         if depth is None or bgr is None:
             return
 
-        print("depth min", np.min(depth))
-        print("depth mean", np.mean(depth))
-        print("depth max", np.max(depth))
-        # depth = cv2.resize(depth, (256, 256))
+        remove_nan(depth)
         depth[depth < 200] = 0
         depth[depth > 700] = 0
+
         # depth_bgr = colorize_depth(depth, 100, 1500)
 
         bgr = cv2.resize(bgr, (256, 256))
@@ -189,8 +196,6 @@ class HangingPointsNet():
             normalized_depth = normalize_depth(
                 depth, 0.2, 0.7)[..., None]
             in_feature = np.concatenate((normalized_depth, gray), axis=2)
-
-        # print('in_feature.shape)', in_feature.shape)
 
         if self.transform:
             in_feature = self.transform(in_feature)
@@ -229,7 +234,7 @@ class HangingPointsNet():
 
             # dep_roi_clip = depth_roi_clip
             dep_roi_clip = depth_roi_clip[np.where(
-                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 500))]
+                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 700))]
 
             depth_roi_clip_bgr = colorize_depth(depth_roi_clip, 300, 600)
             # print(np.max(dep_roi_clip), np.mean(dep_roi_clip), np.median(dep_roi_clip), np.min(dep_roi_clip))
@@ -242,31 +247,23 @@ class HangingPointsNet():
 
             pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
                            int(cy * (ymax - ymin) / float(256) + ymin)]
-            cv2.circle(axis_pred_raw, tuple(pixel_point), 2, (0, 0, 0), 1)
+            cv2.circle(axis_pred_raw, tuple(pixel_point), 10, (0, 0, 0), 3)
 
             hanging_point = np.array(
-                self.camera_model.project_pixel_to_3d_ray(
-                    pixel_point))
+                self.camera_model.project_pixel_to_3d_ray((
+                    cx * (xmax - xmin) / float(256),
+                    cy * (ymax - ymin) / float(256))))
 
-            hanging_point_aligned_depth_to_color = np.array(
-                self.camera_model_aligned_depth_to_color.project_pixel_to_3d_ray(
-                    pixel_point))
-
-            length = float(dep) / hanging_point[2]
-            # length = 0.5 / hanging_point[2]
+            length = float(dep_roi_clip) / \
+                hanging_point[2]
             hanging_point *= length
 
-            length = float(dep_roi_clip) / hanging_point_aligned_depth_to_color[2]
-            hanging_point_aligned_depth_to_color *= length
-            # hanging_point_aligned_depth_to_color *= dep_roi_clip
-
             print(hanging_point, float(dep), dep_roi_clip)
-            # print(dep)
 
             hanging_point_pose = Pose()
-            hanging_point_pose.position.x = hanging_point_aligned_depth_to_color[0]
-            hanging_point_pose.position.y = hanging_point_aligned_depth_to_color[1]
-            hanging_point_pose.position.z = hanging_point_aligned_depth_to_color[2]
+            hanging_point_pose.position.x = hanging_point[0]
+            hanging_point_pose.position.y = hanging_point[1]
+            hanging_point_pose.position.z = hanging_point[2]
             hanging_point_pose.orientation.w = q[0]
             hanging_point_pose.orientation.x = q[1]
             hanging_point_pose.orientation.y = q[2]
@@ -280,10 +277,10 @@ class HangingPointsNet():
                 (int(roi[2] * (xmax - xmin) / float(256) + xmin),
                  int(roi[3] * (ymax - ymin) / float(256) + ymin)),
                 (0, 255, 0), 1)
-            draw_axis(axis_pred_raw,
-                      quaternion2matrix(q),
-                      hanging_point,
-                      self.camera_model.K)
+            axis_pred_raw = draw_axis(axis_pred_raw,
+                                      quaternion2matrix(q),
+                                      hanging_point,
+                                      self.camera_model_without_roi.K)
 
         # print('dep_pred', dep_pred)
 
@@ -321,11 +318,7 @@ class HangingPointsNet():
         axis_pred_raw_msg = self.bridge.cv2_to_imgmsg(axis_pred_raw, "bgr8")
         axis_pred_raw_msg.header.stamp = depth_msg.header.stamp
 
-        hanging_points_pose_array.header = depth_msg.header
-        hanging_points_pose_array.header.frame_id = self.camera_info.header.frame_id
-        print(depth_msg.header.frame_id)
-        print(self.camera_info.header.frame_id)
-
+        hanging_points_pose_array.header = camera_info_msg.header
         self.pub_pred.publish(pred_msg)
         self.pub.publish(msg_out)
         self.pub_depth.publish(colorized_depth_msg)

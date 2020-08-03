@@ -17,12 +17,15 @@ except ImportError:
             sys.path.append(path)
 
 
+def remove_nan(img):
+    nan_mask = np.isnan(img)
+    img[nan_mask] = 0
+
 def normalize_depth(depth, min_value=None, max_value=None):
     min_value = np.nanmin(depth) if min_value is None else min_value
     max_value = np.nanmax(depth) if max_value is None else max_value
     normalized_depth = depth.copy()
-    nan_mask = np.isnan(normalized_depth)
-    normalized_depth[nan_mask] = 0
+    remove_nan(normalized_depth)
     normalized_depth = (normalized_depth - min_value) / (max_value - min_value)
     normalized_depth[normalized_depth <= 0] = 0
     normalized_depth[normalized_depth > 1] = 1
@@ -32,8 +35,7 @@ def normalize_depth(depth, min_value=None, max_value=None):
 
 def inverse_normalize_depth(normalized_depth, min_value, max_value):
     depth = normalized_depth.copy()
-    nan_mask = np.isnan(depth)
-    depth[nan_mask] = 0
+    remove_nan(depth)
     depth = depth * (max_value - min_value) + min_value
 
     return depth
@@ -68,24 +70,19 @@ def create_depth_circle(img, cy, cx, value, radius=50):
     img[circlular_mask_idx] = value
 
 
-def draw_axis(img, R, t, K):
+def draw_axis(img, R, t, K, copy=False):
+    if copy:
+        img = img.copy()
+
     rotV, _ = cv2.Rodrigues(R)
     points = np.float32(
         [[0.01, 0, 0], [0, 0.01, 0], [0, 0, 0.01], [0, 0, 0]]).reshape(-1, 3)
-    axisPoints, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
-    if np.count_nonzero(np.isnan([axisPoints])) > 0:
-        return img
+    axis_points, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
 
-    img = cv2.line(
-        img, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()),
-        (0, 0, 255), 2)
-    img = cv2.line(
-        img,
-        tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()),
-        (0, 255, 0), 2)
-    img = cv2.line(
-        img,
-        tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()),
-        (255, 0, 0), 2)
+    for color, axis_point in zip(
+            [(0, 0, 255), (0, 255, 0), (255, 0, 0)], axis_points):
+        img = cv2.line(
+            img, tuple(axis_points[3].ravel()), tuple(axis_point.ravel()),
+            color, 2)
 
     return img
