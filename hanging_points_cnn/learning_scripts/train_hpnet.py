@@ -21,8 +21,12 @@ sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hpnet import HPNET
 from HPNETLoss import HPNETLoss
 from HangingPointsData import load_dataset
-from hanging_points_cnn.utils.image import colorize_depth, create_depth_circle, draw_axis
-from hanging_points_cnn.utils.rois_tools import annotate_rois, find_rois
+from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import create_depth_circle
+from hanging_points_cnn.utils.image import draw_axis
+from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.rois_tools import annotate_rois
+from hanging_points_cnn.utils.rois_tools import find_rois
 
 try:
     import cv2
@@ -50,11 +54,12 @@ class Trainer(object):
                 'use_bgr2gray': True,
             }
         self.config = config
-
+        self.depth_range = [0.2, 0.7]
         self.train_dataloader, self.val_dataloader = load_dataset(
             data_path, batch_size,
             use_bgr=self.config['use_bgr'],
-            use_bgr2gray=self.config['use_bgr2gray'])
+            use_bgr2gray=self.config['use_bgr2gray'],
+            depth_range=self.depth_range)
 
         self.train_data_num = train_data_num
         self.val_data_num = val_data_num
@@ -175,12 +180,17 @@ class Trainer(object):
             #     ).copy()[0, 0, ...] * 1000
             #     depth_bgr = colorize_depth(depth.copy(), 100, 1500)
 
+            # hanging_point_depth_gt \
+            #     = ground_truth[0, 1, ...].astype(np.float32) * 1000
             hanging_point_depth_gt \
-                = ground_truth[:, 1, ...].astype(np.float32) * 1000
-            rotations_gt = ground_truth[0, 2:, ...]
+                = unnormalize_depth(
+                    ground_truth[0, 1, ...].astype(np.float32),
+                    self.depth_range[0], self.depth_range[1])
+
+            rotations_gt = ground_truth[0, 2:, ...]i
             rotations_gt = rotations_gt.transpose(1, 2, 0)
             hanging_point_depth_gt_bgr \
-                = colorize_depth(hanging_point_depth_gt[0, ...], 100, 1500)
+                = colorize_depth(hanging_point_depth_gt, 100, 1500)
             hanging_point_depth_gt_rgb = cv2.cvtColor(
                 hanging_point_depth_gt_bgr,
                 cv2.COLOR_BGR2RGB).transpose(2, 0, 1)

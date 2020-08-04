@@ -21,11 +21,11 @@ for path in sys.path:
         import cv2
 
 
-def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray):
+def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
     transform = transforms.Compose([
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(
-        data_path, transform, use_bgr, use_bgr2gray)
+        data_path, transform, use_bgr, use_bgr2gray, depth_range)
 
     train_size = int(0.9 * len(hp_data))
     test_size = len(hp_data) - train_size
@@ -50,7 +50,9 @@ def onehot(data, n):
 
 
 class HangingPointsDataset(Dataset):
-    def __init__(self, data_path, transform=None, use_bgr=True, use_bgr2gray=True):
+    def __init__(self, data_path, transform=None,
+                 use_bgr=True, use_bgr2gray=True, depth_range=[0.2, 0.7]):
+
         self.data_path = data_path
         self.transform = transform
         self.file_paths = list(
@@ -59,6 +61,7 @@ class HangingPointsDataset(Dataset):
         if use_bgr2gray:
             self.use_bgr = True
         self.use_bgr2gray = use_bgr2gray
+        self.depth_range = depth_range
 
     def __len__(self):
         return len(self.file_paths)
@@ -87,7 +90,8 @@ class HangingPointsDataset(Dataset):
                 gray = cv2.cvtColor(
                     color, cv2.COLOR_BGR2GRAY)[..., None] / 255.
                 gray = gray.astype(np.float32)
-                normalized_depth = normalize_depth(depth, 0.2, 0.7)[..., None]
+                normalized_depth = normalize_depth(
+                    depth, self.depth_range[0], self.depth_range[1])[..., None]
 
                 # -1~1
                 # gray = gray * 2 - 1
@@ -113,6 +117,8 @@ class HangingPointsDataset(Dataset):
         hanging_point_depth = np.load(
             depth_filepath.parent.parent / 'hanging_points_depth' /
             depth_filepath.name).astype(np.float32) * 0.001
+        hanging_point_depth = normalize_depth(
+            depth, self.depth_range[0], self.depth_range[1])
 
         rotations = np.load(
             depth_filepath.parent.parent / 'rotations' /

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+
+  <arg name="camera_info" default="/apply_mask_image_in_gripper_color/output/camera_info" />
+  <arg name="rgb_raw" default="/head_mount_kinect/hd/image_color_rect_repub" />
+  <arg name="rgb" default="/apply_mask_image_in_gripper_color/output" />
+  <arg name="depth" default="/apply_mask_image_in_gripper_depth/output" />
+  <arg name="gpu" default="0" />
+
+  <node name="hanging_points_detector" pkg="hanging_points_cnn" type="hanging_points_detector.py" output="screen">
+
+    <remap from="~camera_info" to="$(arg camera_info)" />
+    <remap from="~rgb_raw" to="$(arg rgb_raw)" />
+    <remap from="~rgb" to="$(arg rgb)" />
+    <remap from="~depth" to="$(arg depth)" />
+
+
+    <rosparam subst_value="true">
+        gpu: $(arg gpu)
+    </rosparam>
+  </node>
+
+</launch>

@@ -25,6 +25,7 @@ from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import normalize_depth
+from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import remove_nan
 
 
@@ -60,21 +61,8 @@ class HangingPointsNet():
             "~axis_raw", Image, queue_size=10)
         self.pub_hanging_points = rospy.Publisher(
             "/hanging_points", PoseArray, queue_size=10)
-        self.camera_info_topic = rospy.get_param(
-            '~camera_info',
-            '/apply_mask_image/output/camera_info')
-        self.input_image_raw = rospy.get_param(
-            '~image_raw',
-            'camera/color/image_rect_color')
-        self.input_image = rospy.get_param(
-            '~image',
-            '/apply_mask_image/output')
-        self.input_depth = rospy.get_param(
-            '~depth',
-            '/apply_mask_depth/output')
+
         self.gpu_id = rospy.get_param('~gpu', 0)
-        # self.use_color = rospy.get_param('~use_color', False)
-        # self.use_gray = rospy.get_param('~use_gray', False)
 
         os.environ['CUDA_VISIBLE_DEVICES'] = str(self.gpu_id)
         self.device = torch.device(
@@ -115,13 +103,13 @@ class HangingPointsNet():
 
     def subscribe(self):
         self.sub_camera_info = message_filters.Subscriber(
-            self.camera_info_topic, CameraInfo, queue_size=1, buff_size=2**24)
+            '~camera_info', CameraInfo, queue_size=1, buff_size=2**24)
         self.sub_rgb_raw = message_filters.Subscriber(
-            self.input_image_raw, Image, queue_size=1, buff_size=2**24)
+            '~rgb_raw', Image, queue_size=1, buff_size=2**24)
         self.sub_rgb = message_filters.Subscriber(
-            self.input_image, Image, queue_size=1, buff_size=2**24)
+            '~rgb', Image, queue_size=1, buff_size=2**24)
         self.sub_depth = message_filters.Subscriber(
-            self.input_depth, Image, queue_size=1, buff_size=2**24)
+            '~depth', Image, queue_size=1, buff_size=2**24)
         sync = message_filters.ApproximateTimeSynchronizer(
             [self.sub_camera_info,
              self.sub_rgb_raw,
@@ -131,27 +119,27 @@ class HangingPointsNet():
             slop=0.1)
         sync.registerCallback(self.callback)
 
-    def get_camera_info_without_roi(self, camera_info):
-        camera_info_without_roi = copy.copy(camera_info)
-        camera_info_without_roi.roi.x_offset = 0
-        camera_info_without_roi.roi.y_offset = 0
-        camera_info_without_roi.roi.height = 0
-        camera_info_without_roi.roi.width = 0
+    def get_full_camera_info(self, camera_info):
+        full_camera_info = copy.copy(camera_info)
+        full_camera_info.roi.x_offset = 0
+        full_camera_info.roi.y_offset = 0
+        full_camera_info.roi.height = 0
+        full_camera_info.roi.width = 0
 
-        return camera_info_without_roi
+        return full_camera_info
 
     def load_camera_info(self):
         print('load camera info')
         self.camera_info = rospy.wait_for_message(
-            self.camera_info_topic, CameraInfo)
+            '~camera_info', CameraInfo)
         self.camera_model\
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
-        self.camera_info_without_roi = self.get_camera_info_without_roi(
+        self.full_camera_info = self.get_full_camera_info(
             self.camera_info)
-        self.camera_model_without_roi\
+        self.full_camera_model\
             = cameramodels.PinholeCameraModel.from_camera_info(
-                self.camera_info_without_roi)
+                self.full_camera_info)
 
     def callback(self, camera_info_msg, img_raw_msg, img_msg, depth_msg):
         xmin = camera_info_msg.roi.x_offset
@@ -192,7 +180,8 @@ class HangingPointsNet():
             gray = cv2.resize(gray, (256, 256))[..., None] / 255.
             normalized_depth = normalize_depth(
                 depth, 0.2, 0.7)[..., None]
-            in_feature = np.concatenate((normalized_depth, gray), axis=2).astype(np.float32)
+            in_feature = np.concatenate(
+                (normalized_depth, gray), axis=2).astype(np.float32)
 
         if self.transform:
             in_feature = self.transform(in_feature)
@@ -247,7 +236,7 @@ class HangingPointsNet():
             cv2.circle(axis_pred_raw, tuple(pixel_point), 10, (0, 0, 0), 3)
 
             hanging_point = np.array(
-                self.camera_model_without_roi.project_pixel_to_3d_ray(pixel_point))
+                self.full_camera_model.project_pixel_to_3d_ray(pixel_point))
 
             length = float(dep_roi_clip) / \
                 hanging_point[2]
@@ -275,7 +264,7 @@ class HangingPointsNet():
             axis_pred_raw = draw_axis(axis_pred_raw,
                                       quaternion2matrix(q),
                                       hanging_point,
-                                      self.camera_model_without_roi.K)
+                                      self.full_camera_model.K)
 
         # print('dep_pred', dep_pred)
 

@@ -33,7 +33,7 @@ def normalize_depth(depth, min_value=None, max_value=None):
     return normalized_depth
 
 
-def inverse_normalize_depth(normalized_depth, min_value, max_value):
+def unnormalize_depth(normalized_depth, min_value, max_value):
     depth = normalized_depth.copy()
     remove_nan(depth)
     depth = depth * (max_value - min_value) + min_value
