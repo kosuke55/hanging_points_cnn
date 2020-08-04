@@ -135,17 +135,13 @@ class HangingPointsNet():
         self.camera_model\
             = cameramodels.PinholeCameraModel.from_camera_info(
                 self.camera_info)
-        self.full_camera_info = self.get_full_camera_info(
-            self.camera_info)
-        self.full_camera_model\
-            = cameramodels.PinholeCameraModel.from_camera_info(
-                self.full_camera_info)
 
     def callback(self, camera_info_msg, img_raw_msg, img_msg, depth_msg):
-        xmin = camera_info_msg.roi.x_offset
-        xmax = camera_info_msg.roi.x_offset + camera_info_msg.roi.width
         ymin = camera_info_msg.roi.y_offset
+        xmin = camera_info_msg.roi.x_offset
         ymax = camera_info_msg.roi.y_offset + camera_info_msg.roi.height
+        xmax = camera_info_msg.roi.x_offset + camera_info_msg.roi.width
+        self.camera_model.roi = [ymin, xmin, ymax, xmax]
 
         bgr_raw = self.bridge.imgmsg_to_cv2(img_raw_msg, "bgr8")
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -200,11 +196,6 @@ class HangingPointsNet():
 
         axis_pred = bgr.copy()
         axis_pred_raw = bgr_raw.copy()
-        # axis_large_pred = np.zeros((self.camera_model.height,
-        #                             self.camera_model.width, 3))
-
-        # axis_large_pred[ymin:ymax, xmin:xmax] \
-        #     = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
 
         dep_pred = []
         hanging_points_pose_array = PoseArray()
@@ -212,8 +203,8 @@ class HangingPointsNet():
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
-            cx = int((roi[0] + roi[2]) / 2)
-            cy = int((roi[1] + roi[3]) / 2)
+            hanging_point_x = int((roi[0] + roi[2]) / 2)
+            hanging_point_y = int((roi[1] + roi[3]) / 2)
 
             depth_roi_clip = depth[int(roi[1]):int(roi[3]),
                                    int(roi[0]):int(roi[2])]
@@ -231,12 +222,14 @@ class HangingPointsNet():
             q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
             q /= np.linalg.norm(q)
 
-            pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                           int(cy * (ymax - ymin) / float(256) + ymin)]
-            cv2.circle(axis_pred_raw, tuple(pixel_point), 10, (0, 0, 0), 3)
+            camera_model_crop_resize \
+                = self.camera_model.crop_resize_camera_info(
+                    target_size=[256, 256])
 
             hanging_point = np.array(
-                self.full_camera_model.project_pixel_to_3d_ray(pixel_point))
+                camera_model_crop_resize.project_pixel_to_3d_ray(
+                    [int(hanging_point_x),
+                     int(hanging_point_y)]))
 
             length = float(dep_roi_clip) / \
                 hanging_point[2]
@@ -264,12 +257,10 @@ class HangingPointsNet():
             axis_pred_raw = draw_axis(axis_pred_raw,
                                       quaternion2matrix(q),
                                       hanging_point,
-                                      self.full_camera_model.K)
+                                      self.camera_model.full_K)
 
-        # print('dep_pred', dep_pred)
-
-        axis_pred = cv2.resize(axis_pred_raw.copy()[ymin:ymax, xmin:xmax],
-                               (256, 256)).astype(np.uint8)
+        axis_pred = self.camera_model.crop_image(
+            axis_pred_raw, copy=True).astype(np.uint8)
 
         # draw pred rois
         # for roi in self.model.rois_list[0]:
