@@ -236,6 +236,8 @@ class HangingPointsNet():
             hanging_point *= length
 
             print(hanging_point, float(dep), dep_roi_clip)
+            if dep_roi_clip == np.nan:
+                continue
 
             hanging_point_pose = Pose()
             hanging_point_pose.position.x = hanging_point[0]

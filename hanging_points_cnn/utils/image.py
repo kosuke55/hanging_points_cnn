@@ -17,9 +17,30 @@ except ImportError:
             sys.path.append(path)
 
 
+def get_depth_in_roi(depth, roi, depth_range=None):
+    """Get median depth in roi
+
+    Parameters
+    ----------
+    depth : np.ndarray
+        depth image
+    roi : list[int]
+        [xmin, ymin, xmax, ymax]
+    """
+    depth = depth.copy()
+    depth = depth[int(roi[1]):int(roi[3]), int(roi[0]):int(roi[2])]
+    if depth_range is not None:
+        depth = depth[np.where(np.logical_and(
+            depth_range[0] < depth, depth < depth_range[1]))]
+    depth = np.median(depth)
+
+    return depth
+
+
 def remove_nan(img):
     nan_mask = np.isnan(img)
     img[nan_mask] = 0
+
 
 def normalize_depth(depth, min_value=None, max_value=None):
     min_value = np.nanmin(depth) if min_value is None else min_value

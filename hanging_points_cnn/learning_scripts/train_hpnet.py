@@ -24,6 +24,7 @@ from HangingPointsData import load_dataset
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
+from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
 from hanging_points_cnn.utils.rois_tools import find_rois
@@ -50,11 +51,12 @@ class Trainer(object):
                 'output_channels': 1,
                 'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
+                'depth_range': [200, 1500],
                 'use_bgr': True,
                 'use_bgr2gray': True,
             }
         self.config = config
-        self.depth_range = [0.2, 0.7]
+        self.depth_range = config['depth_range']
         self.train_dataloader, self.val_dataloader = load_dataset(
             data_path, batch_size,
             use_bgr=self.config['use_bgr'],
@@ -70,14 +72,8 @@ class Trainer(object):
         self.time_now = datetime.now().strftime('%Y%m%d_%H%M')
         self.best_loss = 1e10
 
-        self.intrinsics = np.load(
-            sorted(list(Path(data_path).glob("**/intrinsics.npy")))[0])
-
-        # for visualize
-        self.height = 1080
-        self.width = 1920
-        self.cameramodel = cameramodels.PinholeCameraModel.from_intrinsic_matrix(
-            self.intrinsics, self.height, self.width)
+        self.camramodel = None
+        self.target_size = [256, 256]
 
         self.vis = visdom.Visdom(port=port)
 
@@ -119,13 +115,13 @@ class Trainer(object):
         rotation_loss_sum = 0
         rotation_loss_count = 0
 
-        for index, (hp_data, depth, clip_info, hp_data_gt) in tqdm.tqdm(
+        for index, (hp_data, depth, camera_info_path, hp_data_gt) in tqdm.tqdm(
                 enumerate(dataloader), total=len(dataloader),
                 desc='{} epoch={}'.format(mode, self.epo), leave=False):
-            xmin = clip_info[0, 0]
-            xmax = clip_info[0, 1]
-            ymin = clip_info[0, 2]
-            ymax = clip_info[0, 3]
+            self.cameramodel \
+                = cameramodels.PinholeCameraModel.from_yaml_file(
+                    camera_info_path[0])
+            self.cameramodel.target_size = self.target_size
 
             pos_weight = hp_data_gt.detach().numpy().copy()
             pos_weight = pos_weight[:, 0, ...]
@@ -137,11 +133,13 @@ class Trainer(object):
             pos_weight = pos_weight.to(self.device)
 
             criterion = HPNETLoss().to(self.device)
+
             hp_data = hp_data.to(self.device)
 
-            depth = depth.numpy(
-            ).copy()[0, 0, ...] * 1000
-            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
+            depth = depth.numpy().copy()[0, 0, ...]
+            depth_bgr = colorize_depth(
+                depth.copy(),
+                self.depth_range[0], self.depth_range[1])
 
             hp_data_gt = hp_data_gt.to(self.device)
             ground_truth = hp_data_gt.cpu().detach().numpy().copy()
@@ -163,80 +161,60 @@ class Trainer(object):
                 self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
             confidence_loss, depth_loss, rotation_loss = criterion(
-                confidence, hp_data_gt, pos_weight, depth_and_rotation, annotated_rois)
+                confidence, hp_data_gt, pos_weight,
+                depth_and_rotation, annotated_rois)
 
-            loss = confidence_loss * 0.1 + rotation_loss
+            loss = confidence_loss * 0.1 + rotation_loss + depth_loss
 
             if mode == 'train':
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
-            # if self.config['use_bgr']:
-            #     depth_bgr = hp_data.cpu().detach().numpy()[
-            #         0, 0:3, ...].transpose(1, 2, 0)
-            # else:
-            #     depth = hp_data.cpu().detach().numpy(
-            #     ).copy()[0, 0, ...] * 1000
-            #     depth_bgr = colorize_depth(depth.copy(), 100, 1500)
-
-            # hanging_point_depth_gt \
-            #     = ground_truth[0, 1, ...].astype(np.float32) * 1000
             hanging_point_depth_gt \
                 = unnormalize_depth(
                     ground_truth[0, 1, ...].astype(np.float32),
                     self.depth_range[0], self.depth_range[1])
 
-            rotations_gt = ground_truth[0, 2:, ...]i
+            rotations_gt = ground_truth[0, 2:, ...]
             rotations_gt = rotations_gt.transpose(1, 2, 0)
             hanging_point_depth_gt_bgr \
-                = colorize_depth(hanging_point_depth_gt, 100, 1500)
+                = colorize_depth(
+                    hanging_point_depth_gt,
+                    self.depth_range[0], self.depth_range[1])
             hanging_point_depth_gt_rgb = cv2.cvtColor(
                 hanging_point_depth_gt_bgr,
                 cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             axis_gt = depth_bgr.copy()
-            axis_large_gt = np.zeros((self.height, self.width, 3))
-            axis_large_gt[ymin:ymax, xmin:xmax] \
-                = cv2.resize(axis_gt, (xmax - xmin, ymax - ymin))
 
             confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
             ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
 
             # Visualize gt axis and roi
             rois_gt_filtered = []
-            dep_gt = []
             for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
                 roi = roi.cpu().detach().numpy().copy()
                 cx = roi_c[0]
                 cy = roi_c[1]
-                dep = depth[int(roi[1]):int(roi[3]),
-                            int(roi[0]):int(roi[2])]
-                dep = np.median(dep[np.where(
-                    np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
-                dep_gt.append(dep)
+                dep = get_depth_in_roi(depth, roi, self.depth_range)
                 rotation = rotations_gt[cy, cx, :]
-                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                               int(cy * (ymax - ymin) / float(256) + ymin)]
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
-                        pixel_point)) * dep * 0.001
+                        [int(cx), int(cy)])) * dep * 0.001
                 try:
-                    draw_axis(axis_large_gt,
+                    draw_axis(axis_gt,
                               quaternion2matrix(rotation),
                               hanging_point_pose,
-                              self.intrinsics)
+                              self.cameramodel.K)
                 except Exception:
                     print('Fail to draw axis')
                     pass
                 rois_gt_filtered.append(roi)
 
-            axis_gt = cv2.resize(
-                cv2.cvtColor(
-                    axis_large_gt[ymin:ymax, xmin:xmax].astype(
-                        np.uint8), cv2.COLOR_BGR2RGB), (256, 256))
+            axis_gt = cv2.cvtColor(axis_gt, cv2.COLOR_BGR2RGB)
 
             # draw gt rois
             for roi in rois_gt_filtered:
@@ -247,14 +225,11 @@ class Trainer(object):
                     axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
 
-                # Visualize pred axis and roi
+            # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
-            axis_large_pred = np.zeros((self.height, self.width, 3))
-            axis_large_pred[ymin:ymax, xmin:xmax]\
-                = cv2.resize(axis_pred, (xmax - xmin, ymax - ymin))
-            dep_pred = []
-            # for i, roi in enumerate(self.model.rois_list[0]):
-            for i, (roi, roi_c) in enumerate(zip(self.model.rois_list[0], self.model.rois_center_list[0])):
+            for i, (roi, roi_c) in enumerate(
+                    zip(self.model.rois_list[0],
+                        self.model.rois_center_list[0])):
 
                 if roi.tolist() == [0, 0, 0, 0]:
                     continue
@@ -262,43 +237,42 @@ class Trainer(object):
                 cx = roi_c[0]
                 cy = roi_c[1]
 
-                dep = depth[int(roi[1]):int(roi[3]),
-                            int(roi[0]):int(roi[2])]
-                dep = np.median(dep[np.where(
-                    np.logical_and(dep > 200, dep < 1000))]).astype(np.uint8)
+                dep = get_depth_in_roi(depth, roi, self.depth_range)
+                print(dep)
 
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
                 if annotated_rois[i][2]:
                     confidence_vis = cv2.rectangle(
-                        confidence_vis, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
-                            int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+                        confidence_vis,
+                        (int(annotated_rois[i][0][0]),
+                         int(annotated_rois[i][0][1])),
+                        (int(annotated_rois[i][0][2]),
+                         int(annotated_rois[i][0][3])),
+                        (255, 0, 0), 2)
 
                 create_depth_circle(depth, cy, cx, dep)
 
                 q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                 q /= np.linalg.norm(q)
-                pixel_point = [int(cx * (xmax - xmin) / float(256) + xmin),
-                               int(cy * (ymax - ymin) / float(256) + ymin)]
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
-                        pixel_point)) * float(dep * 0.001)
+                        [int(cx), int(cy)])) * float(dep * 0.001)
                 try:
-                    draw_axis(axis_large_pred,
+                    draw_axis(axis_pred,
                               quaternion2matrix(q),
                               hanging_point_pose,
-                              self.intrinsics)
+                              self.cameramodel.K)
                 except Exception:
                     print('Fail to draw axis')
                     pass
 
-            axis_pred = cv2.resize(axis_large_pred[ymin:ymax, xmin:xmax],
-                                   (256, 256)).astype(np.uint8)
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
 
-            depth_pred_bgr = colorize_depth(depth, 100, 1500)
+            depth_pred_bgr = colorize_depth(
+                depth, self.depth_range[0], self.depth_range[1])
             depth_pred_rgb = cv2.cvtColor(
                 depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
@@ -311,8 +285,12 @@ class Trainer(object):
                     (0, 255, 0), 3)
                 if annotated_rois[i][2]:
                     axis_pred = cv2.rectangle(
-                        axis_pred, (int(annotated_rois[i][0][0]), int(annotated_rois[i][0][1])), (
-                            int(annotated_rois[i][0][2]), int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+                        axis_pred,
+                        (int(annotated_rois[i][0][0]),
+                         int(annotated_rois[i][0][1])),
+                        (int(annotated_rois[i][0][2]),
+                         int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+
             confidence_loss_sum += confidence_loss.item()
 
             if rotation_loss.item() > 0:

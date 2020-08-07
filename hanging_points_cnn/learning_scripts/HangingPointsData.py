@@ -42,16 +42,9 @@ def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
     return train_dataloader, test_dataloader
 
 
-def onehot(data, n):
-    buf = np.zeros(data.shape + (n, ))
-    nmsk = np.arange(data.size) * n + data.ravel()
-    buf.ravel()[nmsk] = 1
-    return buf
-
-
 class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None,
-                 use_bgr=True, use_bgr2gray=True, depth_range=[0.2, 0.7]):
+                 use_bgr=True, use_bgr2gray=True, depth_range=[0.2, 0.7], test=False):
 
         self.data_path = data_path
         self.transform = transform
@@ -62,6 +55,7 @@ class HangingPointsDataset(Dataset):
             self.use_bgr = True
         self.use_bgr2gray = use_bgr2gray
         self.depth_range = depth_range
+        self.test = test
 
     def __len__(self):
         return len(self.file_paths)
@@ -69,7 +63,7 @@ class HangingPointsDataset(Dataset):
     def __getitem__(self, idx):
         depth_filepath = self.file_paths[idx]
 
-        depth = np.load(depth_filepath).astype(np.float32) * 0.001
+        depth = np.load(depth_filepath).astype(np.float32)
 
         r = np.random.randint(20)
         kernel = np.ones((r, r), np.uint8)
@@ -80,7 +74,7 @@ class HangingPointsDataset(Dataset):
         depth = cv2.GaussianBlur(depth, (r, r), 10)
 
         if self.use_bgr:
-            depth_bgr = colorize_depth(depth.copy()*1000, 100, 1500)
+            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
             color = cv2.imread(
                 str(depth_filepath.parent.parent / 'color' /
                     depth_filepath.with_suffix('.png').name),
@@ -103,10 +97,17 @@ class HangingPointsDataset(Dataset):
                 # 6 channels
                 in_feature = np.concatenate((depth_bgr, color), axis=2)
         else:
-            in_feature = depth
+            in_feature = depth * 0.001
 
-        clip_info = np.load(
-            depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
+        if self.test:
+            if self.transform:
+                in_feature = self.transform(in_feature)
+
+        # clip_info = np.load(
+        #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
+        camera_info_path= str(
+            depth_filepath.parent.parent /
+            'camera_info' / depth_filepath.with_suffix('.yaml').name)
 
         confidence = cv2.imread(
             str(depth_filepath.parent.parent / 'heatmap' /
@@ -116,7 +117,7 @@ class HangingPointsDataset(Dataset):
 
         hanging_point_depth = np.load(
             depth_filepath.parent.parent / 'hanging_points_depth' /
-            depth_filepath.name).astype(np.float32) * 0.001
+            depth_filepath.name).astype(np.float32)
         hanging_point_depth = normalize_depth(
             depth, self.depth_range[0], self.depth_range[1])
 
@@ -134,4 +135,4 @@ class HangingPointsDataset(Dataset):
             depth = self.transform(depth)
             ground_truth = self.transform(ground_truth)
 
-        return in_feature, depth, clip_info, ground_truth
+        return in_feature, depth, camera_info_path, ground_truth

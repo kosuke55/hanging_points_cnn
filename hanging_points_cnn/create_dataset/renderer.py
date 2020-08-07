@@ -106,9 +106,11 @@ def draw_axis(img, R, t, K):
         (255, 0, 0), 2)
     return img
 
+# def __init__(self, im_width=1920, im_height=1080, fov=42.5,
+
 
 class Renderer:
-    def __init__(self, im_width=1920, im_height=1080, fov=42.5,
+    def __init__(self, im_width=512, im_height=424, fov=42.5,
                  near_plane=0.1, far_plane=2.0, DEBUG=False):
         self.objects = []
         self.im_width = im_width
@@ -331,9 +333,12 @@ class Renderer:
                        np.random.randint(0, margin_size), 0])
         xmax = np.min([np.max(self.object_mask[1]) +
                        np.random.randint(0, margin_size), int(self.im_width - 1)])
-        self.roi = [ymin, ymax, xmin, xmax]
+        # self.roi = [ymin, ymax, xmin, xmax]
 
-        return self.roi
+        # [top, left, bottom, right] order
+        self.camera_model.roi = [ymin, xmin, ymax, xmax]
+        return [ymin, ymax, xmin, xmax]
+        # return self.roi
 
     def get_visible_hp_coords(self, contact_points, debug_line=False):
         self.hanging_point_in_camera_coords_list = []
@@ -341,14 +346,14 @@ class Renderer:
             hanging_point_coords = coordinates.Coordinates(
                 pos=(cp[0] - self.object_center), rot=cp[1:])
             # hanging_point_coords.translate([0, 0.01, 0])
-            hanging_point_worldcoords\
+            hanging_point_worldcoords \
                 = r.object_coords.copy().transform(
                     hanging_point_coords)
-            hanging_point_in_camera_coords\
+            hanging_point_in_camera_coords \
                 = r.camera_coords.inverse_transformation(
                 ).transform(hanging_point_worldcoords)
-            px, py = r.camera_model.project3d_to_pixel(
-                hanging_point_in_camera_coords.worldpos())
+            # px, py = r.camera_model.project3d_to_pixel(
+            #     hanging_point_in_camera_coords.worldpos())
             rayInfo = pybullet.rayTest(
                 hanging_point_worldcoords.worldpos(),
                 r.camera_coords.worldpos())
@@ -534,6 +539,7 @@ def make_save_dirs(save_dir):
     os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'clip_info'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'camera_info'), exist_ok=True)
     return save_dir
 
 
@@ -542,29 +548,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        '--save_dir',
-        '-s',
-        type=str,
-        help='save dir',
+        '--save_dir', '-s',
+        type=str, help='save dir',
         default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge')
     # default='ycb_hanging_object/per5000')
     parser.add_argument(
-        '--input_files',
-        '-i',
-        type=str,
-        help='input files',
+        '--input_files', '-i',
+        type=str, help='input files',
         default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf/*/*')
     parser.add_argument(
-        '--urdf_name',
-        '-u',
-        type=str,
-        help='save dir',
+        '--urdf_name', '-u',
+        type=str, help='save dir',
         default='textured.urdf')
     parser.add_argument(
-        '--gui',
-        '-g',
-        type=int,
-        help='debug gui',
+        '--gui', '-g',
+        type=int,         help='debug gui',
+        default=0)
+    parser.add_argument(
+        '--show_image', '-si',
+        type=int, help='show image',
         default=0)
     args = parser.parse_args()
 
@@ -620,7 +622,6 @@ if __name__ == '__main__':
 
                     object_id = r.load_urdf(osp.join(dirname, urdf_name),
                                             random_pose=True)
-
                     r.change_texture(object_id)
                     r.change_texture(r.plane_id)
                     r.create_camera()
@@ -637,35 +638,19 @@ if __name__ == '__main__':
                         continue
 
                     depth = r.get_object_depth()
-                    annotation_img = np.zeros_like(seg, dtype=np.uint8)
 
-                    ymin, ymax, xmin, xmax = r.get_roi(margin_size=50)
+                    [ymin, ymax, xmin, xmax] = r.get_roi(margin_size=50)
+                    # clip_info = np.array([xmin, xmax, ymin, ymax])
 
-                    bgr_raw = bgr.copy()
-                    bgr = bgr[ymin:ymax, xmin:xmax]
-
-                    scale = float(width) / np.array(bgr.shape[:2])
-
-                    bgr = cv2.resize(bgr, (width, height))
+                    r.camera_model.target_size = (width, height)
+                    bgr = r.camera_model.crop_resize_image(bgr)
 
                     depth_bgr = colorize_depth(depth, 100, 1500)
-                    depth_bgr = depth_bgr[ymin:ymax, xmin:xmax]
-                    depth_bgr = cv2.resize(depth_bgr, (width, height))
+                    depth_bgr = r.camera_model.crop_resize_image(depth_bgr)
+                    annotation_img = np.zeros(
+                        r.camera_model.target_size, dtype=np.uint32)
 
-                    # depth = depth[ymin:ymax, xmin:xmax]
-                    # depth = cv2.resize(depth, (width, height))
-
-                    # depth = depth[ymin:ymax, xmin:xmax]
-                    # depth = cv2.resize(depth, (width, height))
-                    # print(np.min(depth))
-                    # print(np.mean(depth))
-                    # print(np.max(depth))
-
-                    annotation_img = annotation_img[ymin:ymax, xmin:xmax]
-                    annotation_img = cv2.resize(
-                        annotation_img, (width, height))
-                    annotation_img = annotation_img.astype(np.uint32)
-                    rotation_map = RotationMap(width, height)
+                    rotation_map = RotationMap(height, width)
 
                     hanging_point_in_camera_coords_list \
                         = r.get_visible_hp_coords(contact_points)
@@ -681,7 +666,6 @@ if __name__ == '__main__':
 
                     quaternion_list = []
 
-                    # hanging_points_depth = np.zeros_like(depth)
                     hanging_points_depth = depth.copy()
 
                     for label in range(np.max(dbscan.labels_) + 1):
@@ -698,7 +682,7 @@ if __name__ == '__main__':
                                 q_distance\
                                     = coordinates.math.quaternion_distance(
                                         q_base, hp.quaternion)
-                                # print(label, idx, np.rad2deg(q_distance))
+
                                 if np.rad2deg(q_distance) > 135:
                                     hanging_point_in_camera_coords_list[
                                         idx].rotate(np.pi, 'y')
@@ -709,34 +693,17 @@ if __name__ == '__main__':
                                 draw_axis(bgr_axis,
                                           hp.worldrot(),
                                           hp.worldpos(),
-                                          r.camera_model.K)
+                                          r.camera_model.full_K)
 
-                                if int(scale[1] * (-xmin + px)) >= 0 and \
-                                   int(scale[1] * (-xmin + px)) < width and \
-                                   int(scale[0] * (-ymin + py)) >= 0 and \
-                                   int(scale[0] * (-ymin + py)) < height:
-
-                                    # gradient_circle(
-                                    #     annotation_img,
-                                    #     int(scale[0] * (-ymin + py)),
-                                    #     int(scale[1] * (-xmin + px)))
-
+                                if 0 <= px <= width and 0 <= py <= height:
                                     create_gradient_circle(
                                         annotation_img,
-                                        int(scale[0] * (-ymin + py)),
-                                        int(scale[1] * (-xmin + px)))
+                                        int(py), int(px))
 
                                     rotation_map.add_quaternion(
-                                        int(scale[1] * (-xmin + px)),
-                                        int(scale[0] * (-ymin + py)),
+                                        int(px), int(py),
                                         hanging_point_in_camera_coords_list[
                                             idx].quaternion)
-
-                                    # create_depth_circle(
-                                    #     hanging_points_depth,
-                                    #     int(scale[0] * (-ymin + py)),
-                                    #     int(scale[1] * (-xmin + px)),
-                                    #     hp.worldpos()[2] * 1000)
 
                                     create_depth_circle(
                                         hanging_points_depth,
@@ -760,50 +727,32 @@ if __name__ == '__main__':
                     rotations = np.array(
                         rotation_map.rotations).reshape(height, width, 4)
 
-                    # print(rotations[np.where(
-                    #     np.any(rotations != [0, 0, 0, 1], axis=2))])
-
-                    bgr_axis = bgr_axis[ymin:ymax, xmin:xmax]
-                    bgr_axis = cv2.resize(bgr_axis, (width, height))
-
-                    depth = depth[ymin:ymax, xmin:xmax]
-                    depth = cv2.resize(depth, (width, height))
-
+                    bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
+                    depth = r.camera_model.crop_resize_image(depth)
                     hanging_points_depth_bgr\
                         = colorize_depth(hanging_points_depth, 100, 1500)
-                    hanging_points_depth_bgr = hanging_points_depth_bgr[
-                        ymin:ymax, xmin:xmax]
-                    hanging_points_depth_bgr\
-                        = cv2.resize(hanging_points_depth_bgr, (width, height))
+                    hanging_points_depth_bgr \
+                        = r.camera_model.crop_resize_image(
+                            hanging_points_depth_bgr)
+                    hanging_points_depth = r.camera_model.crop_resize_image(
+                        hanging_points_depth)
 
-                    hanging_points_depth = hanging_points_depth[
-                        ymin:ymax, xmin:xmax]
-                    hanging_points_depth\
-                        = cv2.resize(hanging_points_depth, (width, height))
-
-                    # cv2.imshow('annotation', annotation_img)
-                    # cv2.imshow('bgr', bgr)
-                    # cv2.imshow('bgr_annotation', bgr_annotation)
-                    # cv2.imshow('bgr_axis', bgr_axis)
-                    # cv2.imshow('depth_bgr', depth_bgr)
-                    # cv2.imshow('hanging_points_depth_bgr',
-                    #            hanging_points_depth_bgr)
-                    # cv2.imshow('depth', depth)
-                    # cv2.imshow('hanging_points_depth', hanging_points_depth)
-                    # cv2.waitKey(10)
-
-                    clip_info = np.array([xmin, xmax, ymin, ymax])
+                    if args.show_image:
+                        cv2.imshow('annotation', annotation_img)
+                        cv2.imshow('bgr', bgr)
+                        cv2.imshow('bgr_annotation', bgr_annotation)
+                        cv2.imshow('bgr_axis', bgr_axis)
+                        cv2.imshow('depth_bgr', depth_bgr)
+                        cv2.imshow('hanging_points_depth_bgr',
+                                   hanging_points_depth_bgr)
+                        cv2.imshow('depth', depth)
+                        cv2.imshow('hanging_points_depth',
+                                   hanging_points_depth)
+                        cv2.waitKey(10)
 
                     data_id = len(
                         glob.glob(osp.join(save_dir, 'depth', '*')))
                     print('{}: {} sum: {}'.format(file, data_count, data_id))
-
-                    # if data_id == 0:
-                    #     cv2.moveWindow('bgr', 100, 100)
-                    #     cv2.moveWindow('bgr_axis', 100, 200)
-                    #     cv2.moveWindow('depth_bgr', 500, 100)
-                    #     cv2.moveWindow('hanging_points_depth_bgr', 500, 200)
-                    #     cv2.moveWindow('annotation', 900, 100)
 
                     cv2.imwrite(
                         osp.join(
@@ -841,10 +790,13 @@ if __name__ == '__main__':
                         osp.join(
                             save_dir, 'heatmap', '{:06}.png'.format(
                                 data_id)), annotation_img)
-                    np.save(
-                        osp.join(
-                            save_dir, 'clip_info', '{:06}'.format(data_id)),
-                        clip_info)
+                    # np.save(
+                    #     osp.join(
+                    #         save_dir, 'clip_info', '{:06}'.format(data_id)),
+                    #     clip_info)
+                    r.camera_model.dump(osp.join(
+                        save_dir, 'camera_info', '{:06}.yaml'.format(
+                            data_id)))
 
                     data_count += 1
                     # data_id += 1
