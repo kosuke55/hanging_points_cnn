@@ -238,7 +238,6 @@ class Trainer(object):
                 cy = roi_c[1]
 
                 dep = get_depth_in_roi(depth, roi, self.depth_range)
-                print(dep)
 
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
@@ -330,7 +329,6 @@ class Trainer(object):
                         in_gray = hp_data.cpu().detach().numpy().copy()[
                             0, 1:2, ...] * 255
                         in_gray = in_gray.astype(np.uint8)
-                        print(in_gray.shape)
                         self.vis.images([in_gray],
                                         win='{} in_gray'.format(mode),
                                         opts=dict(
