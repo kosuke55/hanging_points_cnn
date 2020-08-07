@@ -68,7 +68,7 @@ class HPNETLoss(Module):
         # rotation_loss *= 10000
 
         print('confidence_loss', float(confidence_loss))
-        # print('depth_loss', float(depth_loss))
+        print('depth_loss', float(depth_loss))
         print('rotation_loss', float(rotation_loss))
 
         return confidence_loss, depth_loss, rotation_loss

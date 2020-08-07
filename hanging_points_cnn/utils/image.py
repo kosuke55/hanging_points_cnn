@@ -91,13 +91,13 @@ def create_depth_circle(img, cy, cx, value, radius=50):
     img[circlular_mask_idx] = value
 
 
-def draw_axis(img, R, t, K, copy=False):
+def draw_axis(img, R, t, K, axis_length=0.1, copy=False):
     if copy:
         img = img.copy()
 
     rotV, _ = cv2.Rodrigues(R)
-    points = np.float32(
-        [[0.01, 0, 0], [0, 0.01, 0], [0, 0, 0.01], [0, 0, 0]]).reshape(-1, 3)
+    points = np.vstack((
+        np.eye(3) * axis_length, np.zeros((1, 3)))).astype(np.float32)
     axis_points, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
 
     for color, axis_point in zip(

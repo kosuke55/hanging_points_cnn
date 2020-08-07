@@ -164,7 +164,7 @@ class Trainer(object):
                 confidence, hp_data_gt, pos_weight,
                 depth_and_rotation, annotated_rois)
 
-            loss = confidence_loss * 0.1 + rotation_loss + depth_loss
+            loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
 
             if mode == 'train':
                 self.optimizer.zero_grad()
@@ -237,7 +237,10 @@ class Trainer(object):
                 cx = roi_c[0]
                 cy = roi_c[1]
 
-                dep = get_depth_in_roi(depth, roi, self.depth_range)
+                dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+                # dep = get_depth_in_roi(depth, roi, self.depth_range)
+                dep = unnormalize_depth(
+                    dep, self.depth_range[0], self.depth_range[1])
 
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
@@ -293,18 +296,21 @@ class Trainer(object):
             confidence_loss_sum += confidence_loss.item()
 
             if rotation_loss.item() > 0:
+                depth_loss_sum += depth_loss.item()
                 rotation_loss_sum += rotation_loss.item()
-                loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item()
+                loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * depth_loss.item()
                 rotation_loss_count += 1
 
             if np.mod(index, 1) == 0:
-                print('epoch {}, {}/{},{} loss is confidence:{} rotation:{}'.format(
+                print(
+                    'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(
                     self.epo,
                     index,
                     len(dataloader),
                     mode,
                     confidence_loss_sum,
-                    rotation_loss_sum
+                    rotation_loss_sum,
+                    depth_loss_sum
                 ))
 
                 self.vis.images([hanging_point_depth_gt_rgb,
