@@ -118,8 +118,9 @@ class HangingPointsDataset(Dataset):
         hanging_point_depth = np.load(
             depth_filepath.parent.parent / 'hanging_points_depth' /
             depth_filepath.name).astype(np.float32)
+
         hanging_point_depth = normalize_depth(
-            depth, self.depth_range[0], self.depth_range[1])
+            hanging_point_depth, self.depth_range[0], self.depth_range[1])
 
         rotations = np.load(
             depth_filepath.parent.parent / 'rotations' /

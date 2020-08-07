@@ -182,6 +182,7 @@ class Trainer(object):
                 = colorize_depth(
                     hanging_point_depth_gt,
                     self.depth_range[0], self.depth_range[1])
+
             hanging_point_depth_gt_rgb = cv2.cvtColor(
                 hanging_point_depth_gt_bgr,
                 cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
@@ -238,7 +239,6 @@ class Trainer(object):
                 cy = roi_c[1]
 
                 dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
-                # dep = get_depth_in_roi(depth, roi, self.depth_range)
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
 
@@ -355,20 +355,26 @@ class Trainer(object):
             if rotation_loss_count > 0:
                 avg_rotation_loss\
                     = rotation_loss_sum / rotation_loss_count
+                avg_depth_loss\
+                    = depth_loss_sum / rotation_loss_count
                 avg_loss\
                     = loss_sum / rotation_loss_count
             else:
                 avg_rotation_loss = 1e10
+                avg_depth_loss = 1e10
                 avg_loss = 1e10
         else:
             avg_confidence_loss = confidence_loss_sum
             avg_rotation_loss = rotation_loss_sum
+            avg_depth_loss = rotation_loss_sum
 
         self.vis.line(X=np.array([self.epo]), Y=np.array([avg_confidence_loss]),
                       win='loss', name='{}_confidence_loss'.format(mode), update='append')
         if rotation_loss_count > 0:
             self.vis.line(X=np.array([self.epo]), Y=np.array([avg_rotation_loss]),
                           win='loss', name='{}_rotation_loss'.format(mode), update='append')
+            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_depth_loss]),
+                          win='loss', name='{}_depth_loss'.format(mode), update='append')
             self.vis.line(X=np.array([self.epo]), Y=np.array([avg_loss]),
                           win='loss', name='{}_loss'.format(mode), update='append')
 
@@ -388,7 +394,6 @@ class Trainer(object):
     def train(self):
         for self.epo in range(self.max_epoch):
             self.step(self.train_dataloader, 'train')
-            # if np.mod(self.epo, 50) == 0:
             self.step(self.val_dataloader, 'val')
             self.scheduler.step()
 

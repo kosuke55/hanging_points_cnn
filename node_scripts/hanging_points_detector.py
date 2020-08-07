@@ -153,7 +153,7 @@ class HangingPointsNet():
 
         remove_nan(depth)
         depth[depth < 200] = 0
-        depth[depth > 700] = 0
+        depth[depth > 1000] = 0
 
         # depth_bgr = colorize_depth(depth, 100, 1500)
 
@@ -163,10 +163,11 @@ class HangingPointsNet():
         # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
         depth = cv2.resize(depth, (256, 256))
+
         depth = frame_img(depth)
         kernel = np.ones((10, 10), np.uint8)
         depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
-        depth_bgr = colorize_depth(depth, 300, 700)
+        depth_bgr = colorize_depth(depth, 300, 1000)
         # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
         depth_bgr[np.where(depth == 0)] = [0, 0, 0]
         in_feature = depth.copy().astype(np.float32) * 0.001
@@ -175,7 +176,7 @@ class HangingPointsNet():
             gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
             gray = cv2.resize(gray, (256, 256))[..., None] / 255.
             normalized_depth = normalize_depth(
-                depth, 0.2, 0.7)[..., None]
+                depth, 0.2, 1)[..., None]
             in_feature = np.concatenate(
                 (normalized_depth, gray), axis=2).astype(np.float32)
 
@@ -211,9 +212,9 @@ class HangingPointsNet():
 
             # dep_roi_clip = depth_roi_clip
             dep_roi_clip = depth_roi_clip[np.where(
-                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 700))]
+                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 1000))]
 
-            depth_roi_clip_bgr = colorize_depth(depth_roi_clip, 300, 600)
+            depth_roi_clip_bgr = colorize_depth(depth_roi_clip, 200, 1000)
             # print(np.max(dep_roi_clip), np.mean(dep_roi_clip), np.median(dep_roi_clip), np.min(dep_roi_clip))
             dep_roi_clip = np.median(dep_roi_clip) * 0.001
             dep = depth_and_rotation[i, 0]

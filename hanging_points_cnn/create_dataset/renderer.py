@@ -536,6 +536,7 @@ def make_save_dirs(save_dir):
     os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'depth_bgr'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'hanging_points_depth_bgr'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'clip_info'), exist_ok=True)
@@ -578,15 +579,16 @@ if __name__ == '__main__':
     height = 256
 
     save_dir = make_save_dirs(save_dir)
-    r = Renderer(DEBUG=args.gui)
+    r = Renderer(DEBUG=False)
     r.save_intrinsics(save_dir)
+    r.finish()
 
     if 'ycb' in args.input_files:
         category_name_list = [
             "019_pitcher_base",
             "022_windex_bottle",
             "025_mug",
-            "033_spatula",
+            # "033_spatula", # no contact pointsa
             "035_power_drill",
             "042_adjustable_wrench",
             "048_hammer",
@@ -644,9 +646,10 @@ if __name__ == '__main__':
 
                     r.camera_model.target_size = (width, height)
                     bgr = r.camera_model.crop_resize_image(bgr)
-
+                    bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
+                    depth = r.camera_model.crop_resize_image(depth)
                     depth_bgr = colorize_depth(depth, 100, 1500)
-                    depth_bgr = r.camera_model.crop_resize_image(depth_bgr)
+                    # depth_bgr = r.camera_model.crop_resize_image(depth_bgr)
                     annotation_img = np.zeros(
                         r.camera_model.target_size, dtype=np.uint32)
 
@@ -693,7 +696,7 @@ if __name__ == '__main__':
                                 draw_axis(bgr_axis,
                                           hp.worldrot(),
                                           hp.worldpos(),
-                                          r.camera_model.full_K)
+                                          r.camera_model.K)
 
                                 if 0 <= px <= width and 0 <= py <= height:
                                     create_gradient_circle(
@@ -727,15 +730,15 @@ if __name__ == '__main__':
                     rotations = np.array(
                         rotation_map.rotations).reshape(height, width, 4)
 
-                    bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
-                    depth = r.camera_model.crop_resize_image(depth)
+                    # bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
+                    # depth = r.camera_model.crop_resize_image(depth)
                     hanging_points_depth_bgr\
                         = colorize_depth(hanging_points_depth, 100, 1500)
-                    hanging_points_depth_bgr \
-                        = r.camera_model.crop_resize_image(
-                            hanging_points_depth_bgr)
-                    hanging_points_depth = r.camera_model.crop_resize_image(
-                        hanging_points_depth)
+                    # hanging_points_depth_bgr \
+                    #     = r.camera_model.crop_resize_image(
+                    #         hanging_points_depth_bgr)
+                    # hanging_points_depth = r.camera_model.crop_resize_image(
+                    #     hanging_points_depth)
 
                     if args.show_image:
                         cv2.imshow('annotation', annotation_img)
@@ -786,6 +789,10 @@ if __name__ == '__main__':
                         osp.join(
                             save_dir, 'depth_bgr', '{:06}.png'.format(
                                 data_id)), depth_bgr)
+                    cv2.imwrite(
+                        osp.join(
+                            save_dir, 'hanging_points_depth_bgr', '{:06}.png'.format(
+                                data_id)), hanging_points_depth_bgr)
                     cv2.imwrite(
                         osp.join(
                             save_dir, 'heatmap', '{:06}.png'.format(

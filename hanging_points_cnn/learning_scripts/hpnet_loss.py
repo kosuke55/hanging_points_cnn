@@ -1,8 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+
+import numpy as np
 import torch
+from skrobot import coordinates
 from torch.nn import Module
+
+
+def two_vectors_angle(v1, v2):
+    cos = torch.dot(v1, v2) / (torch.norm(v1) * torch.norm(v2))
+    return torch.acos(cos)
 
 
 def quaternion2matrix(q):
@@ -33,6 +41,7 @@ class HPNETLoss(Module):
         self.Ry = torch.tensor(
             [[-1, 0, 0], [0, 1, 0], [0, 0, -1]],
             dtype=torch.float32).to('cuda')
+        self.vx = torch.tensor([1., 0, 0], dtype=torch.float32).to('cuda')
 
     def forward(self, confidence, confidence_gt,
                 weight, depth_and_rotation, annotated_rois):
@@ -51,15 +60,28 @@ class HPNETLoss(Module):
 
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
+                print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
                 depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
-                m_pred = quaternion2matrix(ar[1][1:])
+                # 1 dof
                 q = depth_and_rotation[i, 1:]
                 q = q / torch.norm(q)
-                m_gt = quaternion2matrix(q)
+                m_pred = quaternion2matrix(q)
+                v_pred = torch.matmul(m_pred, self.vx)
+                m_gt = quaternion2matrix(ar[1][1:])
+                v_gt = torch.matmul(m_gt, self.vx)
                 rotation_loss += torch.min(
-                    torch.norm(m_gt - m_pred),
-                    torch.norm(m_gt - m_pred.mm(self.Ry)))
+                    two_vectors_angle(v_pred, v_gt),
+                    two_vectors_angle(v_pred, -v_gt))
+
+                # 3 dof
+                # m_gt = quaternion2matrix(ar[1][1:])
+                # q = depth_and_rotation[i, 1:]
+                # q = q / torch.norm(q)
+                # m_pred = quaternion2matrix(q)
+                # rotation_loss += torch.min(
+                #     torch.norm(m_gt - m_pred),
+                #     torch.norm(m_gt - m_pred.mm(self.Ry)))
 
         if len(annotated_rois) > 0:
             depth_loss /= len(annotated_rois)
