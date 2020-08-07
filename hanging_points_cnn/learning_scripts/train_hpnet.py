@@ -19,8 +19,8 @@ from skrobot.coordinates.math import quaternion2matrix
 
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hpnet import HPNET
-from HPNETLoss import HPNETLoss
-from HangingPointsData import load_dataset
+from hpnet_loss import HPNETLoss
+from hanging_points_data import load_dataset
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
