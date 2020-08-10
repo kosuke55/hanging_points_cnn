@@ -59,7 +59,7 @@ class HangingPointsDataset(Dataset):
         self.test = test
 
         self.aug_seq = iaa.Sequential([
-            iaa.Dropout([0.1, 0.5]),
+            iaa.Dropout([0, 0.3]),
             iaa.GaussianBlur((0, 1.0)),
         ], random_order=True)
 

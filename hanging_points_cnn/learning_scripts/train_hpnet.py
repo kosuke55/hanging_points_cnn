@@ -146,7 +146,13 @@ class Trainer(object):
             confidence_gt = hp_data_gt[:, 0:1, ...]
             rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
 
-            confidence, depth_and_rotation = self.model(hp_data)
+            if mode == 'train':
+                confidence, depth_and_rotation = self.model(hp_data)
+            elif mode == 'val':
+                with torch.no_grad():
+                    confidence, depth_and_rotation = self.model(hp_data)
+
+
             confidence_np = confidence[0, ...].cpu(
             ).detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
