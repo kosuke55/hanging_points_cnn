@@ -407,9 +407,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training data path',
-        # default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/runmany')
-        # default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0722-only2')
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/0722')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0808')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)

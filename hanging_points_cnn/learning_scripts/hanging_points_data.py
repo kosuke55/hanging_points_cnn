@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 
+import imgaug.augmenters as iaa
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms
@@ -57,6 +58,11 @@ class HangingPointsDataset(Dataset):
         self.depth_range = depth_range
         self.test = test
 
+        self.aug_seq = iaa.Sequential([
+            iaa.Dropout([0.1, 0.5]),
+            iaa.GaussianBlur((0, 1.0)),
+        ], random_order=True)
+
     def __len__(self):
         return len(self.file_paths)
 
@@ -64,14 +70,15 @@ class HangingPointsDataset(Dataset):
         depth_filepath = self.file_paths[idx]
 
         depth = np.load(depth_filepath).astype(np.float32)
+        depth = self.aug_seq.augment_image(depth)
 
-        r = np.random.randint(20)
-        kernel = np.ones((r, r), np.uint8)
-        depth = cv2.dilate(depth, kernel, iterations=1)
+        # r = np.random.randint(20)
+        # kernel = np.ones((r, r), np.uint8)
+        # depth = cv2.dilate(depth, kernel, iterations=1)
 
-        r = np.random.randint(20)
-        r = r if np.mod(r, 2) else r + 1
-        depth = cv2.GaussianBlur(depth, (r, r), 10)
+        # r = np.random.randint(20)
+        # r = r if np.mod(r, 2) else r + 1
+        # depth = cv2.GaussianBlur(depth, (r, r), 10)
 
         if self.use_bgr:
             depth_bgr = colorize_depth(depth.copy(), 100, 1500)
@@ -79,6 +86,7 @@ class HangingPointsDataset(Dataset):
                 str(depth_filepath.parent.parent / 'color' /
                     depth_filepath.with_suffix('.png').name),
                 cv2.IMREAD_COLOR)
+            color = self.aug_seq.augment_image(color)
             if self.use_bgr2gray:
                 # 0~1
                 gray = cv2.cvtColor(
@@ -105,7 +113,7 @@ class HangingPointsDataset(Dataset):
 
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
-        camera_info_path= str(
+        camera_info_path = str(
             depth_filepath.parent.parent /
             'camera_info' / depth_filepath.with_suffix('.yaml').name)
 

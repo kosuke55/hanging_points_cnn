@@ -383,11 +383,9 @@ class Renderer:
                     self.camera_coords.worldrot())))
 
     def move_to_random_pos(self):
-        # newpos = [0, 0, 0]
-        # while np.linalg.norm(newpos) < 0.3:
         newpos = [(np.random.rand() - 0.5) * 0.1,
                   (np.random.rand() - 0.5) * 0.1,
-                  np.random.rand() * 0.2 + 0.3]
+                  np.random.rand() * 0.7 + 0.3]
         self.move_to(newpos)
 
     def look_at(self, p):
@@ -551,7 +549,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save_dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/hoge')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0808')
     # default='ycb_hanging_object/per5000')
     parser.add_argument(
         '--input_files', '-i',
@@ -751,7 +749,7 @@ if __name__ == '__main__':
                         cv2.imshow('depth', depth)
                         cv2.imshow('hanging_points_depth',
                                    hanging_points_depth)
-                        cv2.waitKey(10)
+                        cv2.waitKey(1)
 
                     data_id = len(
                         glob.glob(osp.join(save_dir, 'depth', '*')))
@@ -765,10 +763,10 @@ if __name__ == '__main__':
                     #     osp.join(
                     #         save_dir, 'color_raw', '{:06}.png'.format(
                     #             data_id)), bgr_raw)
-                    cv2.imwrite(
-                        osp.join(
-                            save_dir, 'debug_axis', '{:06}.png'.format(
-                                data_id)), bgr_axis)
+                    # cv2.imwrite(
+                    #     osp.join(
+                    #         save_dir, 'debug_axis', '{:06}.png'.format(
+                    #             data_id)), bgr_axis)
                     # cv2.imwrite(
                     #     osp.join(
                     #         save_dir, 'debug_heatmap', '{:06}.png'.format(
@@ -785,14 +783,14 @@ if __name__ == '__main__':
                         osp.join(
                             save_dir, 'rotations', '{:06}'.format(data_id)),
                         rotations)
-                    cv2.imwrite(
-                        osp.join(
-                            save_dir, 'depth_bgr', '{:06}.png'.format(
-                                data_id)), depth_bgr)
-                    cv2.imwrite(
-                        osp.join(
-                            save_dir, 'hanging_points_depth_bgr', '{:06}.png'.format(
-                                data_id)), hanging_points_depth_bgr)
+                    # cv2.imwrite(
+                    #     osp.join(
+                    #         save_dir, 'depth_bgr', '{:06}.png'.format(
+                    #             data_id)), depth_bgr)
+                    # cv2.imwrite(
+                    #     osp.join(
+                    #         save_dir, 'hanging_points_depth_bgr', '{:06}.png'.format(
+                    #             data_id)), hanging_points_depth_bgr)
                     cv2.imwrite(
                         osp.join(
                             save_dir, 'heatmap', '{:06}.png'.format(
