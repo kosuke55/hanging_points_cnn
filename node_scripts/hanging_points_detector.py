@@ -230,7 +230,7 @@ class HangingPointsNet():
                 v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
                 v /= np.linalg.norm(v)
                 coords = coordinates.Coordinates()
-                coordinates.geo.orient_coods_to_axis(coords, v, 'x')
+                coordinates.geo.orient_coords_to_axis(coords, v, 'x')
                 q = coords.quaternion
 
             camera_model_crop_resize \
