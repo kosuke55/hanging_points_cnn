@@ -36,12 +36,13 @@ def quaternion2matrix(q):
 
 
 class HPNETLoss(Module):
-    def __init__(self):
+    def __init__(self, use_coords):
         super(HPNETLoss, self).__init__()
         self.Ry = torch.tensor(
             [[-1, 0, 0], [0, 1, 0], [0, 0, -1]],
             dtype=torch.float32).to('cuda')
         self.vx = torch.tensor([1., 0, 0], dtype=torch.float32).to('cuda')
+        self.use_coords = use_coords
 
     def forward(self, confidence, confidence_gt,
                 weight, depth_and_rotation, annotated_rois):
@@ -64,10 +65,17 @@ class HPNETLoss(Module):
                 depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
                 # 1 dof
-                q = depth_and_rotation[i, 1:]
-                q = q / torch.norm(q)
-                m_pred = quaternion2matrix(q)
-                v_pred = torch.matmul(m_pred, self.vx)
+                if self.use_coords:
+                    q = depth_and_rotation[i, 1:]
+                    q = q / torch.norm(q)
+                    m_pred = quaternion2matrix(q)
+                    v_pred = torch.matmul(m_pred, self.vx)
+                else:
+                    v_pred = depth_and_rotation[i, 1:4]
+                    v_pred = v_pred / torch.norm(v_pred)
+                    # print(v_pred)
+                    # import ipdb; ipdb.set_trace()
+
                 m_gt = quaternion2matrix(ar[1][1:])
                 v_gt = torch.matmul(m_gt, self.vx)
                 rotation_loss += torch.min(

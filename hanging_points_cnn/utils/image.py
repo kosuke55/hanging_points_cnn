@@ -107,3 +107,16 @@ def draw_axis(img, R, t, K, axis_length=0.1, copy=False):
             color, 2)
 
     return img
+
+
+def draw_vec(img, vec, t, cm, vec_length=0.1, copy=False):
+    if copy:
+        img = img.copy()
+
+    s = cm.project3d_to_pixel(t)
+    e = cm.project3d_to_pixel(t + vec)
+    img = cv2.line(
+        img, s, e,
+        (0, 0, 255), 2)
+
+    return img

@@ -19,8 +19,8 @@ from torchvision import transforms
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
+from skrobot import coordinates
 from skrobot.coordinates.math import quaternion2matrix
-
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import draw_axis
@@ -100,6 +100,7 @@ class HangingPointsNet():
         self.model.eval()
         self.camera_model = None
         self.load_camera_info()
+        self.use_coords = False
         # self.hanging_points_pose_array = PoseArray()
         self.subscribe()
 
@@ -222,8 +223,15 @@ class HangingPointsNet():
             dep = depth_and_rotation[i, 0]
             # dep_pred.append(float(dep))
 
-            q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
-            q /= np.linalg.norm(q)
+            if self.use_coords:
+                q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
+                q /= np.linalg.norm(q)
+            else:
+                v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
+                v /= np.linalg.norm(v)
+                coords = coordinates.Coordinates()
+                coordinates.geo.orient_coods_to_axis(coords, v, 'x')
+                q = coords.quaternion
 
             camera_model_crop_resize \
                 = self.camera_model.crop_resize_camera_info(

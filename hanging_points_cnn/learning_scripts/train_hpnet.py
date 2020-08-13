@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import argparse
+import copy
 import os
 import os.path as osp
 import sys
@@ -24,6 +25,7 @@ from hanging_points_data import load_dataset
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
+from hanging_points_cnn.utils.image import draw_vec
 from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
@@ -94,12 +96,13 @@ class Trainer(object):
         #     self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
         self.optimizer = torch.optim.Adam(
             self.model.parameters(), lr=args.lr,  betas=(0.9, 0.999),
-            eps=1e-08, weight_decay=0, amsgrad=False)
+            eps=1e-10, weight_decay=0, amsgrad=False)
 
         self.scheduler = optim.lr_scheduler.LambdaLR(
             self.optimizer, lr_lambda=lambda epo: 0.9 ** epo)
 
         self.now = datetime.now().strftime('%Y%m%d_%H%M')
+        self.use_coords = False
 
     def step(self, dataloader, mode):
         print('Start {}'.format(mode))
@@ -132,7 +135,7 @@ class Trainer(object):
             pos_weight = torch.from_numpy(pos_weight)
             pos_weight = pos_weight.to(self.device)
 
-            criterion = HPNETLoss().to(self.device)
+            criterion = HPNETLoss(self.use_coords).to(self.device)
 
             hp_data = hp_data.to(self.device)
 
@@ -152,7 +155,6 @@ class Trainer(object):
                 with torch.no_grad():
                     confidence, depth_and_rotation = self.model(hp_data)
 
-
             confidence_np = confidence[0, ...].cpu(
             ).detach().numpy().copy()
             confidence_np[confidence_np >= 1] = 1.
@@ -170,7 +172,24 @@ class Trainer(object):
                 confidence, hp_data_gt, pos_weight,
                 depth_and_rotation, annotated_rois)
 
+            # import ipdb
+            # ipdb.set_trace()
+
             loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
+
+            if torch.isnan(loss):
+                print('loss is nan!!')
+                self.model = self.prev_model
+                self.optimizer = torch.optim.Adam(
+                    self.prev_model.parameters(), lr=args.lr,
+                    betas=(0.9, 0.999), eps=1e-10, weight_decay=0,
+                    amsgrad=False)
+                self.optimizer.load_state_dict(
+                    self.prev_optimizer.state_dict())
+                continue
+            else:
+                self.prev_model = copy.deepcopy(self.model)
+                self.prev_optimizer = copy.deepcopy(self.optimizer)
 
             if mode == 'train':
                 self.optimizer.zero_grad()
@@ -211,14 +230,28 @@ class Trainer(object):
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
                         [int(cx), int(cy)])) * dep * 0.001
-                try:
-                    draw_axis(axis_gt,
-                              quaternion2matrix(rotation),
-                              hanging_point_pose,
-                              self.cameramodel.K)
-                except Exception:
-                    print('Fail to draw axis')
-                    pass
+
+                # import ipdb
+                # ipdb.set_trace()
+                if self.use_coords:
+                    try:
+                        draw_axis(axis_gt,
+                                  quaternion2matrix(rotation),
+                                  hanging_point_pose,
+                                  self.cameramodel.K)
+                    except Exception:
+                        print('Fail to draw axis')
+
+                else:
+                    v = np.matmul(quaternion2matrix(rotation),
+                                  [1, 0, 0])
+                    try:
+                        draw_vec(axis_gt, v,
+                                 hanging_point_pose,
+                                 self.cameramodel)
+                    except Exception:
+                        print('Fail to draw vec')
+
                 rois_gt_filtered.append(roi)
 
             axis_gt = cv2.cvtColor(axis_gt, cv2.COLOR_BGR2RGB)
@@ -262,19 +295,30 @@ class Trainer(object):
 
                 create_depth_circle(depth, cy, cx, dep)
 
-                q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
-                q /= np.linalg.norm(q)
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
                         [int(cx), int(cy)])) * float(dep * 0.001)
-                try:
-                    draw_axis(axis_pred,
-                              quaternion2matrix(q),
-                              hanging_point_pose,
-                              self.cameramodel.K)
-                except Exception:
-                    print('Fail to draw axis')
-                    pass
+
+                if self.use_coords:
+                    q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
+                    q /= np.linalg.norm(q)
+                    try:
+                        draw_axis(axis_pred,
+                                  quaternion2matrix(q),
+                                  hanging_point_pose,
+                                  self.cameramodel.K)
+                    except Exception:
+                        print('Fail to draw axis')
+                        pass
+                else:
+                    v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
+                    v /= np.linalg.norm(v)
+                    try:
+                        draw_vec(axis_pred, v,
+                                 hanging_point_pose,
+                                 self.cameramodel)
+                    except Exception:
+                        print('Fail to draw vec')
 
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
@@ -304,20 +348,21 @@ class Trainer(object):
             if rotation_loss.item() > 0:
                 depth_loss_sum += depth_loss.item()
                 rotation_loss_sum += rotation_loss.item()
-                loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * depth_loss.item()
+                loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * \
+                    depth_loss.item()
                 rotation_loss_count += 1
 
             if np.mod(index, 1) == 0:
                 print(
                     'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(
-                    self.epo,
-                    index,
-                    len(dataloader),
-                    mode,
-                    confidence_loss_sum,
-                    rotation_loss_sum,
-                    depth_loss_sum
-                ))
+                        self.epo,
+                        index,
+                        len(dataloader),
+                        mode,
+                        confidence_loss_sum,
+                        rotation_loss_sum,
+                        depth_loss_sum
+                    ))
 
                 self.vis.images([hanging_point_depth_gt_rgb,
                                  depth_pred_rgb],
@@ -370,6 +415,7 @@ class Trainer(object):
                 avg_depth_loss = 1e10
                 avg_loss = 1e10
         else:
+            avg_loss = loss_sum
             avg_confidence_loss = confidence_loss_sum
             avg_rotation_loss = rotation_loss_sum
             avg_depth_loss = rotation_loss_sum
@@ -386,16 +432,23 @@ class Trainer(object):
 
         if mode == 'val':
             if np.mod(self.epo, self.save_model_interval) == 0:
+                save_file = osp.join(
+                    self.save_dir,
+                    'hpnet_latestmodel_' + self.time_now + '.pt')
+                print('save {}'.format(save_file))
                 torch.save(
-                    self.model.state_dict(),
-                    osp.join(self.save_dir, 'hpnet_latestmodel_' + self.time_now + '.pt'))
+                    self.model.state_dict(), save_file)
+
             if self.best_loss > avg_loss:
                 print('update best model {} -> {}'.format(
                     self.best_loss, avg_loss))
                 self.best_loss = avg_loss
+                save_file = osp.join(
+                    self.save_dir,
+                    'hpnet_bestmodel_' + self.time_now + '.pt')
+                print('save {}'.format(save_file))
                 torch.save(
-                    self.model.state_dict(),
-                    osp.join(self.save_dir, 'hpnet_bestmodel_' + self.time_now + '.pt'))
+                    self.model.state_dict(), save_file)
 
     def train(self):
         for self.epo in range(self.max_epoch):
@@ -425,7 +478,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/hoge/hpnet_latestmodel_20200727_1438.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200812_2224.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
