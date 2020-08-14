@@ -85,6 +85,7 @@ class Trainer(object):
         print('device is:{}'.format(self.device))
 
         self.model = HPNET(config).to(self.device)
+        self.prev_model = copy.deepcopy(self.model)
         self.save_model_interval = 1
         if os.path.exists(pretrained_model):
             print('use pretrained model')
@@ -97,6 +98,7 @@ class Trainer(object):
         self.optimizer = torch.optim.Adam(
             self.model.parameters(), lr=args.lr,  betas=(0.9, 0.999),
             eps=1e-10, weight_decay=0, amsgrad=False)
+        self.prev_optimizer = copy.deepcopy(self.optimizer)
 
         self.scheduler = optim.lr_scheduler.LambdaLR(
             self.optimizer, lr_lambda=lambda epo: 0.9 ** epo)
@@ -194,6 +196,8 @@ class Trainer(object):
             if mode == 'train':
                 self.optimizer.zero_grad()
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(), 5.0)
                 self.optimizer.step()
 
             hanging_point_depth_gt \
@@ -359,9 +363,9 @@ class Trainer(object):
                         index,
                         len(dataloader),
                         mode,
-                        confidence_loss_sum,
-                        rotation_loss_sum,
-                        depth_loss_sum
+                        confidence_loss.item(),
+                        rotation_loss.item(),
+                        depth_loss.item()
                     ))
 
                 self.vis.images([hanging_point_depth_gt_rgb,

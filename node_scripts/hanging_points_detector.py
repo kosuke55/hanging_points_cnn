@@ -88,11 +88,12 @@ class HangingPointsNet():
         self.config = {
             'output_channels': 1,
             'feature_extractor_name': 'resnet50',
-            'confidence_thresh': 0.3,
+            'confidence_thresh': 0.5,
+            'depth_range': [200, 1500],
             'use_bgr': True,
             'use_bgr2gray': True,
         }
-
+        self.depth_range = self.config['depth_range']
         self.model = HPNET(self.config).to(device)
         if osp.exists(pretrained_model):
             print('use pretrained model')
@@ -167,10 +168,11 @@ class HangingPointsNet():
 
         depth = cv2.resize(depth, (256, 256))
 
-        depth = frame_img(depth)
-        kernel = np.ones((10, 10), np.uint8)
-        depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
-        depth_bgr = colorize_depth(depth, 300, 1000)
+        # depth = frame_img(depth)
+        # kernel = np.ones((10, 10), np.uint8)
+        # depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
+        depth_bgr = colorize_depth(
+            depth, self.depth_range[0], self.depth_range[1])
         # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
         depth_bgr[np.where(depth == 0)] = [0, 0, 0]
         in_feature = depth.copy().astype(np.float32) * 0.001
@@ -179,7 +181,7 @@ class HangingPointsNet():
             gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
             gray = cv2.resize(gray, (256, 256))[..., None] / 255.
             normalized_depth = normalize_depth(
-                depth, 0.2, 1)[..., None]
+                depth, self.depth_range[0], self.depth_range[1])[..., None]
             in_feature = np.concatenate(
                 (normalized_depth, gray), axis=2).astype(np.float32)
 
@@ -215,12 +217,17 @@ class HangingPointsNet():
 
             # dep_roi_clip = depth_roi_clip
             dep_roi_clip = depth_roi_clip[np.where(
-                np.logical_and(depth_roi_clip > 200, depth_roi_clip < 1000))]
+                np.logical_and(self.depth_range[0] < depth_roi_clip,
+                               depth_roi_clip < self.depth_range[1]))]
 
-            depth_roi_clip_bgr = colorize_depth(depth_roi_clip, 200, 1000)
+            depth_roi_clip_bgr = colorize_depth(
+                depth_roi_clip, self.depth_range[0], self.depth_range[1])
             # print(np.max(dep_roi_clip), np.mean(dep_roi_clip), np.median(dep_roi_clip), np.min(dep_roi_clip))
             dep_roi_clip = np.median(dep_roi_clip) * 0.001
-            dep = depth_and_rotation[i, 0]
+
+            dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+            dep = unnormalize_depth(
+                dep, self.depth_range[0], self.depth_range[1]) * 0.001
             # dep_pred.append(float(dep))
 
             if self.use_coords:
@@ -242,11 +249,12 @@ class HangingPointsNet():
                     [int(hanging_point_x),
                      int(hanging_point_y)]))
 
-            length = float(dep_roi_clip) / \
+            length = float(dep) / \
                 hanging_point[2]
             hanging_point *= length
 
-            print(hanging_point, float(dep), dep_roi_clip)
+            # print(hanging_point, float(dep), dep_roi_clip)
+            print(dep, dep_roi_clip)
             if dep_roi_clip == np.nan:
                 continue
 
@@ -317,7 +325,7 @@ class HangingPointsNet():
 
 def main(args):
     rospy.init_node("hanging_points_net", anonymous=False)
-    hpn = HangingPointsNet()
+    HangingPointsNet()
     rospy.spin()
 
 

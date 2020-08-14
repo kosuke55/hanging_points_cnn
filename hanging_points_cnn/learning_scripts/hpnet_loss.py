@@ -61,7 +61,7 @@ class HPNETLoss(Module):
 
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
-                print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
+                # print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
                 depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
                 # 1 dof
