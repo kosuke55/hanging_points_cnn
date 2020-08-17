@@ -19,9 +19,10 @@ import visdom
 from skrobot.coordinates.math import quaternion2matrix
 
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
-from hpnet import HPNET
-from hpnet_loss import HPNETLoss
-from hanging_points_data import load_dataset
+from hanging_points_cnn.learning_scripts.hpnet import HPNET
+from hanging_points_cnn.learning_scripts.hpnet_loss import HPNETLoss
+from hanging_points_cnn.learning_scripts.hanging_points_data import load_dataset
+from hanging_points_cnn.learning_scripts.hanging_points_data import load_test_dataset
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
@@ -44,9 +45,9 @@ except ImportError:
 
 class Trainer(object):
 
-    def __init__(self, gpu, data_path, batch_size, max_epoch,
-                 pretrained_model, train_data_num, val_data_num,
-                 save_dir, lr, config=None, port=6006):
+    def __init__(self, gpu, data_path, test_data_path,
+                 batch_size, max_epoch, pretrained_model, train_data_num,
+                 val_data_num, save_dir, lr, config=None, port=6006):
 
         if config is None:
             config = {
@@ -59,11 +60,16 @@ class Trainer(object):
             }
         self.config = config
         self.depth_range = config['depth_range']
-        self.train_dataloader, self.val_dataloader = load_dataset(
-            data_path, batch_size,
-            use_bgr=self.config['use_bgr'],
-            use_bgr2gray=self.config['use_bgr2gray'],
-            depth_range=self.depth_range)
+        self.train_dataloader, self.val_dataloader\
+            = load_dataset(data_path, batch_size,
+                           use_bgr=self.config['use_bgr'],
+                           use_bgr2gray=self.config['use_bgr2gray'],
+                           depth_range=self.depth_range)
+        self.test_dataloder \
+            = load_test_dataset(test_data_path,
+                                use_bgr=self.config['use_bgr'],
+                                use_bgr2gray=self.config['use_bgr2gray'],
+                                depth_range=self.depth_range)
 
         self.train_data_num = train_data_num
         self.val_data_num = val_data_num
@@ -85,12 +91,14 @@ class Trainer(object):
         print('device is:{}'.format(self.device))
 
         self.model = HPNET(config).to(self.device)
-        self.prev_model = copy.deepcopy(self.model)
+
         self.save_model_interval = 1
         if os.path.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(
                 torch.load(pretrained_model), strict=False)
+
+        self.prev_model = copy.deepcopy(self.model)
 
         self.best_loss = 1e10
         # self.optimizer = optim.SGD(
@@ -108,10 +116,10 @@ class Trainer(object):
 
     def step(self, dataloader, mode):
         print('Start {}'.format(mode))
-
+        # self.model = self.prev_model
         if mode == 'train':
             self.model.train()
-        elif mode == 'val':
+        elif mode == 'val' or mode == 'test':
             self.model.eval()
 
         loss_sum = 0
@@ -123,21 +131,14 @@ class Trainer(object):
         for index, (hp_data, depth, camera_info_path, hp_data_gt) in tqdm.tqdm(
                 enumerate(dataloader), total=len(dataloader),
                 desc='{} epoch={}'.format(mode, self.epo), leave=False):
-            self.cameramodel \
+
+            # if index == 0:
+            #     self.model = self.prev_model
+
+            self.cameramodel\
                 = cameramodels.PinholeCameraModel.from_yaml_file(
                     camera_info_path[0])
             self.cameramodel.target_size = self.target_size
-
-            pos_weight = hp_data_gt.detach().numpy().copy()
-            pos_weight = pos_weight[:, 0, ...]
-            zeroidx = np.where(pos_weight < 0.5)
-            nonzeroidx = np.where(pos_weight >= 0.5)
-            pos_weight[zeroidx] = 0.5
-            pos_weight[nonzeroidx] = 1.0
-            pos_weight = torch.from_numpy(pos_weight)
-            pos_weight = pos_weight.to(self.device)
-
-            criterion = HPNETLoss(self.use_coords).to(self.device)
 
             hp_data = hp_data.to(self.device)
 
@@ -146,14 +147,9 @@ class Trainer(object):
                 depth.copy(),
                 self.depth_range[0], self.depth_range[1])
 
-            hp_data_gt = hp_data_gt.to(self.device)
-            ground_truth = hp_data_gt.cpu().detach().numpy().copy()
-            confidence_gt = hp_data_gt[:, 0:1, ...]
-            rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
-
             if mode == 'train':
                 confidence, depth_and_rotation = self.model(hp_data)
-            elif mode == 'val':
+            elif mode == 'val' or mode == 'test':
                 with torch.no_grad():
                     confidence, depth_and_rotation = self.model(hp_data)
 
@@ -164,110 +160,128 @@ class Trainer(object):
             confidence_vis = cv2.cvtColor(confidence_np[0, ...] * 255,
                                           cv2.COLOR_GRAY2BGR)
 
-            depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
-            if self.model.rois_list is None or rois_list_gt is None:
-                return None, None
-            annotated_rois = annotate_rois(
-                self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
+            if mode != 'test':
+                pos_weight = hp_data_gt.detach().numpy().copy()
+                pos_weight = pos_weight[:, 0, ...]
+                zeroidx = np.where(pos_weight < 0.5)
+                nonzeroidx = np.where(pos_weight >= 0.5)
+                pos_weight[zeroidx] = 0.5
+                pos_weight[nonzeroidx] = 1.0
+                pos_weight = torch.from_numpy(pos_weight)
+                pos_weight = pos_weight.to(self.device)
 
-            confidence_loss, depth_loss, rotation_loss = criterion(
-                confidence, hp_data_gt, pos_weight,
-                depth_and_rotation, annotated_rois)
+                hp_data_gt = hp_data_gt.to(self.device)
+                ground_truth = hp_data_gt.cpu().detach().numpy().copy()
+                confidence_gt = hp_data_gt[:, 0:1, ...]
+                rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
 
-            # import ipdb
-            # ipdb.set_trace()
+                depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
 
-            loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
+                criterion = HPNETLoss(self.use_coords).to(self.device)
 
-            if torch.isnan(loss):
-                print('loss is nan!!')
-                self.model = self.prev_model
-                self.optimizer = torch.optim.Adam(
-                    self.prev_model.parameters(), lr=args.lr,
-                    betas=(0.9, 0.999), eps=1e-10, weight_decay=0,
-                    amsgrad=False)
-                self.optimizer.load_state_dict(
-                    self.prev_optimizer.state_dict())
-                continue
-            else:
-                self.prev_model = copy.deepcopy(self.model)
-                self.prev_optimizer = copy.deepcopy(self.optimizer)
+                if self.model.rois_list is None or rois_list_gt is None:
+                    return None, None
+                annotated_rois = annotate_rois(
+                    self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
 
-            if mode == 'train':
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), 5.0)
-                self.optimizer.step()
-
-            hanging_point_depth_gt \
-                = unnormalize_depth(
-                    ground_truth[0, 1, ...].astype(np.float32),
-                    self.depth_range[0], self.depth_range[1])
-
-            rotations_gt = ground_truth[0, 2:, ...]
-            rotations_gt = rotations_gt.transpose(1, 2, 0)
-            hanging_point_depth_gt_bgr \
-                = colorize_depth(
-                    hanging_point_depth_gt,
-                    self.depth_range[0], self.depth_range[1])
-
-            hanging_point_depth_gt_rgb = cv2.cvtColor(
-                hanging_point_depth_gt_bgr,
-                cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-
-            axis_gt = depth_bgr.copy()
-
-            confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
-            ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
-
-            # Visualize gt axis and roi
-            rois_gt_filtered = []
-            for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
-                if roi.tolist() == [0, 0, 0, 0]:
-                    continue
-                roi = roi.cpu().detach().numpy().copy()
-                cx = roi_c[0]
-                cy = roi_c[1]
-                dep = get_depth_in_roi(depth, roi, self.depth_range)
-                rotation = rotations_gt[cy, cx, :]
-                hanging_point_pose = np.array(
-                    self.cameramodel.project_pixel_to_3d_ray(
-                        [int(cx), int(cy)])) * dep * 0.001
+                confidence_loss, depth_loss, rotation_loss = criterion(
+                    confidence, hp_data_gt, pos_weight,
+                    depth_and_rotation, annotated_rois)
 
                 # import ipdb
                 # ipdb.set_trace()
-                if self.use_coords:
-                    try:
-                        draw_axis(axis_gt,
-                                  quaternion2matrix(rotation),
-                                  hanging_point_pose,
-                                  self.cameramodel.K)
-                    except Exception:
-                        print('Fail to draw axis')
 
+                loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
+
+                if torch.isnan(loss):
+                    print('loss is nan!!')
+                    self.model = self.prev_model
+                    self.optimizer = torch.optim.Adam(
+                        self.model.parameters(), lr=args.lr,
+                        betas=(0.9, 0.999), eps=1e-10, weight_decay=0,
+                        amsgrad=False)
+                    self.optimizer.load_state_dict(
+                        self.prev_optimizer.state_dict())
+                    continue
                 else:
-                    v = np.matmul(quaternion2matrix(rotation),
-                                  [1, 0, 0])
-                    try:
-                        draw_vec(axis_gt, v,
-                                 hanging_point_pose,
-                                 self.cameramodel)
-                    except Exception:
-                        print('Fail to draw vec')
+                    self.prev_model = copy.deepcopy(self.model)
+                    self.prev_optimizer = copy.deepcopy(self.optimizer)
 
-                rois_gt_filtered.append(roi)
+                if mode == 'train':
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), 5.0)
+                    self.optimizer.step()
 
-            axis_gt = cv2.cvtColor(axis_gt, cv2.COLOR_BGR2RGB)
+                hanging_point_depth_gt \
+                    = unnormalize_depth(
+                        ground_truth[0, 1, ...].astype(np.float32),
+                        self.depth_range[0], self.depth_range[1])
 
-            # draw gt rois
-            for roi in rois_gt_filtered:
-                confidence_gt_vis = cv2.rectangle(
-                    confidence_gt_vis, (roi[0], roi[1]), (roi[2], roi[3]),
-                    (0, 255, 0), 3)
-                axis_gt = cv2.rectangle(
-                    axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
-                    (0, 255, 0), 3)
+                rotations_gt = ground_truth[0, 2:, ...]
+                rotations_gt = rotations_gt.transpose(1, 2, 0)
+                hanging_point_depth_gt_bgr \
+                    = colorize_depth(
+                        hanging_point_depth_gt,
+                        self.depth_range[0], self.depth_range[1])
+
+                hanging_point_depth_gt_rgb = cv2.cvtColor(
+                    hanging_point_depth_gt_bgr,
+                    cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+
+                axis_gt = depth_bgr.copy()
+
+                confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
+                ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
+
+                # Visualize gt axis and roi
+                rois_gt_filtered = []
+                for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
+                    if roi.tolist() == [0, 0, 0, 0]:
+                        continue
+                    roi = roi.cpu().detach().numpy().copy()
+                    cx = roi_c[0]
+                    cy = roi_c[1]
+                    dep = get_depth_in_roi(depth, roi, self.depth_range)
+                    rotation = rotations_gt[cy, cx, :]
+                    hanging_point_pose = np.array(
+                        self.cameramodel.project_pixel_to_3d_ray(
+                            [int(cx), int(cy)])) * dep * 0.001
+
+                    # import ipdb
+                    # ipdb.set_trace()
+                    if self.use_coords:
+                        try:
+                            draw_axis(axis_gt,
+                                      quaternion2matrix(rotation),
+                                      hanging_point_pose,
+                                      self.cameramodel.K)
+                        except Exception:
+                            print('Fail to draw axis')
+
+                    else:
+                        v = np.matmul(quaternion2matrix(rotation),
+                                      [1, 0, 0])
+                        try:
+                            draw_vec(axis_gt, v,
+                                     hanging_point_pose,
+                                     self.cameramodel)
+                        except Exception:
+                            print('Fail to draw vec')
+
+                    rois_gt_filtered.append(roi)
+
+                axis_gt = cv2.cvtColor(axis_gt, cv2.COLOR_BGR2RGB)
+
+                # draw gt rois
+                for roi in rois_gt_filtered:
+                    confidence_gt_vis = cv2.rectangle(
+                        confidence_gt_vis, (roi[0], roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
+                    axis_gt = cv2.rectangle(
+                        axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
+                        (0, 255, 0), 3)
 
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
@@ -347,26 +361,27 @@ class Trainer(object):
                         (int(annotated_rois[i][0][2]),
                          int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
-            confidence_loss_sum += confidence_loss.item()
+            if mode != 'test':
+                confidence_loss_sum += confidence_loss.item()
 
-            if rotation_loss.item() > 0:
-                depth_loss_sum += depth_loss.item()
-                rotation_loss_sum += rotation_loss.item()
-                loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * \
-                    depth_loss.item()
-                rotation_loss_count += 1
-
-            if np.mod(index, 1) == 0:
-                print(
-                    'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(
-                        self.epo,
-                        index,
-                        len(dataloader),
-                        mode,
-                        confidence_loss.item(),
-                        rotation_loss.item(),
+                if rotation_loss.item() > 0:
+                    depth_loss_sum += depth_loss.item()
+                    rotation_loss_sum += rotation_loss.item()
+                    loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * \
                         depth_loss.item()
-                    ))
+                    rotation_loss_count += 1
+
+                if np.mod(index, 1) == 0:
+                    print(
+                        'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(
+                            self.epo,
+                            index,
+                            len(dataloader),
+                            mode,
+                            confidence_loss.item(),
+                            rotation_loss.item(),
+                            depth_loss.item()
+                        ))
 
                 self.vis.images([hanging_point_depth_gt_rgb,
                                  depth_pred_rgb],
@@ -403,56 +418,79 @@ class Trainer(object):
                                         win='{} in_rgb'.format(mode),
                                         opts=dict(
                             title='{} in_rgb'.format(mode)))
-
-        if len(dataloader) > 0:
-            avg_confidence_loss\
-                = confidence_loss_sum / len(dataloader)
-            if rotation_loss_count > 0:
-                avg_rotation_loss\
-                    = rotation_loss_sum / rotation_loss_count
-                avg_depth_loss\
-                    = depth_loss_sum / rotation_loss_count
-                avg_loss\
-                    = loss_sum / rotation_loss_count
             else:
-                avg_rotation_loss = 1e10
-                avg_depth_loss = 1e10
-                avg_loss = 1e10
-        else:
-            avg_loss = loss_sum
-            avg_confidence_loss = confidence_loss_sum
-            avg_rotation_loss = rotation_loss_sum
-            avg_depth_loss = rotation_loss_sum
+                self.vis.images([depth_pred_rgb],
+                                win='{} hanging_point_depth_gt_rgb'.format(
+                                    mode),
+                                opts=dict(
+                    title='{} hanging_point_depth (pred)'.format(mode)))
+                self.vis.images([axis_pred.transpose(2, 0, 1)],
+                                win='{} axis'.format(mode),
+                                opts=dict(
+                    title='{} axis'.format(mode)))
+                self.vis.images([confidence_vis.transpose(2, 0, 1)],
+                                win='{}_confidence_roi'.format(mode),
+                                opts=dict(
+                    title='{} confidence(Pred)'.format(mode)))
 
-        self.vis.line(X=np.array([self.epo]), Y=np.array([avg_confidence_loss]),
-                      win='loss', name='{}_confidence_loss'.format(mode), update='append')
-        if rotation_loss_count > 0:
-            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_rotation_loss]),
-                          win='loss', name='{}_rotation_loss'.format(mode), update='append')
-            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_depth_loss]),
-                          win='loss', name='{}_depth_loss'.format(mode), update='append')
-            self.vis.line(X=np.array([self.epo]), Y=np.array([avg_loss]),
-                          win='loss', name='{}_loss'.format(mode), update='append')
+        if mode != 'test':
+            if len(dataloader) > 0:
+                avg_confidence_loss\
+                    = confidence_loss_sum / len(dataloader)
+                if rotation_loss_count > 0:
+                    avg_rotation_loss\
+                        = rotation_loss_sum / rotation_loss_count
+                    avg_depth_loss\
+                        = depth_loss_sum / rotation_loss_count
+                    avg_loss\
+                        = loss_sum / rotation_loss_count
+                else:
+                    avg_rotation_loss = 1e10
+                    avg_depth_loss = 1e10
+                    avg_loss = 1e10
+            else:
+                avg_loss = loss_sum
+                avg_confidence_loss = confidence_loss_sum
+                avg_rotation_loss = rotation_loss_sum
+                avg_depth_loss = rotation_loss_sum
 
-        if mode == 'val':
-            if np.mod(self.epo, self.save_model_interval) == 0:
-                save_file = osp.join(
-                    self.save_dir,
-                    'hpnet_latestmodel_' + self.time_now + '.pt')
-                print('save {}'.format(save_file))
-                torch.save(
-                    self.model.state_dict(), save_file)
+            self.vis.line(
+                X=np.array([self.epo]), Y=np.array([avg_confidence_loss]),
+                win='loss', name='{}_confidence_loss'.format(mode),
+                update='append')
+            if rotation_loss_count > 0:
+                self.vis.line(
+                    X=np.array([self.epo]), Y=np.array([avg_rotation_loss]),
+                    win='loss', name='{}_rotation_loss'.format(mode),
+                    update='append')
+                self.vis.line(
+                    X=np.array([self.epo]), Y=np.array([avg_depth_loss]),
+                    win='loss', name='{}_depth_loss'.format(mode),
+                    update='append')
+                self.vis.line(
+                    X=np.array([self.epo]), Y=np.array([avg_loss]),
+                    win='loss', name='{}_loss'.format(mode),
+                    update='append')
 
-            if self.best_loss > avg_loss:
-                print('update best model {} -> {}'.format(
-                    self.best_loss, avg_loss))
-                self.best_loss = avg_loss
-                save_file = osp.join(
-                    self.save_dir,
-                    'hpnet_bestmodel_' + self.time_now + '.pt')
-                print('save {}'.format(save_file))
-                torch.save(
-                    self.model.state_dict(), save_file)
+            if mode == 'val':
+                if np.mod(self.epo, self.save_model_interval) == 0:
+                    save_file = osp.join(
+                        self.save_dir,
+                        'hpnet_latestmodel_' + self.time_now + '.pt')
+                    print('save {}'.format(save_file))
+                    torch.save(
+                        self.model.state_dict(), save_file)
+
+                if self.best_loss > avg_loss:
+                    print('update best model {} -> {}'.format(
+                        self.best_loss, avg_loss))
+                    self.best_loss = avg_loss
+                    save_file = osp.join(
+                        self.save_dir,
+                        'hpnet_bestmodel_' + self.time_now + '.pt')
+                    print('save {}'.format(save_file))
+                    torch.save(
+                        self.model.state_dict(), save_file)
 
     def train(self):
         for self.epo in range(self.max_epoch):
@@ -466,11 +504,17 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-g', '--gpu', type=int, required=True, help='gpu id')
     parser.add_argument(
-        '--data_path',
+        '--datap-path',
         '-dp',
         type=str,
-        help='Training data path',
+        help='Training and Validation data path',
         default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0808')
+    parser.add_argument(
+        '--test-data-path',
+        '-tdp',
+        type=str,
+        help='Test data path',
+        default='')
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)
@@ -482,7 +526,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200812_2224.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray_0814.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
@@ -513,6 +557,7 @@ if __name__ == "__main__":
     trainer = Trainer(
         gpu=args.gpu,
         data_path=args.data_path,
+        test_data_path=args.test_data_path,
         batch_size=args.batch_size,
         max_epoch=args.max_epoch,
         pretrained_model=args.pretrained_model,
