@@ -503,8 +503,8 @@ class Trainer(object):
 
     def train(self):
         for self.epo in range(self.max_epoch):
-            # self.step(self.train_dataloader, 'train')
-            # self.step(self.val_dataloader, 'val')
+            self.step(self.train_dataloader, 'train')
+            self.step(self.val_dataloader, 'val')
             self.step(self.test_dataloader, 'test')
             self.scheduler.step()
 
