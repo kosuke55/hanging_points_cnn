@@ -121,16 +121,41 @@ def reshape_rois_list(rois_list):
     return reshaped_rois_list
 
 
-def expand_box(box, img_shape, scale=1.5):
-    """Expand roi box.
-    """
+def expand_box(box, img_shape, scale=None, padding=None):
+    """Expand roi box
 
+    Parameters
+    ----------
+    box : list
+        [x, y, w, h] order.
+    img_shape : list
+        [width, height]
+    scale : float, optional
+        Expand roi by scale, by default None
+    padding : int, optional
+        Expand roi by padding, by default None
+
+    Returns
+    -------
+    expanded roi: list
+        [x, y, w, h] order.
+    """
     x, y, w, h = box
     wmax, hmax = img_shape
-    xo = np.max([x - (scale - 1) * w / 2, 0])
-    yo = np.max([y - (scale - 1) * h / 2, 0])
-    wo = w * scale
-    ho = h * scale
+
+    if scale is not None:
+        xo = max([x - (scale - 1) * w / 2, 0])
+        yo = max([y - (scale - 1) * h / 2, 0])
+        wo = w * scale
+        ho = h * scale
+    elif padding is not None:
+        xo = max(x - padding, 0)
+        yo = max(y - padding, 0)
+        wo = w + padding * 2
+        ho = h + padding * 2
+    else:
+        xo, yo, wo, ho = x, y, w, h
+
     if xo + wo >= wmax:
         wo = wmax - xo - 1
     if yo + ho >= hmax:
@@ -214,7 +239,7 @@ def find_rois(confidence,
                 continue
 
             box_center = [int(box[0] + box[2] / 2), int(box[1] + box[3] / 2)]
-            box = expand_box(box, confidence_mask.shape, scale=2.5)
+            box = expand_box(box, confidence_mask.shape, padding=30)
             if rois_n is None:
                 rois_n = torch.tensor(
                     [[box[0], box[1],
