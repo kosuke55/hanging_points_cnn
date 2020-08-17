@@ -139,7 +139,8 @@ class HangingPointsDataset(Dataset):
         if self.test:
             if self.transform:
                 in_feature = self.transform(in_feature)
-                return in_feature, depth, camera_info_path, None
+                depth = self.transform(depth)
+                return in_feature, depth, camera_info_path, 'dummy'
 
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)

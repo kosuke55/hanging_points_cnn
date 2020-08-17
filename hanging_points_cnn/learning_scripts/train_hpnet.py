@@ -65,7 +65,7 @@ class Trainer(object):
                            use_bgr=self.config['use_bgr'],
                            use_bgr2gray=self.config['use_bgr2gray'],
                            depth_range=self.depth_range)
-        self.test_dataloder \
+        self.test_dataloader \
             = load_test_dataset(test_data_path,
                                 use_bgr=self.config['use_bgr'],
                                 use_bgr2gray=self.config['use_bgr2gray'],
@@ -302,14 +302,15 @@ class Trainer(object):
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
-                if annotated_rois[i][2]:
-                    confidence_vis = cv2.rectangle(
-                        confidence_vis,
-                        (int(annotated_rois[i][0][0]),
-                         int(annotated_rois[i][0][1])),
-                        (int(annotated_rois[i][0][2]),
-                         int(annotated_rois[i][0][3])),
-                        (255, 0, 0), 2)
+                if mode != 'test':
+                    if annotated_rois[i][2]:
+                        confidence_vis = cv2.rectangle(
+                            confidence_vis,
+                            (int(annotated_rois[i][0][0]),
+                             int(annotated_rois[i][0][1])),
+                            (int(annotated_rois[i][0][2]),
+                             int(annotated_rois[i][0][3])),
+                            (255, 0, 0), 2)
 
                 create_depth_circle(depth, cy, cx, dep)
 
@@ -353,13 +354,29 @@ class Trainer(object):
                 axis_pred = cv2.rectangle(
                     axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
                     (0, 255, 0), 3)
-                if annotated_rois[i][2]:
-                    axis_pred = cv2.rectangle(
-                        axis_pred,
-                        (int(annotated_rois[i][0][0]),
-                         int(annotated_rois[i][0][1])),
-                        (int(annotated_rois[i][0][2]),
-                         int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+                if mode != 'test':
+                    if annotated_rois[i][2]:
+                        axis_pred = cv2.rectangle(
+                            axis_pred,
+                            (int(annotated_rois[i][0][0]),
+                             int(annotated_rois[i][0][1])),
+                            (int(annotated_rois[i][0][2]),
+                             int(annotated_rois[i][0][3])), (255, 0, 0), 2)
+
+            if self.config['use_bgr']:
+                if self.config['use_bgr2gray']:
+                    in_gray = hp_data.cpu().detach().numpy().copy()[
+                        0, 1:2, ...] * 255
+                    in_gray = in_gray.transpose(1, 2, 0).astype(np.uint8)
+                    in_gray = cv2.cvtColor(in_gray, cv2.COLOR_GRAY2RGB)
+                    in_gray = in_gray.transpose(2, 0, 1)
+                    in_img = in_gray
+                else:
+                    in_bgr = hp_data.cpu().detach().numpy().copy()[
+                        0, 3:, ...].transpose(1, 2, 0)
+                    in_rgb = cv2.cvtColor(
+                        in_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
+                    in_img = in_rgb
 
             if mode != 'test':
                 confidence_loss_sum += confidence_loss.item()
@@ -401,38 +418,29 @@ class Trainer(object):
                     title='{} confidence(GT, Pred)'.format(mode)))
 
                 if self.config['use_bgr']:
-                    if self.config['use_bgr2gray']:
-                        in_gray = hp_data.cpu().detach().numpy().copy()[
-                            0, 1:2, ...] * 255
-                        in_gray = in_gray.astype(np.uint8)
-                        self.vis.images([in_gray],
-                                        win='{} in_gray'.format(mode),
-                                        opts=dict(
-                            title='{} in_gray'.format(mode)))
-                    else:
-                        in_bgr = hp_data.cpu().detach().numpy().copy()[
-                            0, 3:, ...].transpose(1, 2, 0)
-                        in_rgb = cv2.cvtColor(
-                            in_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-                        self.vis.images([in_rgb],
-                                        win='{} in_rgb'.format(mode),
-                                        opts=dict(
-                            title='{} in_rgb'.format(mode)))
+                    self.vis.images([in_img],
+                                    win='{} in_gray'.format(mode),
+                                    opts=dict(
+                        title='{} in_gray'.format(mode)))
             else:
-                self.vis.images([depth_pred_rgb],
-                                win='{}-{} hanging_point_depth_gt_rgb'.format(
-                                    mode, index),
-                                opts=dict(
-                    title='{}-{} hanging_point_depth (pred)'.format(
-                        mode, index)))
-                self.vis.images([axis_pred.transpose(2, 0, 1)],
-                                win='{}-{} axis'.format(mode, index),
-                                opts=dict(
-                    title='{}-{} axis'.format(mode, index)))
-                self.vis.images([confidence_vis.transpose(2, 0, 1)],
-                                win='{}-{} confidence_roi'.format(mode, index),
-                                opts=dict(
-                    title='{}-{} confidence(Pred)'.format(mode, index)))
+                if self.config['use_bgr']:
+                    self.vis.images(
+                        [in_img, confidence_vis.transpose(2, 0, 1),
+                         depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
+                        win='{}-{}'.format(
+                            mode, index),
+                        opts=dict(
+                            title='{}-{} hanging_point_depth (pred)'.format(
+                                mode, index)))
+                else:
+                    self.vis.images(
+                        [confidence_vis.transpose(2, 0, 1),
+                         depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
+                        win='{}-{}'.format(
+                            mode, index),
+                        opts=dict(
+                            title='{}-{} hanging_point_depth (pred)'.format(
+                                mode, index)))
 
         if mode != 'test':
             if len(dataloader) > 0:
@@ -495,8 +503,9 @@ class Trainer(object):
 
     def train(self):
         for self.epo in range(self.max_epoch):
-            self.step(self.train_dataloader, 'train')
-            self.step(self.val_dataloader, 'val')
+            # self.step(self.train_dataloader, 'train')
+            # self.step(self.val_dataloader, 'val')
+            self.step(self.test_dataloader, 'test')
             self.scheduler.step()
 
 
