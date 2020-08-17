@@ -4,13 +4,17 @@
 import os
 import sys
 from pathlib import Path
+from PIL import Image
 
-import imgaug.augmenters as iaa
 import numpy as np
-from torch.utils.data import DataLoader, Dataset, random_split
+import imgaug.augmenters as iaa
 from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset, random_split
 
-from hanging_points_cnn.utils.image import colorize_depth, normalize_depth
+from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import normalize_depth
+from hanging_points_cnn.utils.image import resize_np_img
+
 
 for path in sys.path:
     if 'opt/ros/' in path:
@@ -42,20 +46,34 @@ def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
     return train_dataloader, val_dataloader
 
 
+def load_test_dataset(data_path, use_bgr, use_bgr2gray, depth_range):
+    transform = transforms.Compose([transforms.ToTensor()])
+    test_dataset = HangingPointsDataset(
+        data_path, transform, use_bgr, use_bgr2gray, depth_range, test=True)
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=1, shuffle=False, num_workers=1)
+
+    return test_dataloader
+
+
 class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None,
                  use_bgr=True, use_bgr2gray=True, depth_range=[0.2, 0.7], test=False):
-
+        self.test = test
         self.data_path = data_path
         self.transform = transform
-        self.file_paths = list(
-            sorted(Path(self.data_path).glob("*/depth/*.npy")))
+        if self.test:
+            self.file_paths = list(
+                sorted(Path(self.data_path).glob("depth/*.npy")))
+        else:
+            self.file_paths = list(
+                sorted(Path(self.data_path).glob("*/depth/*.npy")))
         self.use_bgr = use_bgr
         if use_bgr2gray:
             self.use_bgr = True
         self.use_bgr2gray = use_bgr2gray
         self.depth_range = depth_range
-        self.test = test
+        self.inshape = (256, 256)
 
         self.aug_seq = iaa.Sequential([
             iaa.Dropout([0, 0.3]),
@@ -67,9 +85,12 @@ class HangingPointsDataset(Dataset):
 
     def __getitem__(self, idx):
         depth_filepath = self.file_paths[idx]
-
         depth = np.load(depth_filepath).astype(np.float32)
-        depth = self.aug_seq.augment_image(depth)
+
+        if self.test:
+            depth = resize_np_img(depth, self.inshape)
+        else:
+            depth = self.aug_seq.augment_image(depth)
 
         # r = np.random.randint(20)
         # kernel = np.ones((r, r), np.uint8)
@@ -79,13 +100,22 @@ class HangingPointsDataset(Dataset):
         # r = r if np.mod(r, 2) else r + 1
         # depth = cv2.GaussianBlur(depth, (r, r), 10)
 
+        camera_info_path = str(
+            depth_filepath.parent.parent /
+            'camera_info' / depth_filepath.with_suffix('.yaml').name)
+
         if self.use_bgr:
-            depth_bgr = colorize_depth(depth.copy(), 100, 1500)
+            depth_bgr = colorize_depth(
+                depth.copy(),
+                self.depth_range[0], self.depth_range[1])
             color = cv2.imread(
                 str(depth_filepath.parent.parent / 'color' /
                     depth_filepath.with_suffix('.png').name),
                 cv2.IMREAD_COLOR)
-            color = self.aug_seq.augment_image(color)
+            if self.test:
+                color = resize_np_img(color, self.inshape)
+            else:
+                color = self.aug_seq.augment_image(color)
             if self.use_bgr2gray:
                 # 0~1
                 gray = cv2.cvtColor(
@@ -109,12 +139,11 @@ class HangingPointsDataset(Dataset):
         if self.test:
             if self.transform:
                 in_feature = self.transform(in_feature)
+                return in_feature, depth, camera_info_path, None
 
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
-        camera_info_path = str(
-            depth_filepath.parent.parent /
-            'camera_info' / depth_filepath.with_suffix('.yaml').name)
+
 
         confidence = cv2.imread(
             str(depth_filepath.parent.parent / 'heatmap' /

@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import sys
+from PIL import Image
 
 import numpy as np
 
@@ -120,3 +121,21 @@ def draw_vec(img, vec, t, cm, vec_length=0.1, copy=False):
         (0, 0, 255), 2)
 
     return img
+
+
+def resize_np_img(img, shape):
+    """Resize numpy image.
+
+    Parameters
+    ----------
+    img : numpy.ndarray
+        numpy image
+    shape : tuple
+        (width, height) order. Note numpy image shape is (height ,width)
+
+    Returns
+    -------
+    reshaped np_image
+
+    """
+    return np.array(Image.fromarray(img).resize(shape))

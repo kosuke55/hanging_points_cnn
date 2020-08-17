@@ -72,7 +72,9 @@ class HangingPointsNet():
             '~pretrained_model',
             # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200608_0311.pt')
             # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200619_2113.pt')
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200730_0301.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200815_1638.pt')
+        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200813_1833.pt')
+        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200730_0301.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
@@ -88,7 +90,7 @@ class HangingPointsNet():
         self.config = {
             'output_channels': 1,
             'feature_extractor_name': 'resnet50',
-            'confidence_thresh': 0.5,
+            'confidence_thresh': 0.3,
             'depth_range': [200, 1500],
             'use_bgr': True,
             'use_bgr2gray': True,
@@ -156,8 +158,8 @@ class HangingPointsNet():
             return
 
         remove_nan(depth)
-        depth[depth < 200] = 0
-        depth[depth > 1000] = 0
+        depth[depth < self.depth_range[0]] = 0
+        depth[depth > self.depth_range[1]] = 0
 
         # depth_bgr = colorize_depth(depth, 100, 1500)
 
@@ -249,8 +251,8 @@ class HangingPointsNet():
                     [int(hanging_point_x),
                      int(hanging_point_y)]))
 
-            length = float(dep) / \
-                hanging_point[2]
+            length = float(dep) / hanging_point[2]
+
             hanging_point *= length
 
             # print(hanging_point, float(dep), dep_roi_clip)
