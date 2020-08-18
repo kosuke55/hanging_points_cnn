@@ -168,7 +168,8 @@ class HangingPointsNet():
 
         # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
 
-        depth = cv2.resize(depth, (256, 256))
+        depth = cv2.resize(depth, (256, 256),
+                           interpolation=cv2.INTER_NEAREST)
 
         # depth = frame_img(depth)
         # kernel = np.ones((10, 10), np.uint8)

@@ -9,6 +9,7 @@ import numpy.matlib as npm
 import os
 import os.path as osp
 import sys
+from PIL import Image
 
 import cameramodels
 import numpy as np
@@ -645,7 +646,8 @@ if __name__ == '__main__':
                     r.camera_model.target_size = (width, height)
                     bgr = r.camera_model.crop_resize_image(bgr)
                     bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
-                    depth = r.camera_model.crop_resize_image(depth)
+                    depth = r.camera_model.crop_resize_image(
+                        depth, interpolation=Image.NEAREST)
                     depth_bgr = colorize_depth(depth, 100, 1500)
                     # depth_bgr = r.camera_model.crop_resize_image(depth_bgr)
                     annotation_img = np.zeros(
