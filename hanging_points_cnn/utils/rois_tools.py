@@ -174,14 +174,14 @@ def find_rois(confidence,
 
     Parametersa
     ----------
-    confidence : torch.tensor
-        NCHW
+    confidence : torch.Tensor or numpy.ndarray
+        NCHW or HW(numpy.ndarray)
     Returns
     -------
-    rois : torch.tensor
+    rois : torch.Tensor
         rois [[[x1, y1, x2, y2], ..., [x1, y1, x2, y2]],
               ... [x1, y1, x2, y2], ..., [x1, y1, x2, y2]]
-        len(rois) = n (batch size)
+        len(rois) = n (=batch size)
 
         - example shape
         rois_list (2,)
@@ -189,9 +189,17 @@ def find_rois(confidence,
         rois_list[1] torch.Size([38, 4])
         The first dimension of rois_list shows a batch,
         which contains (the number of roi, (dx, dy, dw, dh)).
-    """
 
-    confidence = confidence.cpu().detach().numpy().copy()
+    rois_center : numpy.ndarray
+        rois_center [[x, y]]
+        len(rois_center) = n (=batch size)
+
+    """
+    if isinstance(confidence, torch.Tensor):
+        confidence = confidence.cpu().detach().numpy().copy()
+    elif isinstance(confidence, np.ndarray):
+        if len(confidence.shape) == 2:
+            confidence = confidence[None, None, ...]
 
     rois = []
     rois_center = []
