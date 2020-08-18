@@ -589,6 +589,7 @@ if __name__ == '__main__':
             "025_mug",
             # "033_spatula", # no contact pointsa
             "035_power_drill",
+            "037_scissors",
             "042_adjustable_wrench",
             "048_hammer",
             "050_medium_clamp",
