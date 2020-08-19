@@ -24,6 +24,7 @@ from skrobot import coordinates
 from hanging_points_generator.hp_generator import cluster_hanging_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
+from hanging_points_generator.generator_utils import load_multiple_contact_points
 
 try:
     import cv2
@@ -498,10 +499,15 @@ class RotationMap():
                     np.array(self.rotations_buffer[idx]))
 
 
-def get_contact_points(json_path, dataset_type='ycb',
-                       use_clustering=True, use_filter_penetration=True):
+def get_contact_points(contact_points_path, json_name='contact_points.json',
+                       dataset_type='ycb', use_clustering=True,
+                       use_filter_penetration=True):
 
-    contact_points_dict = json.load(open(json_path, 'r'))
+    if osp.isdir(contact_points_path):
+        contact_points_dict = load_multiple_contact_points(
+            contact_points_path, json_name)
+    else:
+        contact_points_dict = json.load(open(contact_points_path, 'r'))
     contact_points = contact_points_dict['contact_points']
 
     if use_clustering:
@@ -614,8 +620,10 @@ if __name__ == '__main__':
             if filename == urdf_name:
                 print(category_name)
                 # center = get_urdf_center(osp.join(dirname, urdf_name))
+
+                # load multiple json
                 contact_points = get_contact_points(
-                    osp.join(dirname, 'contact_points.json'))
+                    osp.join(dirname, 'contact_points'))
 
                 data_count = 0
                 while data_count < 1000:
