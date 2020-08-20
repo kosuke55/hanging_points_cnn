@@ -6,7 +6,6 @@ from PIL import Image
 
 import numpy as np
 
-
 try:
     import cv2
 except ImportError:
@@ -63,7 +62,11 @@ def unnormalize_depth(normalized_depth, min_value, max_value):
     return depth
 
 
-def colorize_depth(depth, min_value=None, max_value=None):
+def colorize_depth(depth, min_value=None, max_value=None, ignore_value=None):
+    # if ignore_zero and min_value is None:
+    if ignore_value is not None:
+        depth[depth == ignore_value] = np.nan
+
     normalized_depth = normalize_depth(depth, min_value, max_value)
     nan_mask = np.isnan(normalized_depth)
     gray_depth = normalized_depth * 255
@@ -81,7 +84,9 @@ def create_circular_mask(h, w, cy, cx, radius=50):
     return mask
 
 
-def create_depth_circle(img, cy, cx, value, radius=50):
+def create_depth_circle(img, cy, cx, value, radius=50, copy=True):
+    if copy:
+        img = img.copy()
     depth_mask = np.zeros_like(img)
     depth_mask[np.where(img == 0)] = 1
     circlular_mask = np.zeros_like(img)
@@ -90,6 +95,7 @@ def create_depth_circle(img, cy, cx, value, radius=50):
                              radius=radius))
     circlular_mask[circlular_mask_idx] = 1
     img[circlular_mask_idx] = value
+    return img
 
 
 def draw_axis(img, R, t, K, axis_length=0.1, copy=False):
@@ -123,7 +129,8 @@ def draw_vec(img, vec, t, cm, vec_length=0.1, copy=False):
     return img
 
 
-def resize_np_img(img, shape):
+def resize_np_img(
+        img, shape, interpolation=Image.BILINEAR):
     """Resize numpy image.
 
     Parameters
@@ -133,9 +140,36 @@ def resize_np_img(img, shape):
     shape : tuple
         (width, height) order. Note numpy image shape is (height ,width)
 
+    interpolation : int
+        interpolation method.
+        You can specify, PIL.Image.NEAREST, PIL.Image.BILINEAR,
+        PIL.Image.BICUBIC and PIL.Image.LANCZOS.
+
     Returns
     -------
     reshaped np_image
 
     """
-    return np.array(Image.fromarray(img).resize(shape))
+    return np.array(
+        Image.fromarray(img).resize(
+            shape, interpolation=interpolation))
+
+
+def trim_depth(dep, depth):
+    """Get the trimmed detph value
+
+    Parameters
+    ----------
+    dep : float
+        depth value
+    depth : numpy.ndarray
+        depth image
+
+    Returns
+    -------
+    trimmed_dep
+        depth value which is trimmed by depth image
+    """
+    dep = np.nanmin(depth) if dep < np.nanmin(depth) else dep
+    dep = np.nanmax(depth) if np.nanmax(depth) < dep else dep
+    return dep

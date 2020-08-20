@@ -29,6 +29,7 @@ from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import draw_vec
 from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.image import trim_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
 from hanging_points_cnn.utils.rois_tools import find_rois
 
@@ -140,12 +141,13 @@ class Trainer(object):
                     camera_info_path[0])
             self.cameramodel.target_size = self.target_size
 
+            depth = hp_data.numpy().copy()[0, 0, ...]
+            depth = unnormalize_depth(
+                depth, self.depth_range[0], self.depth_range[1])
+
             hp_data = hp_data.to(self.device)
 
-            depth = depth.numpy().copy()[0, 0, ...]
-            depth_bgr = colorize_depth(
-                depth.copy(),
-                self.depth_range[0], self.depth_range[1])
+            depth_bgr = colorize_depth(depth, ignore_value=self.depth_range[0])
 
             if mode == 'train':
                 confidence, depth_and_rotation = self.model(hp_data)
@@ -188,9 +190,6 @@ class Trainer(object):
                     confidence, hp_data_gt, pos_weight,
                     depth_and_rotation, annotated_rois)
 
-                # import ipdb
-                # ipdb.set_trace()
-
                 loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
 
                 if torch.isnan(loss):
@@ -224,7 +223,7 @@ class Trainer(object):
                 hanging_point_depth_gt_bgr \
                     = colorize_depth(
                         hanging_point_depth_gt,
-                        self.depth_range[0], self.depth_range[1])
+                        ignore_value=self.depth_range[0])
 
                 hanging_point_depth_gt_rgb = cv2.cvtColor(
                     hanging_point_depth_gt_bgr,
@@ -285,6 +284,7 @@ class Trainer(object):
 
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
+            depth_pred = depth.copy()
             for i, (roi, roi_c) in enumerate(
                     zip(self.model.rois_list[0],
                         self.model.rois_center_list[0])):
@@ -298,6 +298,7 @@ class Trainer(object):
                 dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
+                dep = trim_depth(dep, depth)
 
                 confidence_vis = cv2.rectangle(
                     confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
@@ -312,7 +313,7 @@ class Trainer(object):
                              int(annotated_rois[i][0][3])),
                             (255, 0, 0), 2)
 
-                create_depth_circle(depth, cy, cx, dep)
+                depth_pred = create_depth_circle(depth_pred, cy, cx, dep)
 
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
@@ -343,7 +344,7 @@ class Trainer(object):
                 axis_pred, cv2.COLOR_BGR2RGB)
 
             depth_pred_bgr = colorize_depth(
-                depth, self.depth_range[0], self.depth_range[1])
+                depth_pred, ignore_value=self.depth_range[0])
             depth_pred_rgb = cv2.cvtColor(
                 depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 

@@ -76,8 +76,8 @@ class HangingPointsDataset(Dataset):
         self.inshape = (256, 256)
 
         self.aug_seq = iaa.Sequential([
-            iaa.Dropout([0, 0.3]),
-            iaa.GaussianBlur((0, 1.0)),
+            iaa.Dropout([0, 0.2]),
+            # iaa.GaussianBlur((0, 1.0)),
         ], random_order=True)
 
     def __len__(self):
@@ -88,7 +88,7 @@ class HangingPointsDataset(Dataset):
         depth = np.load(depth_filepath).astype(np.float32)
 
         if self.test:
-            depth = resize_np_img(depth, self.inshape)
+            depth = resize_np_img(depth, self.inshape, PIL.Image.NEAREST)
         else:
             depth = self.aug_seq.augment_image(depth)
 
