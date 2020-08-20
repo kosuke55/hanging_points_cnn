@@ -512,7 +512,7 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
 
     if use_clustering:
         contact_points = cluster_hanging_points(
-            contact_points, eps=0.005, min_samples=2)
+            contact_points, min_samples=2)
 
     if use_filter_penetration:
         if dataset_type == 'ycb':
@@ -624,6 +624,8 @@ if __name__ == '__main__':
                 # load multiple json
                 contact_points = get_contact_points(
                     osp.join(dirname, 'contact_points'))
+                if contact_points is None:
+                    continue
 
                 data_count = 0
                 while data_count < 1000:
