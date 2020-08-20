@@ -16,6 +16,7 @@ import torch
 import torch.optim as optim
 import tqdm
 import visdom
+from skrobot.coordinates.math import rotation_matrix_from_axis
 from skrobot.coordinates.math import quaternion2matrix
 
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
@@ -248,26 +249,20 @@ class Trainer(object):
                         self.cameramodel.project_pixel_to_3d_ray(
                             [int(cx), int(cy)])) * dep * 0.001
 
-                    # import ipdb
-                    # ipdb.set_trace()
                     if self.use_coords:
-                        try:
-                            draw_axis(axis_gt,
-                                      quaternion2matrix(rotation),
-                                      hanging_point_pose,
-                                      self.cameramodel.K)
-                        except Exception:
-                            print('Fail to draw axis')
+                        rot = quaternion2matrix(rotation),
 
                     else:
                         v = np.matmul(quaternion2matrix(rotation),
                                       [1, 0, 0])
-                        try:
-                            draw_vec(axis_gt, v,
-                                     hanging_point_pose,
-                                     self.cameramodel)
-                        except Exception:
-                            print('Fail to draw vec')
+                        rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
+                    try:
+                        draw_axis(axis_gt,
+                                  rot,
+                                  hanging_point_pose,
+                                  self.cameramodel.K)
+                    except Exception:
+                        print('Fail to draw axis')
 
                     rois_gt_filtered.append(roi)
 
@@ -322,23 +317,20 @@ class Trainer(object):
                 if self.use_coords:
                     q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                     q /= np.linalg.norm(q)
-                    try:
-                        draw_axis(axis_pred,
-                                  quaternion2matrix(q),
-                                  hanging_point_pose,
-                                  self.cameramodel.K)
-                    except Exception:
-                        print('Fail to draw axis')
-                        pass
+                    rot = quaternion2matrix(q)
+
                 else:
                     v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
                     v /= np.linalg.norm(v)
-                    try:
-                        draw_vec(axis_pred, v,
-                                 hanging_point_pose,
-                                 self.cameramodel)
-                    except Exception:
-                        print('Fail to draw vec')
+                    rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
+
+                try:
+                    draw_axis(axis_pred,
+                              rot,
+                              hanging_point_pose,
+                              self.cameramodel.K)
+                except Exception:
+                    print('Fail to draw axis')
 
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
