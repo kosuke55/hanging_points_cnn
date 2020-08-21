@@ -221,8 +221,13 @@ class Trainer(object):
                         ground_truth[0, 1, ...].astype(np.float32),
                         self.depth_range[0], self.depth_range[1])
 
+                depth_gt = ground_truth[0, 1, ...]
+                unnormalized_depth_gt = unnormalize_depth(
+                    depth_gt, self.depth_range[0], self.depth_range[1])
+
                 rotations_gt = ground_truth[0, 2:, ...]
                 rotations_gt = rotations_gt.transpose(1, 2, 0)
+
                 hanging_point_depth_gt_bgr \
                     = colorize_depth(
                         hanging_point_depth_gt,
@@ -245,11 +250,15 @@ class Trainer(object):
                     roi = roi.cpu().detach().numpy().copy()
                     cx = roi_c[0]
                     cy = roi_c[1]
-                    dep = get_depth_in_roi(depth, roi, self.depth_range)
+                    # dep = get_depth_in_roi(depth, roi, self.depth_range)
+                    # dep_gt = float(dep)
                     rotation = rotations_gt[cy, cx, :]
+                    depth_gt_val = depth_gt[cy, cx]
+                    unnormalized_depth_gt_val = unnormalized_depth_gt[cy, cx]
+
                     hanging_point_pose = np.array(
                         self.cameramodel.project_pixel_to_3d_ray(
-                            [int(cx), int(cy)])) * dep * 0.001
+                            [int(cx), int(cy)])) * unnormalized_depth_gt_val * 0.001
 
                     if self.use_coords:
                         rot = quaternion2matrix(rotation),
@@ -266,18 +275,10 @@ class Trainer(object):
                     except Exception:
                         print('Fail to draw axis')
 
-                    rois_gt_filtered.append(roi)
-
-                axis_gt = cv2.cvtColor(axis_gt, cv2.COLOR_BGR2RGB)
-
-                # draw gt rois
-                for roi in rois_gt_filtered:
-                    confidence_gt_vis = cv2.rectangle(
-                        confidence_gt_vis, (roi[0], roi[1]), (roi[2], roi[3]),
-                        (0, 255, 0), 3)
-                    axis_gt = cv2.rectangle(
-                        axis_gt, (roi[0], roi[1]), (roi[2], roi[3]),
-                        (0, 255, 0), 3)
+                    # rois_gt_filtered.append(roi)
+                    confidence_gt_vis = draw_roi(
+                        confidence_gt_vis, roi, val=depth_gt_val, gt=True)
+                    axis_gt = draw_roi(axis_gt, roi, val=depth_gt_val, gt=True)
 
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
@@ -338,6 +339,11 @@ class Trainer(object):
                 axis_pred, cv2.COLOR_BGR2RGB)
             confidence_vis = cv2.cvtColor(
                 confidence_vis, cv2.COLOR_BGR2RGB)
+
+            axis_gt = cv2.cvtColor(
+                axis_gt, cv2.COLOR_BGR2RGB)
+            confidence_gt_vis = cv2.cvtColor(
+                confidence_gt_vis, cv2.COLOR_BGR2RGB)
 
             depth_pred_bgr = colorize_depth(
                 depth_pred, ignore_value=self.depth_range[0])
