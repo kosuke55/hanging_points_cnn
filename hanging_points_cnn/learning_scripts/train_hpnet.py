@@ -282,10 +282,7 @@ class Trainer(object):
 
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
-            hanging_point_depth_pred \
-                = unnormalize_depth(
-                    ground_truth[0, 1, ...].astype(np.float32),
-                    self.depth_range[0], self.depth_range[1])
+            hanging_point_depth_pred = depth.copy()
 
             for i, (roi, roi_c) in enumerate(
                     zip(self.model.rois_list[0],
@@ -316,7 +313,7 @@ class Trainer(object):
                             axis_pred, annotated_rois[i][0],
                             val=annotated_rois[i][1][0], gt=True)
 
-                depth_pred = create_depth_circle(
+                hanging_point_depth_pred = create_depth_circle(
                     hanging_point_depth_pred, cy, cx, dep_pred)
 
                 hanging_point_pose = np.array(
@@ -355,16 +352,6 @@ class Trainer(object):
             confidence_vis = cv2.cvtColor(
                 confidence_vis, cv2.COLOR_BGR2RGB)
 
-            axis_gt = cv2.cvtColor(
-                axis_gt, cv2.COLOR_BGR2RGB)
-            confidence_gt_vis = cv2.cvtColor(
-                confidence_gt_vis, cv2.COLOR_BGR2RGB)
-
-            depth_pred_bgr = colorize_depth(
-                depth_pred, ignore_value=self.depth_range[0])
-            depth_pred_rgb = cv2.cvtColor(
-                depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-
             if self.config['use_bgr']:
                 if self.config['use_bgr2gray']:
                     in_gray = hp_data.cpu().detach().numpy().copy()[
@@ -382,6 +369,11 @@ class Trainer(object):
 
             if mode != 'test':
                 confidence_loss_sum += confidence_loss.item()
+
+                axis_gt = cv2.cvtColor(
+                    axis_gt, cv2.COLOR_BGR2RGB)
+                confidence_gt_vis = cv2.cvtColor(
+                    confidence_gt_vis, cv2.COLOR_BGR2RGB)
 
                 if rotation_loss.item() > 0:
                     depth_loss_sum += depth_loss.item()
@@ -403,7 +395,7 @@ class Trainer(object):
                         ))
 
                 self.vis.images([hanging_point_depth_gt_rgb,
-                                 depth_pred_rgb],
+                                 hanging_point_depth_pred_rgb],
                                 win='{} hanging_point_depth_gt_rgb'.format(
                                     mode),
                                 opts=dict(

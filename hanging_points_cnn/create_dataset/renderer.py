@@ -659,8 +659,6 @@ if __name__ == '__main__':
 
                     quaternion_list = []
 
-                    hanging_points_depth = depth.copy()
-
                     depth_map = DepthMap(width, height, circular=True)
 
                     for label in range(np.max(dbscan.labels_) + 1):
@@ -730,21 +728,10 @@ if __name__ == '__main__':
                     rotations = np.array(
                         rotation_map.rotations).reshape(height, width, 4)
 
-                    # bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
-                    # depth = r.camera_model.crop_resize_image(depth)
-                    hanging_points_depth_bgr\
-                        = colorize_depth(hanging_points_depth, 100, 1500)
 
-                    # hanging_points_depth_map = depth_map.on_depth_image(depth)
-                    hanging_points_depth_map = depth_map.depth
-                    depth_map_bgr\
-                        = colorize_depth(hanging_points_depth_map, ignore_value=0)
-
-                    # hanging_points_depth_bgr \
-                    #     = r.camera_model.crop_resize_image(
-                    #         hanging_points_depth_bgr)
-                    # hanging_points_depth = r.camera_model.crop_resize_image(
-                    #     hanging_points_depth)
+                    hanging_points_depth = depth_map.on_depth_image(depth)
+                    hanging_points_depth_bgr \
+                        = colorize_depth(hanging_points_depth, ignore_value=0)
 
                     if args.show_image:
                         cv2.imshow('annotation', annotation_img)
@@ -752,7 +739,6 @@ if __name__ == '__main__':
                         cv2.imshow('bgr_annotation', bgr_annotation)
                         cv2.imshow('bgr_axis', bgr_axis)
                         cv2.imshow('depth_bgr', depth_bgr)
-                        cv2.imshow('depth_map_bgr', depth_map_bgr)
                         cv2.imshow('hanging_points_depth_bgr',
                                    hanging_points_depth_bgr)
                         cv2.imshow('depth', depth)
