@@ -420,7 +420,7 @@ class Trainer(object):
                 if self.config['use_bgr']:
                     self.vis.images(
                         [in_img, confidence_vis.transpose(2, 0, 1),
-                         depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
+                         hanging_point_depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
                         win='{}-{}'.format(
                             mode, index),
                         opts=dict(
@@ -429,7 +429,7 @@ class Trainer(object):
                 else:
                     self.vis.images(
                         [confidence_vis.transpose(2, 0, 1),
-                         depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
+                         hanging_point_depth_pred_rgb, axis_pred.transpose(2, 0, 1)],
                         win='{}-{}'.format(
                             mode, index),
                         opts=dict(
