@@ -99,6 +99,13 @@ def create_depth_circle(img, cy, cx, value, radius=50, copy=True):
     return img
 
 
+def create_gradient_circle(img, cy, cx, sig=50., gain=100.):
+    h, w = img.shape
+    Y, X = np.ogrid[:h, :w]
+    g = np.exp(-((X - cx)**2 + (Y - cy)**2) / (2. * sig)) * gain
+    img += g.astype(np.uint32)
+
+
 def draw_axis(img, R, t, K, axis_length=0.1, copy=False):
     if copy:
         img = img.copy()

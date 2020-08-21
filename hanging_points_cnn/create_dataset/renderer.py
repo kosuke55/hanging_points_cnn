@@ -25,6 +25,12 @@ from hanging_points_generator.hp_generator import cluster_hanging_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
 from hanging_points_generator.generator_utils import load_multiple_contact_points
+from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import create_circular_mask
+from hanging_points_cnn.utils.image import create_depth_circle
+from hanging_points_cnn.utils.image import create_gradient_circle
+from hanging_points_cnn.utils.image import draw_axis
+
 
 try:
     import cv2
@@ -37,78 +43,6 @@ except ImportError:
             sys.path.append(path)
 
 np.set_printoptions(precision=3, suppress=True)
-
-
-def create_circular_mask(h, w, cy, cx, radius=50):
-    Y, X = np.ogrid[:h, :w]
-    dist_from_center = np.sqrt((X - cx)**2 + (Y - cy)**2)
-    mask = dist_from_center <= radius
-    return mask
-
-
-def create_depth_circle(img, cy, cx, value, radius=50):
-    depth_mask = np.zeros_like(img)
-    depth_mask[np.where(img == 0)] = 1
-    # depth_mask = np.where(img == 0)
-    # print(depth_mask)
-    circlular_mask = np.zeros_like(img)
-    circlular_mask_idx = np.where(
-        create_circular_mask(img.shape[0], img.shape[1], cy, cx,
-                             radius=radius))
-    circlular_mask[circlular_mask_idx] = 1
-
-    # mask = np.where(np.logical_and(depth_mask == 1, circlular_mask == 1))
-    # circlular_mask = np.where(
-    #     create_circular_mask(img.shape[0], img.shape[1], cy, cx))
-    # mask = np.logical_and(depth_mask, circlular_mask)
-
-    # img[mask] = value
-    img[circlular_mask_idx] = value
-
-
-def create_gradient_circle(img, cy, cx, sig=50., gain=100.):
-    h, w = img.shape
-    Y, X = np.ogrid[:h, :w]
-    g = np.exp(-((X - cx)**2 + (Y - cy)**2) / (2. * sig)) * gain
-    img += g.astype(np.uint32)
-
-
-def colorize_depth(depth, min_value=None, max_value=None):
-    min_value = np.nanmin(depth) if min_value is None else min_value
-    max_value = np.nanmax(depth) if max_value is None else max_value
-
-    gray_depth = depth.copy()
-    nan_mask = np.isnan(gray_depth)
-    gray_depth[nan_mask] = 0
-    gray_depth = 255 * (gray_depth - min_value) / (max_value - min_value)
-    gray_depth[gray_depth <= 0] = 0
-    gray_depth[gray_depth > 255] = 255
-    gray_depth = gray_depth.astype(np.uint8)
-    colorized = cv2.applyColorMap(gray_depth, cv2.COLORMAP_JET)
-    colorized[nan_mask] = (0, 0, 0)
-
-    return colorized
-
-
-def draw_axis(img, R, t, K):
-    rotV, _ = cv2.Rodrigues(R)
-    points = np.float32(
-        [[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1], [0, 0, 0]]).reshape(-1, 3)
-    axisPoints, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
-    img = cv2.line(
-        img, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()),
-        (0, 0, 255), 2)
-    img = cv2.line(
-        img,
-        tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()),
-        (0, 255, 0), 2)
-    img = cv2.line(
-        img,
-        tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()),
-        (255, 0, 0), 2)
-    return img
-
-# def __init__(self, im_width=1920, im_height=1080, fov=42.5,
 
 
 class Renderer:
@@ -449,6 +383,71 @@ class Renderer:
         pybullet.disconnect()
 
 
+class DepthMap():
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.size = width * height
+        self.idx_list = []
+        self._depth_buffer = [[] for _ in range(self.size)]
+        self._depth = [0] * depth.size
+
+    def add_depth(self, px, py, d, circular=True):
+        if circular:
+            iy, ix = np.where(
+                create_circular_mask(self.height, self.width, py, px))
+            idices = ix + iy * self.width
+            for idx in idices:
+                self._depth_buffer[idx].append(d)
+                self.idx_list.append(idx)
+        else:
+            idx = px + py * self.width
+            self._depth_buffer[idx].append(d)
+            self.idx_list.append(idx)
+
+    def calc_average_depth(self):
+        for idx in range(self.size):
+            if self._depth_buffer[idx] != []:
+                self._depth[idx] = np.mean(self._depth_buffer[idx])
+
+    def idx2xy(self, idx):
+        x = idx % self.width
+        y = idx // self.width
+        return [x, y]
+
+    def calc_idx_distance(self, idx_0, idx_1):
+        d = np.linalg.norm(
+            [np.array(self.idx2xy(idx_0)) -
+             np.array(self.idx2xy(idx_1))])
+        return d
+
+    def calc_nearest_depth(self):
+        for idx in range(self.size):
+            distance_list = []
+            for base_idx in self.idx_list:
+                distance = self.calc_idx_distance(idx, base_idx)
+                distance_list.append([base_idx, distance])
+            nearest_idx = sorted(distance_list, key=lambda x: x[1])[0][0]
+            self._depth[idx] = self._depth_buffer[nearest_idx]
+
+    @property
+    def depth(self):
+        self.calc_average_depth()
+        return np.array(self._depth).reshape(self.height, self.width)
+
+    @property
+    def nearest_depth(self):
+        self.calc_nearest_depth()
+        return np.array(self._depth).reshape(self.height, self.width)
+
+    def on_depth_image(self, depth_image):
+        depth_image = depth_image.copy()
+        mask = np.where(self.depth != 0)
+        depth_image[mask] = self.depth[mask]
+        return depth_image
+
+
+
 class RotationMap():
     def __init__(self, width, height):
         self.width = width
@@ -682,6 +681,8 @@ if __name__ == '__main__':
 
                     hanging_points_depth = depth.copy()
 
+                    depth_map = DepthMap(width, height)
+
                     for label in range(np.max(dbscan.labels_) + 1):
                         if np.count_nonzero(dbscan.labels_ == label) <= 1:
                             r.finish()
@@ -725,6 +726,13 @@ if __name__ == '__main__':
                                         px,
                                         hp.worldpos()[2] * 1000)
 
+                                    depth_map.add_depth(
+                                        int(px), int(py), hp.worldpos()[2] * 1000)
+
+                    # depth_map.calc_average_depth()
+                    # depth_map_np = np.array(
+                    #     depth_map.depth).reshape(height, width)
+
                     if np.all(annotation_img == 0):
                         r.finish()
                         continue
@@ -745,6 +753,15 @@ if __name__ == '__main__':
                     # depth = r.camera_model.crop_resize_image(depth)
                     hanging_points_depth_bgr\
                         = colorize_depth(hanging_points_depth, 100, 1500)
+
+                    hanging_points_depth_map = depth_map.on_depth_image(depth)
+                    depth_map_bgr\
+                        = colorize_depth(hanging_points_depth_map, ignore_value=0)
+
+                    
+                    cv2.imshow('depth_map_bgr', depth_map_bgr)
+                    cv2.waitKey(1)
+
                     # hanging_points_depth_bgr \
                     #     = r.camera_model.crop_resize_image(
                     #         hanging_points_depth_bgr)
