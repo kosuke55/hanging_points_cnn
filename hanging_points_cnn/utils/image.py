@@ -183,7 +183,7 @@ def resize_np_img(
     """
     return np.array(
         Image.fromarray(img).resize(
-            shape, interpolation=interpolation))
+            shape, resample=interpolation))
 
 
 def trim_depth(dep, depth):
