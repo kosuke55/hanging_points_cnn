@@ -282,7 +282,11 @@ class Trainer(object):
 
             # Visualize pred axis and roi
             axis_pred = depth_bgr.copy()
-            depth_pred = depth.copy()
+            hanging_point_depth_pred \
+                = unnormalize_depth(
+                    ground_truth[0, 1, ...].astype(np.float32),
+                    self.depth_range[0], self.depth_range[1])
+
             for i, (roi, roi_c) in enumerate(
                     zip(self.model.rois_list[0],
                         self.model.rois_center_list[0])):
@@ -294,13 +298,14 @@ class Trainer(object):
                 cy = roi_c[1]
 
                 dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
-                dep_pred = float(dep)
+                normalized_dep_pred = float(dep)
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
-                dep = trim_depth(dep, depth)
+                dep_pred = trim_depth(dep, depth)
 
-                confidence_vis = draw_roi(confidence_vis, roi, val=dep_pred)
-                axis_pred = draw_roi(axis_pred, roi, val=dep_pred)
+                confidence_vis = draw_roi(
+                    confidence_vis, roi, val=normalized_dep_pred)
+                axis_pred = draw_roi(axis_pred, roi, val=normalized_dep_pred)
 
                 if mode != 'test':
                     if annotated_rois[i][2]:
@@ -311,7 +316,8 @@ class Trainer(object):
                             axis_pred, annotated_rois[i][0],
                             val=annotated_rois[i][1][0], gt=True)
 
-                depth_pred = create_depth_circle(depth_pred, cy, cx, dep)
+                depth_pred = create_depth_circle(
+                    hanging_point_depth_pred, cy, cx, dep_pred)
 
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
@@ -334,6 +340,15 @@ class Trainer(object):
                               self.cameramodel.K)
                 except Exception:
                     print('Fail to draw axis')
+
+            hanging_point_depth_pred_bgr \
+                = colorize_depth(
+                    hanging_point_depth_pred,
+                    ignore_value=self.depth_range[0])
+
+            hanging_point_depth_pred_rgb = cv2.cvtColor(
+                hanging_point_depth_pred_bgr,
+                cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
