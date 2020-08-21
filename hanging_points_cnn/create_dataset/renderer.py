@@ -415,7 +415,6 @@ class DepthMap():
             self.calc_average_depth()
         return np.array(self._depth).reshape(self.height, self.width)
 
-
     def on_depth_image(self, depth_image):
         depth_image = depth_image.copy()
         mask = np.where(self.depth != 0)
@@ -475,7 +474,8 @@ class RotationMap():
 
 def get_contact_points(contact_points_path, json_name='contact_points.json',
                        dataset_type='ycb', use_clustering=True,
-                       use_filter_penetration=True):
+                       use_filter_penetration=True,
+                       inf_penetration_check=True):
 
     if osp.isdir(contact_points_path):
         contact_points_dict = load_multiple_contact_points(
@@ -486,17 +486,22 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
 
     if use_clustering:
         contact_points = cluster_hanging_points(
-            contact_points, min_samples=2)
+            contact_points, min_samples=-1)
 
     if use_filter_penetration:
+        if inf_penetration_check:
+            box_size = [100, 0.0001, 0.0001]
+        else:
+            box_size = [0.1, 0.0001, 0.0001]
+
         if dataset_type == 'ycb':
             contact_points, _ = filter_penetration(
                 osp.join(dirname, 'base.urdf'),
-                contact_points, box_size=[0.1, 0.0001, 0.0001])
+                contact_points, box_size=box_size)
         else:
             contact_points, _ = filter_penetration(
                 osp.join(dirname, urdf_name),
-                contact_points, box_size=[0.1, 0.0001, 0.0001])
+                contact_points, box_size=box_size)
 
     if len(contact_points) == 0:
         print('num of hanging points: {}'.format(len(contact_points)))
@@ -753,7 +758,7 @@ if __name__ == '__main__':
                         cv2.imshow('depth', depth)
                         cv2.imshow('hanging_points_depth',
                                    hanging_points_depth)
-                        cv2.waitKey()
+                        cv2.waitKey(1)
 
                     data_id = len(
                         glob.glob(osp.join(save_dir, 'depth', '*')))
