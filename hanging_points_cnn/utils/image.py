@@ -64,6 +64,7 @@ def unnormalize_depth(normalized_depth, min_value, max_value):
 
 def colorize_depth(depth, min_value=None, max_value=None, ignore_value=None):
     # if ignore_zero and min_value is None:
+    depth = depth.copy()
     if ignore_value is not None:
         depth[depth == ignore_value] = np.nan
 

@@ -30,6 +30,7 @@ from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import draw_vec
 from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.image import remove_nan
 from hanging_points_cnn.utils.image import trim_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
 from hanging_points_cnn.utils.rois_tools import find_rois
@@ -143,9 +144,9 @@ class Trainer(object):
             self.cameramodel.target_size = self.target_size
 
             depth = hp_data.numpy().copy()[0, 0, ...]
+            depth = np.nan_to_num(depth)
             depth = unnormalize_depth(
                 depth, self.depth_range[0], self.depth_range[1])
-
             hp_data = hp_data.to(self.device)
 
             depth_bgr = colorize_depth(depth, ignore_value=self.depth_range[0])

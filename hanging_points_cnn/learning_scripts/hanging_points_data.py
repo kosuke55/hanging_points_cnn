@@ -88,7 +88,7 @@ class HangingPointsDataset(Dataset):
         depth = np.load(depth_filepath).astype(np.float32)
 
         if self.test:
-            depth = resize_np_img(depth, self.inshape, PIL.Image.NEAREST)
+            depth = resize_np_img(depth, self.inshape, Image.NEAREST)
         else:
             depth = self.aug_seq.augment_image(depth)
 
