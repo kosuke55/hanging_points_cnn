@@ -137,6 +137,29 @@ def draw_vec(img, vec, t, cm, vec_length=0.1, copy=False):
     return img
 
 
+def draw_roi(img, roi, val=None, gt=False):
+    if gt:
+        color = (0, 0, 255)
+        offset = 60
+        width = 2
+    else:
+        color = (0, 255, 0)
+        offset = 30
+        width = 3
+
+    img = img.copy()
+    img = cv2.rectangle(
+        img, (int(roi[0]), int(roi[1])),
+        (int(roi[2]), int(roi[3])),
+        color, width)
+    if val is not None:
+        cv2.putText(
+            img, str(round(val, 3)),
+            (int(roi[0]), int(roi[1] + offset)),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+    return img
+
+
 def resize_np_img(
         img, shape, interpolation=Image.BILINEAR):
     """Resize numpy image.

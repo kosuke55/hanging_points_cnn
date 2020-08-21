@@ -27,6 +27,7 @@ from hanging_points_cnn.learning_scripts.hanging_points_data import load_test_da
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
+from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import draw_vec
 from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
@@ -292,22 +293,22 @@ class Trainer(object):
                 cy = roi_c[1]
 
                 dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+                dep_pred = float(dep)
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
                 dep = trim_depth(dep, depth)
 
-                confidence_vis = cv2.rectangle(
-                    confidence_vis, (roi[0], roi[1]), (roi[2], roi[3]),
-                    (0, 255, 0), 3)
+                confidence_vis = draw_roi(confidence_vis, roi, val=dep_pred)
+                axis_pred = draw_roi(axis_pred, roi, val=dep_pred)
+
                 if mode != 'test':
                     if annotated_rois[i][2]:
-                        confidence_vis = cv2.rectangle(
-                            confidence_vis,
-                            (int(annotated_rois[i][0][0]),
-                             int(annotated_rois[i][0][1])),
-                            (int(annotated_rois[i][0][2]),
-                             int(annotated_rois[i][0][3])),
-                            (255, 0, 0), 2)
+                        confidence_vis = draw_roi(
+                            confidence_vis, annotated_rois[i][0],
+                            val=annotated_rois[i][1][0], gt=True)
+                        axis_pred = draw_roi(
+                            axis_pred, annotated_rois[i][0],
+                            val=annotated_rois[i][1][0], gt=True)
 
                 depth_pred = create_depth_circle(depth_pred, cy, cx, dep)
 
@@ -335,27 +336,13 @@ class Trainer(object):
 
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
+            confidence_vis = cv2.cvtColor(
+                confidence_vis, cv2.COLOR_BGR2RGB)
 
             depth_pred_bgr = colorize_depth(
                 depth_pred, ignore_value=self.depth_range[0])
             depth_pred_rgb = cv2.cvtColor(
                 depth_pred_bgr, cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-
-            # draw pred rois
-            for i, roi in enumerate(self.model.rois_list[0]):
-                if roi.tolist() == [0, 0, 0, 0]:
-                    continue
-                axis_pred = cv2.rectangle(
-                    axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
-                    (0, 255, 0), 3)
-                if mode != 'test':
-                    if annotated_rois[i][2]:
-                        axis_pred = cv2.rectangle(
-                            axis_pred,
-                            (int(annotated_rois[i][0][0]),
-                             int(annotated_rois[i][0][1])),
-                            (int(annotated_rois[i][0][2]),
-                             int(annotated_rois[i][0][3])), (255, 0, 0), 2)
 
             if self.config['use_bgr']:
                 if self.config['use_bgr2gray']:
