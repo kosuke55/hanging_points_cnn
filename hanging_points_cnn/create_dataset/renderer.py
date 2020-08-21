@@ -384,68 +384,43 @@ class Renderer:
 
 
 class DepthMap():
-    def __init__(self, width, height):
+    def __init__(self, width, height, circular=True):
         self.width = width
         self.height = height
         self.size = width * height
         self.idx_list = []
         self._depth_buffer = [[] for _ in range(self.size)]
         self._depth = [0] * depth.size
+        self.circular = circular
 
-    def add_depth(self, px, py, d, circular=True):
-        if circular:
+    def add_depth(self, px, py, d):
+        if self.circular:
             iy, ix = np.where(
                 create_circular_mask(self.height, self.width, py, px))
             idices = ix + iy * self.width
             for idx in idices:
                 self._depth_buffer[idx].append(d)
-                self.idx_list.append(idx)
         else:
             idx = px + py * self.width
-            self._depth_buffer[idx].append(d)
-            self.idx_list.append(idx)
+            self._depth[idx] = d
 
     def calc_average_depth(self):
         for idx in range(self.size):
             if self._depth_buffer[idx] != []:
                 self._depth[idx] = np.mean(self._depth_buffer[idx])
 
-    def idx2xy(self, idx):
-        x = idx % self.width
-        y = idx // self.width
-        return [x, y]
-
-    def calc_idx_distance(self, idx_0, idx_1):
-        d = np.linalg.norm(
-            [np.array(self.idx2xy(idx_0)) -
-             np.array(self.idx2xy(idx_1))])
-        return d
-
-    def calc_nearest_depth(self):
-        for idx in range(self.size):
-            distance_list = []
-            for base_idx in self.idx_list:
-                distance = self.calc_idx_distance(idx, base_idx)
-                distance_list.append([base_idx, distance])
-            nearest_idx = sorted(distance_list, key=lambda x: x[1])[0][0]
-            self._depth[idx] = self._depth_buffer[nearest_idx]
-
     @property
     def depth(self):
-        self.calc_average_depth()
+        if self.circular:
+            self.calc_average_depth()
         return np.array(self._depth).reshape(self.height, self.width)
 
-    @property
-    def nearest_depth(self):
-        self.calc_nearest_depth()
-        return np.array(self._depth).reshape(self.height, self.width)
 
     def on_depth_image(self, depth_image):
         depth_image = depth_image.copy()
         mask = np.where(self.depth != 0)
         depth_image[mask] = self.depth[mask]
         return depth_image
-
 
 
 class RotationMap():
@@ -681,7 +656,7 @@ if __name__ == '__main__':
 
                     hanging_points_depth = depth.copy()
 
-                    depth_map = DepthMap(width, height)
+                    depth_map = DepthMap(width, height, circular=True)
 
                     for label in range(np.max(dbscan.labels_) + 1):
                         if np.count_nonzero(dbscan.labels_ == label) <= 1:
@@ -754,11 +729,11 @@ if __name__ == '__main__':
                     hanging_points_depth_bgr\
                         = colorize_depth(hanging_points_depth, 100, 1500)
 
-                    hanging_points_depth_map = depth_map.on_depth_image(depth)
+                    # hanging_points_depth_map = depth_map.on_depth_image(depth)
+                    hanging_points_depth_map = depth_map.depth
                     depth_map_bgr\
                         = colorize_depth(hanging_points_depth_map, ignore_value=0)
 
-                    
                     cv2.imshow('depth_map_bgr', depth_map_bgr)
                     cv2.waitKey(1)
 
