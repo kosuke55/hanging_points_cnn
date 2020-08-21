@@ -712,7 +712,8 @@ if __name__ == '__main__':
                         r.finish()
                         continue
 
-                    annotation_img[np.where(annotation_img >= 256)] = 255
+                    annotation_img = annotation_img / annotation_img.max() * 255
+
                     annotation_img = annotation_img.astype(np.uint8)
                     annotation_color = np.zeros_like(bgr, dtype=np.uint8)
                     annotation_color[..., 2] = annotation_img
@@ -734,9 +735,6 @@ if __name__ == '__main__':
                     depth_map_bgr\
                         = colorize_depth(hanging_points_depth_map, ignore_value=0)
 
-                    cv2.imshow('depth_map_bgr', depth_map_bgr)
-                    cv2.waitKey(1)
-
                     # hanging_points_depth_bgr \
                     #     = r.camera_model.crop_resize_image(
                     #         hanging_points_depth_bgr)
@@ -749,12 +747,13 @@ if __name__ == '__main__':
                         cv2.imshow('bgr_annotation', bgr_annotation)
                         cv2.imshow('bgr_axis', bgr_axis)
                         cv2.imshow('depth_bgr', depth_bgr)
+                        cv2.imshow('depth_map_bgr', depth_map_bgr)
                         cv2.imshow('hanging_points_depth_bgr',
                                    hanging_points_depth_bgr)
                         cv2.imshow('depth', depth)
                         cv2.imshow('hanging_points_depth',
                                    hanging_points_depth)
-                        cv2.waitKey(1)
+                        cv2.waitKey()
 
                     data_id = len(
                         glob.glob(osp.join(save_dir, 'depth', '*')))
