@@ -91,12 +91,14 @@ class HPNET(nn.Module):
                 'confidence_thresh': 0.3,
                 'use_bgr': True,
                 'use_bgr2gray': True,
+                'roi_padding': 50
             }
 
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
         self.output_channels = config['output_channels']
         self.confidence_thresh = config['confidence_thresh']
+        self.roi_padding = config['roi_padding']
 
         if config['feature_extractor_name'] == 'resnet50':
             resnet = models.resnet50(pretrained=True)
@@ -149,7 +151,8 @@ class HPNET(nn.Module):
         confidence = self.decoder(feature)
 
         self.rois_list, self.rois_center_list = find_rois(
-            confidence, confidence_thresh=self.confidence_thresh)
+            confidence, confidence_thresh=self.confidence_thresh,
+            padding=self.roi_padding)
 
         if self.rois_list is None:
             self.rois_list = [torch.tensor(

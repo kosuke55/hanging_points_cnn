@@ -97,6 +97,7 @@ class HangingPointsNet():
             'depth_range': [200, 1500],
             'use_bgr': True,
             'use_bgr2gray': True,
+            'roi_padding': 50
         }
         self.depth_range = self.config['depth_range']
         self.model = HPNET(self.config).to(device)
