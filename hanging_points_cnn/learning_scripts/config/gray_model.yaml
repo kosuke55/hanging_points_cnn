@@ -4,3 +4,4 @@ feature_extractor_name: "resnet50"
 confidence_thresh: 0.3
 use_bgr: True
 use_bgr2gray: True
+roi_padding: 50

@@ -75,7 +75,9 @@ class HangingPointsNet():
             '~pretrained_model',
             # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200608_0311.pt')
             # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200619_2113.pt')
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200815_1638.pt')
+            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200824_0102.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200824_1559.pt')
+            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200815_1638.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200813_1833.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200730_0301.pt')
         # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')

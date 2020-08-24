@@ -61,6 +61,7 @@ class Trainer(object):
                 'depth_range': [200, 1500],
                 'use_bgr': True,
                 'use_bgr2gray': True,
+                'roi_padding': 50
             }
         self.config = config
         self.depth_range = config['depth_range']
@@ -512,7 +513,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training and Validation data path',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0808')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0821')
     parser.add_argument(
         '--test-data-path',
         '-tdp',
@@ -530,7 +531,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray_0814.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200824_0102.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)

@@ -263,12 +263,12 @@ class Renderer:
     def get_roi(self, margin_size=0):
         ymin = np.max([np.min(self.object_mask[0]) -
                        np.random.randint(0, margin_size), 0])
-        ymax = np.min([np.max(self.object_mask[0]) +
-                       np.random.randint(0, margin_size), int(self.im_height - 1)])
+        ymax = np.min([np.max(self.object_mask[0]) + \
+                      np.random.randint(0, margin_size), int(self.im_height - 1)])
         xmin = np.max([np.min(self.object_mask[1]) -
                        np.random.randint(0, margin_size), 0])
-        xmax = np.min([np.max(self.object_mask[1]) +
-                       np.random.randint(0, margin_size), int(self.im_width - 1)])
+        xmax = np.min([np.max(self.object_mask[1]) + \
+                      np.random.randint(0, margin_size), int(self.im_width - 1)])
         # self.roi = [ymin, ymax, xmin, xmax]
 
         # [top, left, bottom, right] order
@@ -533,39 +533,39 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        '--save_dir', '-s',
+        '--save-dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0808')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0824')
     # default='ycb_hanging_object/per5000')
     parser.add_argument(
-        '--input_files', '-i',
-        type=str, help='input files',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf/*/*')
+        '--data-num', '-n',
+        type=int, help='num of data per object',
+        default=1000)
     parser.add_argument(
-        '--urdf_name', '-u',
+        '--input-files', '-i',
+        type=str, help='input files',
+        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf2/*/*')
+    parser.add_argument(
+        '--urdf-name', '-u',
         type=str, help='save dir',
         default='textured.urdf')
     parser.add_argument(
         '--gui', '-g',
-        type=int,         help='debug gui',
+        type=int, help='debug gui',
         default=0)
     parser.add_argument(
-        '--show_image', '-si',
+        '--show-image', '-si',
         type=int, help='show image',
         default=0)
     args = parser.parse_args()
 
-    save_dir = args.save_dir
+    
     urdf_name = args.urdf_name
+    data_num = args.data_num
     files = glob.glob(args.input_files)
 
     width = 256
     height = 256
-
-    save_dir = make_save_dirs(save_dir)
-    r = Renderer(DEBUG=False)
-    r.save_intrinsics(save_dir)
-    r.finish()
 
     if 'ycb' in args.input_files:
         category_name_list = [
@@ -596,6 +596,12 @@ if __name__ == '__main__':
             if category_name not in category_name_list:
                 continue
 
+            save_dir = osp.join(args.save_dir, category_name)
+            save_dir = make_save_dirs(save_dir)
+            r = Renderer(DEBUG=False)
+            r.save_intrinsics(save_dir)
+            r.finish()
+
             if filename == urdf_name:
                 print(category_name)
                 # center = get_urdf_center(osp.join(dirname, urdf_name))
@@ -607,7 +613,7 @@ if __name__ == '__main__':
                     continue
 
                 data_count = 0
-                while data_count < 1000:
+                while data_count < data_num:
                     r = Renderer(DEBUG=args.gui)
                     r.get_plane()
 
@@ -717,7 +723,6 @@ if __name__ == '__main__':
                     rotation_map.calc_average_rotations()
                     rotations = np.array(
                         rotation_map.rotations).reshape(height, width, 4)
-
 
                     hanging_points_depth = depth_map.on_depth_image(depth)
                     hanging_points_depth_bgr \

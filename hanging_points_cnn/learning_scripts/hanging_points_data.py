@@ -58,7 +58,8 @@ def load_test_dataset(data_path, use_bgr, use_bgr2gray, depth_range):
 
 class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None,
-                 use_bgr=True, use_bgr2gray=True, depth_range=[0.2, 0.7], test=False):
+                 use_bgr=True, use_bgr2gray=True,
+                 depth_range=[0.2, 0.7], test=False):
         self.test = test
         self.data_path = data_path
         self.transform = transform
@@ -66,8 +67,9 @@ class HangingPointsDataset(Dataset):
             self.file_paths = list(
                 sorted(Path(self.data_path).glob("depth/*.npy")))
         else:
+            # data_path/class/fancy/depth/*.npy
             self.file_paths = list(
-                sorted(Path(self.data_path).glob("*/depth/*.npy")))
+                sorted(Path(self.data_path).glob("*/*/depth/*.npy")))
         self.use_bgr = use_bgr
         if use_bgr2gray:
             self.use_bgr = True
@@ -144,7 +146,6 @@ class HangingPointsDataset(Dataset):
 
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
-
 
         confidence = cv2.imread(
             str(depth_filepath.parent.parent / 'heatmap' /
