@@ -378,8 +378,8 @@ class Trainer(object):
                 if rotation_loss.item() > 0:
                     depth_loss_sum += depth_loss.item()
                     rotation_loss_sum += rotation_loss.item()
-                    loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item() * \
-                        depth_loss.item()
+                    loss_sum = loss_sum + confidence_loss.item() + \
+                        rotation_loss.item() + depth_loss.item()
                     rotation_loss_count += 1
 
                 if np.mod(index, 1) == 0:

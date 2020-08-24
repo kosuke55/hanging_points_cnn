@@ -698,18 +698,9 @@ if __name__ == '__main__':
                                         hanging_point_in_camera_coords_list[
                                             idx].quaternion)
 
-                                    create_depth_circle(
-                                        hanging_points_depth,
-                                        py,
-                                        px,
-                                        hp.worldpos()[2] * 1000)
-
                                     depth_map.add_depth(
-                                        int(px), int(py), hp.worldpos()[2] * 1000)
-
-                    # depth_map.calc_average_depth()
-                    # depth_map_np = np.array(
-                    #     depth_map.depth).reshape(height, width)
+                                        int(px), int(py),
+                                        hp.worldpos()[2] * 1000)
 
                     if np.all(annotation_img == 0):
                         r.finish()
@@ -723,7 +714,6 @@ if __name__ == '__main__':
                     bgr_annotation = cv2.addWeighted(bgr, 0.3,
                                                      annotation_color, 0.7, 0)
 
-                    # rotation_map.calc_average_rotations(annotation_img)
                     rotation_map.calc_average_rotations()
                     rotations = np.array(
                         rotation_map.rotations).reshape(height, width, 4)

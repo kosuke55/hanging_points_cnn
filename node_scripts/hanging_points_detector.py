@@ -20,6 +20,8 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 from skrobot import coordinates
+from skrobot.coordinates.math import matrix2quaternion
+from skrobot.coordinates.math import rotation_matrix_from_axis
 from skrobot.coordinates.math import quaternion2matrix
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.utils.image import colorize_depth
@@ -239,9 +241,11 @@ class HangingPointsNet():
             else:
                 v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
                 v /= np.linalg.norm(v)
-                coords = coordinates.Coordinates()
-                coordinates.geo.orient_coords_to_axis(coords, v, 'x')
-                q = coords.quaternion
+                rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
+                q = matrix2quaternion(rot)
+                # coords = coordinates.Coordinates()
+                # coordinates.geo.orient_coords_to_axis(coords, v, 'x')
+                # q = coords.quaternion
 
             camera_model_crop_resize \
                 = self.camera_model.crop_resize_camera_info(
