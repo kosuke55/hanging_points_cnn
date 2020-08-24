@@ -6,6 +6,7 @@
   <arg name="rgb" default="/apply_mask_image_color/output" />
   <arg name="depth" default="/apply_mask_image_depth/output" />
   <arg name="gpu" default="0" />
+  <arg name="predict_depth" default="true" />
 
   <node name="hanging_points_detector" pkg="hanging_points_cnn" type="hanging_points_detector.py" output="screen">
 
@@ -15,7 +16,8 @@
     <remap from="~depth" to="$(arg depth)" />
 
     <rosparam subst_value="true">
-        gpu: $(arg gpu)
+      gpu: $(arg gpu)
+      predict_depth: $(arg predict_depth)
     </rosparam>
   </node>
 

@@ -65,6 +65,7 @@ class HangingPointsNet():
             "/hanging_points", PoseArray, queue_size=10)
 
         self.gpu_id = rospy.get_param('~gpu', 0)
+        self.predict_depth = rospy.get_param('~predict_depth', True)
 
         os.environ['CUDA_VISIBLE_DEVICES'] = str(self.gpu_id)
         self.device = torch.device(
@@ -163,13 +164,7 @@ class HangingPointsNet():
         depth[depth < self.depth_range[0]] = 0
         depth[depth > self.depth_range[1]] = 0
 
-        # depth_bgr = colorize_depth(depth, 100, 1500)
-
         bgr = cv2.resize(bgr, (256, 256))
-        # depth_bgr = cv2.resize(depth_bgr, (256, 256))
-
-        # depth_bgr[np.where(np.all(cv2.resize(bgr, (256, 256)) == [0, 0, 0], axis=-1))] = [0, 0, 0]
-
         depth = cv2.resize(depth, (256, 256),
                            interpolation=cv2.INTER_NEAREST)
 
@@ -177,9 +172,9 @@ class HangingPointsNet():
         # kernel = np.ones((10, 10), np.uint8)
         # depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
         depth_bgr = colorize_depth(
-            depth, self.depth_range[0], self.depth_range[1])
+            depth, ignore_value=0)
         # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
-        depth_bgr[np.where(depth == 0)] = [0, 0, 0]
+        # depth_bgr[np.where(depth == 0)] = [0, 0, 0]
         in_feature = depth.copy().astype(np.float32) * 0.001
 
         if self.config['use_bgr2gray']:
@@ -217,24 +212,6 @@ class HangingPointsNet():
             hanging_point_x = int((roi[0] + roi[2]) / 2)
             hanging_point_y = int((roi[1] + roi[3]) / 2)
 
-            depth_roi_clip = depth[int(roi[1]):int(roi[3]),
-                                   int(roi[0]):int(roi[2])]
-
-            # dep_roi_clip = depth_roi_clip
-            dep_roi_clip = depth_roi_clip[np.where(
-                np.logical_and(self.depth_range[0] < depth_roi_clip,
-                               depth_roi_clip < self.depth_range[1]))]
-
-            depth_roi_clip_bgr = colorize_depth(
-                depth_roi_clip, self.depth_range[0], self.depth_range[1])
-            # print(np.max(dep_roi_clip), np.mean(dep_roi_clip), np.median(dep_roi_clip), np.min(dep_roi_clip))
-            dep_roi_clip = np.median(dep_roi_clip) * 0.001
-
-            dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
-            dep = unnormalize_depth(
-                dep, self.depth_range[0], self.depth_range[1]) * 0.001
-            # dep_pred.append(float(dep))
-
             if self.use_coords:
                 q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
                 q /= np.linalg.norm(q)
@@ -256,14 +233,23 @@ class HangingPointsNet():
                     [int(hanging_point_x),
                      int(hanging_point_y)]))
 
-            length = float(dep) / hanging_point[2]
+            if self.predict_depth:
+                dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+                dep = unnormalize_depth(
+                    dep, self.depth_range[0], self.depth_range[1]) * 0.001
+                length = float(dep) / hanging_point[2]
+            else:
+                depth_roi_clip = depth[int(roi[1]):int(roi[3]),
+                                       int(roi[0]):int(roi[2])]
+                dep_roi_clip = depth_roi_clip[np.where(
+                    np.logical_and(self.depth_range[0] < depth_roi_clip,
+                                   depth_roi_clip < self.depth_range[1]))]
+                dep_roi_clip = np.median(dep_roi_clip) * 0.001
+                if dep_roi_clip == np.nan:
+                    continue
+                length = float(dep_roi_clip) / hanging_point[2]
 
             hanging_point *= length
-
-            # print(hanging_point, float(dep), dep_roi_clip)
-            print(dep, dep_roi_clip)
-            if dep_roi_clip == np.nan:
-                continue
 
             hanging_point_pose = Pose()
             hanging_point_pose.position.x = hanging_point[0]
