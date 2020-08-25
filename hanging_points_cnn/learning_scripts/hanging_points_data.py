@@ -96,7 +96,7 @@ class HangingPointsDataset(Dataset):
             depth = self.aug_seq.augment_image(depth)
             depth_eraser = get_random_eraser(
                 p=0.9, v_l=depth.min(), v_h=depth.max())
-            detpth = depth_eraser(depth)
+            depth = depth_eraser(depth)
 
         # r = np.random.randint(20)
         # kernel = np.ones((r, r), np.uint8)
