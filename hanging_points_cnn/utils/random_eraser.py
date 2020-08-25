@@ -57,7 +57,10 @@ def get_random_eraser(
                 break
 
         if pixel_level:
-            c = np.random.uniform(v_l, v_h, (h, w, img_c))
+            if input_img.ndim == 3:
+                c = np.random.uniform(v_l, v_h, (h, w, img_c))
+            if input_img.ndim == 2:
+                c = np.random.uniform(v_l, v_h, (h, w))
         else:
             c = np.random.uniform(v_l, v_h)
 
