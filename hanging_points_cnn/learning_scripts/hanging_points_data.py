@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import resize_np_img
+from hanging_points_cnn.utils.random_eraser import get_random_eraser
 
 
 for path in sys.path:
@@ -93,6 +94,9 @@ class HangingPointsDataset(Dataset):
             depth = resize_np_img(depth, self.inshape, Image.NEAREST)
         else:
             depth = self.aug_seq.augment_image(depth)
+            depth_eraser = get_random_eraser(
+                p=0.9, v_l=depth.min(), v_h=depth.max())
+            detpth = depth_eraser(depth)
 
         # r = np.random.randint(20)
         # kernel = np.ones((r, r), np.uint8)
