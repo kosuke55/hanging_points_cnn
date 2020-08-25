@@ -94,8 +94,10 @@ class HangingPointsDataset(Dataset):
             depth = resize_np_img(depth, self.inshape, Image.NEAREST)
         else:
             depth = self.aug_seq.augment_image(depth)
+            nonzero_depth = depth.copy()
+            nonzero_depth[nonzero_depth == 0] =depth.max()
             depth_eraser = get_random_eraser(
-                p=0.9, v_l=depth.min(), v_h=depth.max())
+                p=0.9, v_l=nonzero_depth.min(), v_h=depth.max())
             depth = depth_eraser(depth)
 
         # r = np.random.randint(20)
