@@ -80,6 +80,7 @@ class HangingPointsDataset(Dataset):
 
         self.aug_seq = iaa.Sequential([
             iaa.Dropout([0, 0.2]),
+            iaa.MultiplyElementwise((0.95, 1.05)),
             # iaa.GaussianBlur((0, 1.0)),
         ], random_order=True)
 
@@ -95,9 +96,12 @@ class HangingPointsDataset(Dataset):
         else:
             depth = self.aug_seq.augment_image(depth)
             nonzero_depth = depth.copy()
-            nonzero_depth[nonzero_depth == 0] =depth.max()
+            nonzero_depth[nonzero_depth == 0] = depth.max()
             depth_eraser = get_random_eraser(
-                p=0.9, v_l=nonzero_depth.min(), v_h=depth.max())
+                p=0.9, s_l=0.1, s_h=0.5,
+                v_l=nonzero_depth.min(),
+                v_h=depth.max(),
+                pixel_level=True)
             depth = depth_eraser(depth)
 
         # r = np.random.randint(20)
