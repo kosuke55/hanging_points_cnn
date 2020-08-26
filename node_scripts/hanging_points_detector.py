@@ -73,20 +73,7 @@ class HangingPointsNet():
 
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200608_0311.pt')
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_latestmodel_20200619_2113.pt')
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200824_0102.pt')
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200824_1559.pt')
-            # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200815_1638.pt')
-        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200813_1833.pt')
-        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200730_0301.pt')
-        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_2110.pt')
-        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_1846.pt')
-        # '/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet/hpnet_bestmodel_20200527_0224.pt')
-
-        # '../learning_scripts/checkpoints/unet_latestmodel_20200507_0438.pt')
-        # '../learning_scripts/checkpoints/unet_latestmodel_20200506_2259.pt')
-
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200826_0304.pt')
         self.transform = transforms.Compose([
             transforms.ToTensor()])
 

@@ -513,7 +513,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training and Validation data path',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0821')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0824')
     parser.add_argument(
         '--test-data-path',
         '-tdp',

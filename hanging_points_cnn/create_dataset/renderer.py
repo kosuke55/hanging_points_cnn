@@ -535,7 +535,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save-dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0824')
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0826')
     # default='ycb_hanging_object/per5000')
     parser.add_argument(
         '--data-num', '-n',
