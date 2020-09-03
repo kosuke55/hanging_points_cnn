@@ -46,7 +46,7 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained model',
-    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200826_0304.pt')
+    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200827_0552.pt')
 
 args = parser.parse_args()
 base_dir = args.input_dir
@@ -64,14 +64,17 @@ viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
 cv_bgr = cv2.imread(color_path)
 cv_bgr = cv2.resize(cv_bgr, (256, 256))
-color = o3d.io.read_image(color_path)
+cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
+color = o3d.geometry.Image(cv_rgb)
+# color = o3d.io.read_image(color_path)
 
 depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
 cv_depth = np.load(depth_path)
 cv_depth = cv2.resize(cv_depth, (256, 256),
                       interpolation=cv2.INTER_NEAREST)
 
-depth = o3d.geometry.Image(np.load(depth_path))
+depth = o3d.geometry.Image(cv_depth)
+# depth = o3d.geometry.Image(np.load(depth_path))
 
 rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
     color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
@@ -126,6 +129,7 @@ for i, roi in enumerate(model.rois_list[0]):
     if roi.tolist() == [0, 0, 0, 0]:
         continue
     roi = roi.cpu().detach().numpy().copy()
+    cv_bgr = draw_roi(cv_bgr, roi)
     hanging_point_x = int((roi[0] + roi[2]) / 2)
     hanging_point_y = int((roi[1] + roi[3]) / 2)
 
@@ -158,3 +162,7 @@ trimesh_pc = trimesh.PointCloud(np.asarray(pcd.points), np.asarray(pcd.colors))
 viewer.scene.add_geometry(trimesh_pc)
 
 viewer.show()
+
+cv2.imshow('confidence', confidence_img)
+cv2.imshow('roi', cv_bgr)
+cv2.waitKey()
