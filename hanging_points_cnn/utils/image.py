@@ -204,3 +204,34 @@ def trim_depth(dep, depth):
     dep = np.nanmin(depth) if dep < np.nanmin(depth) else dep
     dep = np.nanmax(depth) if np.nanmax(depth) < dep else dep
     return dep
+
+
+def get_gradation(
+        width, height, max_value, horizontal=True):
+    """Get gradation image for depth deformation
+
+    Parameters
+    ----------
+    width : int
+        image width
+    height : int
+        image height
+    max_value : float
+        max of random value
+    horizontal : bool, optional
+        If True make horizontal gradatation else vetical gradation,
+        by default True
+
+    Returns
+    -------
+    gradation : numpy.ndarray
+        gradation image
+    """
+    start_value = max_value * np.random.rand()
+    end_value = -start_value
+    if horizontal:
+        return np.tile(np.linspace(
+            start_value, end_value, width), (height, 1))
+    else:
+        return np.tile(np.linspace(
+            start_value, end_value, height), (width, 1)).T

@@ -12,10 +12,11 @@ from skrobot.coordinates.math import matrix2quaternion
 from skrobot.coordinates.math import rotation_matrix_from_axis
 from torchvision import transforms
 
-from hanging_points_cnn.utils.rois_tools import find_rois
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
+from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.rois_tools import find_rois
 
 try:
     import cv2
