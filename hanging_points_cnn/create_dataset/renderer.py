@@ -263,12 +263,12 @@ class Renderer:
     def get_roi(self, margin_size=0):
         ymin = np.max([np.min(self.object_mask[0]) -
                        np.random.randint(0, margin_size), 0])
-        ymax = np.min([np.max(self.object_mask[0]) + \
-                      np.random.randint(0, margin_size), int(self.im_height - 1)])
+        ymax = np.min([np.max(self.object_mask[0]) +
+                       np.random.randint(0, margin_size), int(self.im_height - 1)])
         xmin = np.max([np.min(self.object_mask[1]) -
                        np.random.randint(0, margin_size), 0])
-        xmax = np.min([np.max(self.object_mask[1]) + \
-                      np.random.randint(0, margin_size), int(self.im_width - 1)])
+        xmax = np.min([np.max(self.object_mask[1]) +
+                       np.random.randint(0, margin_size), int(self.im_width - 1)])
         # self.roi = [ymin, ymax, xmin, xmax]
 
         # [top, left, bottom, right] order
@@ -559,7 +559,6 @@ if __name__ == '__main__':
         default=0)
     args = parser.parse_args()
 
-    
     urdf_name = args.urdf_name
     data_num = args.data_num
     files = glob.glob(args.input_files)
