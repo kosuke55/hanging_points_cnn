@@ -264,11 +264,13 @@ class Renderer:
         ymin = np.max([np.min(self.object_mask[0]) -
                        np.random.randint(0, margin_size), 0])
         ymax = np.min([np.max(self.object_mask[0]) +
-                       np.random.randint(0, margin_size), int(self.im_height - 1)])
+                       np.random.randint(0, margin_size),
+                       int(self.im_height - 1)])
         xmin = np.max([np.min(self.object_mask[1]) -
                        np.random.randint(0, margin_size), 0])
         xmax = np.min([np.max(self.object_mask[1]) +
-                       np.random.randint(0, margin_size), int(self.im_width - 1)])
+                       np.random.randint(0, margin_size),
+                       int(self.im_width - 1)])
         # self.roi = [ymin, ymax, xmin, xmax]
 
         # [top, left, bottom, right] order
