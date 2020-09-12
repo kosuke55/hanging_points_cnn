@@ -530,6 +530,18 @@ def make_save_dirs(save_dir):
     return save_dir
 
 
+def split_file_name(file, dataset_type='ycb'):
+    dirname, filename = osp.split(file)
+    filename_without_ext, ext = osp.splitext(filename)
+    if dataset_type == 'ycb':
+        category_name = dirname.split("/")[-1]
+        idx = None
+    elif dataset_type == 'ObjectNet3D':
+        category_name = dirname.split("/")[-2]
+        idx = dirname.split("/")[-1]
+    return dirname, filename, category_name, idx
+
+
 if __name__ == '__main__':
     print('Start')
     parser = argparse.ArgumentParser(
@@ -548,6 +560,10 @@ if __name__ == '__main__':
         type=str, help='input files',
         default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf2/*/*')
     parser.add_argument(
+        '--dataset-type', '-dt',
+        type=str, help='dataset type',
+        default='ycb')
+    parser.add_argument(
         '--urdf-name', '-u',
         type=str, help='save dir',
         default='textured.urdf')
@@ -563,6 +579,7 @@ if __name__ == '__main__':
 
     urdf_name = args.urdf_name
     data_num = args.data_num
+    dataset_type = args.dataset_type
     files = glob.glob(args.input_files)
 
     width = 256
@@ -587,15 +604,8 @@ if __name__ == '__main__':
 
     try:
         for file in files:
-            dirname, filename = osp.split(file)
-            filename_without_ext, ext = osp.splitext(filename)
-            if 'ycb' in args.input_files:
-                category_name = dirname.split("/")[-1]
-            elif 'ObjectNet3D' in args.input_files:
-                category_name = dirname.split("/")[-2]
-                idx = dirname.split("/")[-1]
-            if category_name not in category_name_list:
-                continue
+            dirname, filename, category_name, idx \
+                = split_file_name(file, dataset_type)
 
             save_dir = osp.join(args.save_dir, category_name)
             save_dir = make_save_dirs(save_dir)
