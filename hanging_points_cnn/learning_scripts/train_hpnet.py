@@ -58,7 +58,7 @@ class Trainer(object):
                 'output_channels': 1,
                 'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
-                'depth_range': [200, 1500],
+                'depth_range': [100, 1500],
                 'use_bgr': True,
                 'use_bgr2gray': True,
                 'roi_padding': 50
@@ -107,9 +107,9 @@ class Trainer(object):
 
         self.best_loss = 1e10
         # self.optimizer = optim.SGD(
-        #     self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
+        # self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=args.lr,  betas=(0.9, 0.999),
+            self.model.parameters(), lr=args.lr, betas=(0.9, 0.999),
             eps=1e-10, weight_decay=0, amsgrad=False)
         self.prev_optimizer = copy.deepcopy(self.optimizer)
 
@@ -392,8 +392,7 @@ class Trainer(object):
                             mode,
                             confidence_loss.item(),
                             rotation_loss.item(),
-                            depth_loss.item()
-                        ))
+                            depth_loss.item()))
 
                 self.vis.images([hanging_point_depth_gt_rgb,
                                  hanging_point_depth_pred_rgb],
@@ -531,7 +530,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200824_0102.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200826_0304.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)

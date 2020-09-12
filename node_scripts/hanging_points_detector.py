@@ -73,7 +73,7 @@ class HangingPointsNet():
 
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200826_0304.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200827_0552.pt')
         self.transform = transforms.Compose([
             transforms.ToTensor()])
 

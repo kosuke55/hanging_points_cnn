@@ -43,7 +43,8 @@ color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
 color = o3d.io.read_image(color_path)
 
 depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
-depth = o3d.geometry.Image(np.load(depth_path))
+depth = np.load(depth_path)
+depth = o3d.geometry.Image(depth)
 
 camera_info_path = osp.join(
     base_dir, 'camera_info', '{:06}.yaml'.format(idx))

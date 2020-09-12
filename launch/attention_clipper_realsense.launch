@@ -18,8 +18,8 @@
   <arg name="manager" default="hpg_manager" />
   <!-- <arg name="MACHINE" default="localhost"/> -->
 
-  <node name="gripper_box_publisher"
-        pkg="box_publisher" type="pub_box.py">
+  <node name="box_publisher"
+        pkg="topic_publisher" type="pub_box.py">
     <remap from="~output" to="$(arg INPUT_BOX)"/>
       <rosparam>
         x: 0.4
