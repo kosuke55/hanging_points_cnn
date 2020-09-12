@@ -582,7 +582,7 @@ if __name__ == '__main__':
     dataset_type = args.dataset_type
     gui = args.gui
     input_dir = args.input_dir
-    save_dir = args.save_dir
+    save_dir_base = args.save_dir
     urdf_name = args.urdf_name
     show_image = args.show_image
 
@@ -593,7 +593,7 @@ if __name__ == '__main__':
     width = 256
     height = 256
 
-    if args.dataset_type == 'ycb':
+    if dataset_type == 'ycb':
         category_name_list = [
             "019_pitcher_base",
             "022_windex_bottle",
@@ -607,16 +607,14 @@ if __name__ == '__main__':
             "051_large_clamp",
             "052_extra_large_clamp"
         ]
-    elif args.datasettype == 'ObjectNet3D':
+    elif dataset_type == 'ObjectNet3D':
         category_name_list = ['cup', 'key', 'scissors']
 
     try:
         for file in files:
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
-            print(category_name)
-
-            save_dir = osp.join(save_dir, category_name)
+            save_dir = osp.join(save_dir_base, category_name)
             save_dir = make_save_dirs(save_dir)
             r = Renderer(DEBUG=False)
             r.save_intrinsics(save_dir)
