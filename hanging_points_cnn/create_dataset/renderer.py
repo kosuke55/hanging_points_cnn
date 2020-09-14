@@ -550,7 +550,7 @@ def split_file_name(file, dataset_type='ycb'):
     return dirname, filename, category_name, idx
 
 
-def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135):
+def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135.):
     """Align the x-axis of coords
 
     invert coordinates above the threshold.
@@ -564,8 +564,8 @@ def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135):
         eps paramerter of sklearn dbscan, by default 0.005
     min_sample : int, optional
         min_sample paramerter of sklearn dbscan, by default 2
-    angle_thresh : int, optional
-        invert coordinates above the threshold, by default 135
+    angle_thresh : float, optional
+        invert coordinates above the threshold, by default 135.0
 
     Returns
     -------
