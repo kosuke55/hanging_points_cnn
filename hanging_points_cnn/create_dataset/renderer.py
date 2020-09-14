@@ -61,6 +61,7 @@ class Renderer:
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_fov(
                 fov, im_height, im_width)
+        self.camera_model.target_size = (target_width, target_height)
         self.pm = pybullet.computeProjectionMatrixFOV(
             fov, aspect, near_plane, far_plane)
 
@@ -654,8 +655,6 @@ if __name__ == '__main__':
 
                 [ymin, ymax, xmin, xmax] = r.get_roi(padding=50)
                 # clip_info = np.array([xmin, xmax, ymin, ymax])
-
-                r.camera_model.target_size = (width, height)
                 bgr = r.camera_model.crop_resize_image(bgr)
                 bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
                 depth = r.camera_model.crop_resize_image(
