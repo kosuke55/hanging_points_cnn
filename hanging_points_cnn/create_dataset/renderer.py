@@ -47,8 +47,10 @@ np.set_printoptions(precision=3, suppress=True)
 
 
 class Renderer:
-    def __init__(self, im_width=512, im_height=424, fov=42.5,
-                 near_plane=0.1, far_plane=2.0, DEBUG=False):
+    def __init__(
+            self, im_width=512, im_height=424, fov=42.5,
+            near_plane=0.1, far_plane=2.0, target_width=256, target_height=256,
+            DEBUG=False):
         self.objects = []
         self.im_width = im_width
         self.im_height = im_height
@@ -261,16 +263,16 @@ class Renderer:
         self.object_depth[self.non_object_mask] = 0
         return self.object_depth
 
-    def get_roi(self, margin_size=0):
+    def get_roi(self, padding=0):
         ymin = np.max([np.min(self.object_mask[0]) -
-                       np.random.randint(0, margin_size), 0])
+                       np.random.randint(0, padding), 0])
         ymax = np.min([np.max(self.object_mask[0]) +
-                       np.random.randint(0, margin_size),
+                       np.random.randint(0, padding),
                        int(self.im_height - 1)])
         xmin = np.max([np.min(self.object_mask[1]) -
-                       np.random.randint(0, margin_size), 0])
+                       np.random.randint(0, padding), 0])
         xmax = np.min([np.max(self.object_mask[1]) +
-                       np.random.randint(0, margin_size),
+                       np.random.randint(0, padding),
                        int(self.im_width - 1)])
         # self.roi = [ymin, ymax, xmin, xmax]
 
