@@ -282,7 +282,7 @@ class Renderer:
         return [ymin, ymax, xmin, xmax]
         # return self.roi
 
-    def get_visible_hp_coords(self, contact_points, debug_line=False):
+    def get_visible_coords(self, contact_points, debug_line=False):
         self.hanging_point_in_camera_coords_list = []
         for cp in contact_points:
             hanging_point_coords = coordinates.Coordinates(
@@ -310,6 +310,10 @@ class Renderer:
                 pybullet.addUserDebugLine(
                     hanging_point_worldcoords.worldpos(),
                     r.camera_coords.worldpos(), [1, 0, 0], 1)
+
+        if len(self.hanging_point_in_camera_coords_list) == 0:
+            print('-- No visible hanging point --')
+            return False
 
         return self.hanging_point_in_camera_coords_list
 
@@ -546,6 +550,51 @@ def split_file_name(file, dataset_type='ycb'):
     return dirname, filename, category_name, idx
 
 
+def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135):
+    """Align the x-axis of coords
+
+    invert coordinates above the threshold.
+    If you do not align, the average value of the
+    rotation map will be incorrect.
+
+    Parameters
+    ----------
+    coords_list : list[skrobot.coordinates.base.Coordinates]
+    eps : float, optional
+        eps paramerter of sklearn dbscan, by default 0.005
+    min_sample : int, optional
+        min_sample paramerter of sklearn dbscan, by default 2
+    angle_thresh : int, optional
+        invert coordinates above the threshold, by default 135
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
+    dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
+        [coords.worldpos() for coords in coords_list])
+
+    for label in range(np.max(dbscan.labels_) + 1):
+        if np.count_nonzero(dbscan.labels_ == label) <= 1:
+            continue
+
+        q_base = None
+
+        for idx, coords in enumerate(coords_list):
+            if dbscan.labels_[idx] == label:
+                if q_base is None:
+                    q_base = coords.quaternion
+                q_distance \
+                    = coordinates.math.quaternion_distance(
+                        q_base, coords.quaternion)
+
+                if np.rad2deg(q_distance) > angle_thresh:
+                    coords_list[idx].rotate(np.pi, 'y')
+
+    return coords_list
+
+
 if __name__ == '__main__':
     print('Start')
     parser = argparse.ArgumentParser(
@@ -667,11 +716,13 @@ if __name__ == '__main__':
                 rotation_map = RotationMap(height, width)
 
                 hanging_point_in_camera_coords_list \
-                    = r.get_visible_hp_coords(contact_points)
-                if len(hanging_point_in_camera_coords_list) == 0:
+                    = r.get_visible_coords(contact_points)
+                if not hanging_point_in_camera_coords_list:
                     print('-- No visible hanging point --')
                     r.finish()
                     continue
+
+                depth_map = DepthMap(width, height, circular=True)
 
                 dbscan = DBSCAN(
                     eps=0.005, min_samples=2).fit(
