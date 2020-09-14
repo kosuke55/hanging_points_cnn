@@ -569,8 +569,7 @@ def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135.):
 
     Returns
     -------
-    [type]
-        [description]
+    coords_list : list[skrobot.coordinates.base.Coordinates]
     """
     dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
         [coords.worldpos() for coords in coords_list])
