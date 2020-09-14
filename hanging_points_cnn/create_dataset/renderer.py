@@ -652,7 +652,7 @@ if __name__ == '__main__':
 
                 depth = r.get_object_depth()
 
-                [ymin, ymax, xmin, xmax] = r.get_roi(margin_size=50)
+                [ymin, ymax, xmin, xmax] = r.get_roi(padding=50)
                 # clip_info = np.array([xmin, xmax, ymin, ymax])
 
                 r.camera_model.target_size = (width, height)
