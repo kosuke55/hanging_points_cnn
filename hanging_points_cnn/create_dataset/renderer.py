@@ -94,6 +94,7 @@ class Renderer:
                 cameraTargetPosition=[0, 0, 0.1])
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
+        self.debug_visible_line = False
 
         self.texture_paths = glob.glob(
             osp.join('/media/kosuke/SANDISK/dtd', '**', '*.jpg'),
@@ -275,41 +276,55 @@ class Renderer:
         xmax = np.min([np.max(self.object_mask[1]) +
                        np.random.randint(0, padding),
                        int(self.im_width - 1)])
-        # self.roi = [ymin, ymax, xmin, xmax]
 
         # [top, left, bottom, right] order
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
-        # return self.roi
+
+    def translate_contact_points(self, contact_points):
+        contact_point_worldcoords_list = []
+        contact_point_in_camera_coords_list = []
+        for cp in contact_points:
+            contact_point_coords = coordinates.Coordinates(
+                pos=(cp[0] - self.object_center), rot=cp[1:])
+            contact_point_worldcoords \
+                = self.object_coords.copy().transform(
+                    contact_point_coords)
+            contact_point_worldcoords_list.append(contact_point_worldcoords)
+            contact_point_in_camera_coords \
+                = self.camera_coords.inverse_transformation(
+                ).transform(contact_point_worldcoords)
+            contact_point_in_camera_coords_list.append(
+                contact_point_in_camera_coords)
+
+        return contact_point_in_camera_coords_list, \
+            contact_point_worldcoords_list
 
     def get_visible_coords(self, contact_points, debug_line=False):
         self.hanging_point_in_camera_coords_list = []
-        for cp in contact_points:
-            hanging_point_coords = coordinates.Coordinates(
-                pos=(cp[0] - self.object_center), rot=cp[1:])
-            # hanging_point_coords.translate([0, 0.01, 0])
-            hanging_point_worldcoords \
-                = r.object_coords.copy().transform(
-                    hanging_point_coords)
-            hanging_point_in_camera_coords \
-                = r.camera_coords.inverse_transformation(
-                ).transform(hanging_point_worldcoords)
-            # px, py = r.camera_model.project3d_to_pixel(
-            #     hanging_point_in_camera_coords.worldpos())
-            rayInfo = pybullet.rayTest(
-                hanging_point_worldcoords.worldpos(),
-                r.camera_coords.worldpos())
-            if rayInfo[0][0] == r.camera_id:
-                self.hanging_point_in_camera_coords_list.append(
-                    hanging_point_in_camera_coords)
-                pybullet.addUserDebugLine(
-                    hanging_point_worldcoords.worldpos(),
-                    r.camera_coords.worldpos(), [1, 1, 1], 1)
-            # occulsion
+
+        contact_point_in_camera_coords_list, contact_point_worldcoords_list \
+            = self.translate_contact_points(contact_points)
+        ray_info_list = pybullet.rayTestBatch(
+            [c.worldpos() for c in contact_point_worldcoords_list],
+            [self.camera_coords.worldpos()] * len(
+                contact_point_in_camera_coords_list))
+
+        for coords_w, coords_c, ray_info in zip(
+                contact_point_worldcoords_list,
+                contact_point_in_camera_coords_list,
+                ray_info_list):
+            if ray_info[0] == self.camera_id:
+                self.hanging_point_in_camera_coords_list.append(coords_c)
+                if self.debug_visible_line:
+                    pybullet.addUserDebugLine(
+                        coords_w.worldpos(),
+                        self.camera_coords.worldpos(), [1, 1, 1], 1)
             else:
-                pybullet.addUserDebugLine(
-                    hanging_point_worldcoords.worldpos(),
-                    r.camera_coords.worldpos(), [1, 0, 0], 1)
+                if self.debug_visible_line:
+                    pybullet.addUserDebugLine(
+                        coords_w.worldpos(),
+                        self.camera_coords.worldpos(), [1, 0, 0], 1)
 
         if len(self.hanging_point_in_camera_coords_list) == 0:
             print('-- No visible hanging point --')
@@ -481,9 +496,6 @@ class Renderer:
             self.get_bgr()
             self.get_seg()
 
-            # if self.get_object_mask(self.object_id) is None:
-            #     self.finish()
-            #     return False
             if self.get_object_mask(self.object_id) is None:
                 self.reset_object_pose()
                 continue
@@ -491,7 +503,6 @@ class Renderer:
             self.get_object_depth()
 
             self.crop()
-
         align_coords(self.hanging_point_in_camera_coords_list, copy_list=False)
         if not self.create_annotation_data():
             self.finish()
