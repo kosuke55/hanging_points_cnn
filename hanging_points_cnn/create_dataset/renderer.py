@@ -411,7 +411,7 @@ class Renderer:
             px, py = self.camera_model.project3d_to_pixel(hp.worldpos())
             if self.save_debug_axis:
                 self.bgr_axis = self.bgr.copy()
-            if 0 <= px < width and 0 <= py < height:
+            if 0 <= px < self.target_width and 0 <= py < self.target_height:
                 if self.save_debug_axis:
                     draw_axis(self.bgr_axis,
                               hp.worldrot(),
