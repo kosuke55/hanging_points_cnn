@@ -81,9 +81,6 @@ class Renderer:
         self.rotations = None
         self.depth_map = DepthMap(target_width, target_height, circular=True)
 
-        # self.object_pos = np.array([0, 0, 0.1])
-        # self.object_rot = coordinates.math.rotation_matrix_from_rpy([0, 0, 0])
-
         self.object_coords = coordinates.Coordinates(
             pos=np.array([0, 0, 0.1]),
             rot=coordinates.math.rotation_matrix_from_rpy([0, 0, 0]))
@@ -112,16 +109,9 @@ class Renderer:
         self._rendered_rot = None
 
     def load_urdf(self, urdf, random_pose=True):
+        self.object_id = pybullet.loadURDF(urdf, [0, 0, 0], [0, 0, 0, 1])
         if random_pose:
-            roll = np.random.rand() * np.pi
-            pitch = np.random.rand() * np.pi
-            yaw = np.random.rand() * np.pi
-            self.object_id = pybullet.loadURDF(
-                urdf, [0, 0, 0], pybullet.getQuaternionFromEuler(
-                    [roll, pitch, yaw]))
-        else:
-            self.object_id = pybullet.loadURDF(
-                urdf, [0, 0, 0], [0, 0, 0, 1])
+            self.reset_object_pose()
 
         self.object_center = get_urdf_center(urdf)
         self.objects.append(self.object_id)
@@ -146,19 +136,17 @@ class Renderer:
             self.remove_object(o_id, True)
         self.objects = []
 
-    def reset_object_pose(self, object_id):
-        x = (np.random.rand() - 0.5) * 0.1
-        y = (np.random.rand() - 0.5) * 0.1
-        z = (np.random.rand() - 0.5) * 0.1
+    def reset_object_pose(self):
         roll = np.random.rand() * np.pi
         pitch = np.random.rand() * np.pi
         yaw = np.random.rand() * np.pi
-        pybullet.setGravity(0, 0, 0)
         pybullet.resetBasePositionAndOrientation(
-            object_id,
-            [x, y, z],
+            self.object_id,
+            [0, 0, 0],
             pybullet.getQuaternionFromEuler([roll, pitch, yaw]))
-        return [x, y, z]
+        pos, rot = pybullet.getBasePositionAndOrientation(self.object_id)
+        self.object_coords = coordinates.Coordinates(
+            pos=pos, rot=coordinates.math.xyzw2wxyz(rot))
 
     def step(self, n=1):
         for i in range(n):
@@ -326,6 +314,8 @@ class Renderer:
         if len(self.hanging_point_in_camera_coords_list) == 0:
             print('-- No visible hanging point --')
             return False
+        else:
+            print('-- Find visible hanging point --')
 
         return self.hanging_point_in_camera_coords_list
 
@@ -477,24 +467,32 @@ class Renderer:
         self.change_texture(self.plane_id)
         self.change_texture(self.object_id)
         self.create_camera()
-        self.move_to_random_pos()
-        self.look_at(self.object_coords.worldpos() - self.object_center)
-        self.step(1)
+        loop = True
+        while loop:
+            self.move_to_random_pos()
+            self.look_at(self.object_coords.worldpos() - self.object_center)
+            self.step(1)
+            if not self.get_visible_coords(contact_points):
+                self.reset_object_pose()
+                continue
+            else:
+                loop = False
 
-        self.get_bgr()
-        self.get_seg()
+            self.get_bgr()
+            self.get_seg()
 
-        if self.get_object_mask(self.object_id) is None:
-            self.finish()
-            return False
+            # if self.get_object_mask(self.object_id) is None:
+            #     self.finish()
+            #     return False
+            if self.get_object_mask(self.object_id) is None:
+                self.reset_object_pose()
+                continue
 
-        self.get_object_depth()
+            self.get_object_depth()
 
-        self.crop()
+            self.crop()
 
-        if not self.get_visible_coords(contact_points):
-            self.finish()
-            return False
+
 
         align_coords(self.hanging_point_in_camera_coords_list, copy_list=False)
         if not self.create_annotation_data():
