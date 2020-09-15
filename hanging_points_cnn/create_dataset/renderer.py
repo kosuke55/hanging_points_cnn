@@ -492,8 +492,6 @@ class Renderer:
 
             self.crop()
 
-
-
         align_coords(self.hanging_point_in_camera_coords_list, copy_list=False)
         if not self.create_annotation_data():
             self.finish()
