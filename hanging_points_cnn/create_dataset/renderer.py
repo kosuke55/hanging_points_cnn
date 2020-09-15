@@ -741,7 +741,7 @@ if __name__ == '__main__':
                               hp.worldrot(),
                               hp.worldpos(),
                               r.camera_model.K)
-                    if 0 <= px <= width and 0 <= py <= height:
+                    if 0 <= px < width and 0 <= py < height:
                         create_gradient_circle(
                             annotation_img,
                             int(py), int(px))
