@@ -61,6 +61,7 @@ class Renderer:
         self.camera_model \
             = cameramodels.PinholeCameraModel.from_fov(
                 fov, im_height, im_width)
+
         self.camera_model.target_size = (target_width, target_height)
         self.pm = pybullet.computeProjectionMatrixFOV(
             fov, aspect, near_plane, far_plane)
@@ -68,6 +69,10 @@ class Renderer:
         self.camera_coords = coordinates.Coordinates(
             pos=np.array([0, 0, 0.5]),
             rot=coordinates.math.rotation_matrix_from_rpy([0, np.pi, 0]))
+
+        self.annotation_img = np.zeros(
+            (target_width, target_height), dtype=np.uint32)
+        self.rotation_map = RotationMap(target_width, target_height)
 
         # self.object_pos = np.array([0, 0, 0.1])
         # self.object_rot = coordinates.math.rotation_matrix_from_rpy([0, 0, 0])
@@ -550,7 +555,8 @@ def split_file_name(file, dataset_type='ycb'):
     return dirname, filename, category_name, idx
 
 
-def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135.):
+def align_coords(coords_list, eps=0.005, min_sample=2,
+                 angle_thresh=135., copy_list=True):
     """Align the x-axis of coords
 
     invert coordinates above the threshold.
@@ -566,11 +572,15 @@ def align_coords(coords_list, eps=0.005, min_sample=2, angle_thresh=135.):
         min_sample paramerter of sklearn dbscan, by default 2
     angle_thresh : float, optional
         invert coordinates above the threshold, by default 135.0
+    copy_list ; bool, optional
+        If True copy coords_list, by default True
 
     Returns
     -------
     coords_list : list[skrobot.coordinates.base.Coordinates]
     """
+    if copy_list:
+        coords_list = copy.copy(coords_list)
     dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
         [coords.worldpos() for coords in coords_list])
 
@@ -702,7 +712,6 @@ if __name__ == '__main__':
                 depth = r.get_object_depth()
 
                 [ymin, ymax, xmin, xmax] = r.get_roi(padding=50)
-                # clip_info = np.array([xmin, xmax, ymin, ymax])
                 bgr = r.camera_model.crop_resize_image(bgr)
                 bgr_axis = r.camera_model.crop_resize_image(bgr_axis)
                 depth = r.camera_model.crop_resize_image(
@@ -850,10 +859,6 @@ if __name__ == '__main__':
                     osp.join(
                         save_dir, 'heatmap', '{:06}.png'.format(
                             data_id)), annotation_img)
-                # np.save(
-                #     osp.join(
-                #         save_dir, 'clip_info', '{:06}'.format(data_id)),
-                #     clip_info)
                 r.camera_model.dump(osp.join(
                     save_dir, 'camera_info', '{:06}.yaml'.format(
                         data_id)))
