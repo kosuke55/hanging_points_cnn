@@ -732,55 +732,26 @@ if __name__ == '__main__':
 
                 depth_map = DepthMap(width, height, circular=True)
 
-                dbscan = DBSCAN(
-                    eps=0.005, min_samples=2).fit(
-                        [hp.worldpos() for hp in
-                         hanging_point_in_camera_coords_list])
+                hanging_point_in_camera_coords_list \
+                    = align_coords(hanging_point_in_camera_coords_list)
 
-                quaternion_list = []
+                for hp in hanging_point_in_camera_coords_list:
+                    px, py = r.camera_model.project3d_to_pixel(hp.worldpos())
+                    draw_axis(bgr_axis,
+                              hp.worldrot(),
+                              hp.worldpos(),
+                              r.camera_model.K)
+                    if 0 <= px <= width and 0 <= py <= height:
+                        create_gradient_circle(
+                            annotation_img,
+                            int(py), int(px))
 
-                depth_map = DepthMap(width, height, circular=True)
+                        rotation_map.add_quaternion(
+                            int(px), int(py), hp.quaternion)
 
-                for label in range(np.max(dbscan.labels_) + 1):
-                    if np.count_nonzero(dbscan.labels_ == label) <= 1:
-                        r.finish()
-                        continue
-
-                    q_base = None
-                    for idx, hp in enumerate(
-                            hanging_point_in_camera_coords_list):
-                        if dbscan.labels_[idx] == label:
-                            if q_base is None:
-                                q_base = hp.quaternion
-                            q_distance\
-                                = coordinates.math.quaternion_distance(
-                                    q_base, hp.quaternion)
-
-                            if np.rad2deg(q_distance) > 135:
-                                hanging_point_in_camera_coords_list[
-                                    idx].rotate(np.pi, 'y')
-
-                            px, py = r.camera_model.project3d_to_pixel(
-                                hp.worldpos())
-
-                            draw_axis(bgr_axis,
-                                      hp.worldrot(),
-                                      hp.worldpos(),
-                                      r.camera_model.K)
-
-                            if 0 <= px <= width and 0 <= py <= height:
-                                create_gradient_circle(
-                                    annotation_img,
-                                    int(py), int(px))
-
-                                rotation_map.add_quaternion(
-                                    int(px), int(py),
-                                    hanging_point_in_camera_coords_list[
-                                        idx].quaternion)
-
-                                depth_map.add_depth(
-                                    int(px), int(py),
-                                    hp.worldpos()[2] * 1000)
+                        depth_map.add_depth(
+                            int(px), int(py),
+                            hp.worldpos()[2] * 1000)
 
                 if np.all(annotation_img == 0):
                     r.finish()
