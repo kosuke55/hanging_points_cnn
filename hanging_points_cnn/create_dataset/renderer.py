@@ -22,6 +22,7 @@ from eos import make_fancy_output_dir
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
+from hanging_points_generator.create_mesh import load_camera_pose
 from hanging_points_generator.hp_generator import cluster_hanging_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
@@ -334,6 +335,16 @@ class Renderer:
 
         return self.hanging_point_in_camera_coords_list
 
+    def move_to_coords(self, coords):
+        self.camera_coords = coords
+        pybullet.resetBasePositionAndOrientation(
+            self.camera_id,
+            self.camera_coords.worldpos(),
+            coordinates.math.wxyz2xyzw(
+                coordinates.math.matrix2quaternion(
+                    self.camera_coords.worldrot())))
+        self.draw_camera_pos()
+
     def move_to(self, T):
         self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
@@ -511,6 +522,27 @@ class Renderer:
         self.save_data()
         self.finish()
         return True
+
+    def from_camera_pose(self, camera_pose_path):
+        coords = load_camera_pose(camera_pose_path)
+        self.move_to_coords(coords)
+
+    def get_sim_images(self, urdf_file, camera_pose_path):
+        self.load_urdf(urdf_file, random_pose=False)
+        self.create_camera()
+        self.from_camera_pose(camera_pose_path)
+        self.step(1)
+
+        self.get_bgr()
+        self.get_seg()
+
+        if self.get_object_mask(self.object_id) is None:
+            return False
+
+        self.get_object_depth()
+        self.crop()
+
+        return self.bgr, self.depth
 
     def finish(self):
         self.remove_all_objects()
