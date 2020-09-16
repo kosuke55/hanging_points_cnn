@@ -688,6 +688,20 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
     return contact_points
 
 
+def sample_contact_points(contact_points, num_samples):
+    idx = np.random.randint(0, len(contact_points), num_samples)
+    return [contact_points[i] for i in idx]
+
+# def move_contact_points(contact_points, axis='y', value=0.01):
+#     if axis == 'y':
+#         translate = np.array([0, value, 0])
+
+#     for i, cp in enumerate(contact_points):
+#         contact_points[i][0] = cp[0] + translate
+
+#     return contact_points
+
+
 def make_save_dirs(save_dir):
     save_dir = make_fancy_output_dir(save_dir)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
@@ -838,6 +852,7 @@ if __name__ == '__main__':
             # load multiple json
             contact_points = get_contact_points(
                 osp.join(dirname, 'contact_points'))
+            contact_points = sample_contact_points(contact_points, 30)
             if contact_points is None:
                 continue
 
