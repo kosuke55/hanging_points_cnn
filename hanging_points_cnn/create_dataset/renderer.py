@@ -148,9 +148,9 @@ class Renderer:
                     self.object_coords.worldrot())))
 
     def reset_object_pose(self):
-        roll = np.random.rand() * np.pi
-        pitch = np.random.rand() * np.pi
-        yaw = np.random.rand() * np.pi
+        roll = np.random.rand() * np.pi * 2
+        pitch = np.random.rand() * np.pi * 2
+        yaw = np.random.rand() * np.pi * 2
         pybullet.resetBasePositionAndOrientation(
             self.object_id,
             [0, 0, 0],
