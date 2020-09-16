@@ -291,12 +291,14 @@ class Renderer:
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
 
-    def transform_contact_points(self, contact_points):
+    def transform_contact_points(self, contact_points,
+                                 translate=[0, 0.01, 0]):
         contact_point_worldcoords_list = []
         contact_point_in_camera_coords_list = []
         for cp in contact_points:
             contact_point_coords = coordinates.Coordinates(
-                pos=(cp[0] - self.object_center), rot=cp[1:])
+                pos=(cp[0] - self.object_center),
+                rot=cp[1:]).translate(translate, 'local')
             contact_point_worldcoords \
                 = self.object_coords.copy().transform(
                     contact_point_coords)
