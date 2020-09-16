@@ -52,6 +52,29 @@ class Renderer:
             self, im_width=512, im_height=424, fov=42.5,
             near_plane=0.1, far_plane=2.0, target_width=256, target_height=256,
             save_dir='./', DEBUG=False):
+        """Create training data of CNN
+
+        Parameters
+        ----------
+        im_width : int, optional
+            sim camera width, by default 512
+        im_height : int, optional
+            sim camera height, by default 424
+        fov : float, optional
+            sim camera fov, by default 42.5
+        near_plane : float, optional
+            by default 0.1
+        far_plane : float, optional
+            by default 2.0
+        target_width : int, optional
+            created data width, by default 256
+        target_height : int, optional
+             created data height, by default 256
+        save_dir : str, optional
+            [description], by default './'
+        DEBUG : bool, optional
+            enable gui , by default False
+        """
         self.objects = []
         self.im_width = im_width
         self.im_height = im_height
@@ -111,6 +134,18 @@ class Renderer:
         self._rendered_rot = None
 
     def load_urdf(self, urdf, random_pose=True):
+        """Load urdf
+
+        Parameters
+        ----------
+        urdf : str
+        random_pose : bool, optional
+            If true, rotate object to random pose, by default True
+
+        Returns
+        -------
+        self.object_id : int
+        """
         self.object_id = pybullet.loadURDF(urdf, [0, 0, 0], [0, 0, 0, 1])
         if random_pose:
             self.reset_object_pose()
@@ -126,12 +161,22 @@ class Renderer:
         return self.object_id
 
     def remove_object(self, o_id, update=True):
+        """Remove object
+
+        Parameters
+        ----------
+        o_id : int
+            remove target object id
+        update : bool, optional
+            remove form self.objects list, by default True
+        """
         pybullet.removeBody(o_id)
         if update:
             # print("remove ", o_id)
             self.objects.remove(o_id)
 
     def remove_all_objects(self):
+        """Remove all objects"""
         # objects = copy.copy(self.objects)
         # for o_id in objects:
         for o_id in self.objects:
@@ -139,6 +184,12 @@ class Renderer:
         self.objects = []
 
     def move_object_coords(self, coords):
+        """Move object to target coords
+
+        Parameters
+        ----------
+        coords : skrobot.coordinates.base.Coordinates
+        """
         self.object_coords = coords
         pybullet.resetBasePositionAndOrientation(
             self.object_id,
@@ -148,6 +199,7 @@ class Renderer:
                     self.object_coords.worldrot())))
 
     def reset_object_pose(self):
+        """Reset object rotation randomly"""
         roll = np.random.rand() * np.pi * 2
         pitch = np.random.rand() * np.pi * 2
         yaw = np.random.rand() * np.pi * 2
@@ -160,33 +212,18 @@ class Renderer:
             pos=pos, rot=coordinates.math.xyzw2wxyz(rot))
 
     def step(self, n=1):
+        """Step simulation
+
+        Parameters
+        ----------
+        n : int, optional
+            the number of step, by default 1
+        """
         for i in range(n):
             pybullet.stepSimulation()
 
-    def _rotation_matrix(self, rpy):
-        r, p, y = rpy
-
-        Rx = np.array([
-            [1, 0, 0, 0],
-            [0, np.cos(r), -np.sin(r), 0],
-            [0, np.sin(r), np.cos(r), 0],
-            [0, 0, 0, 1]
-        ])
-        Ry = np.array([
-            [np.cos(p), 0, np.sin(p), 0],
-            [0, 1, 0, 0],
-            [-np.sin(p), 0, np.cos(p), 0],
-            [0, 0, 0, 1]
-        ])
-        Rz = np.array([
-            [np.cos(y), -np.sin(y), 0, 0],
-            [np.sin(y), np.cos(y), 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-        return np.linalg.multi_dot([Rz, Ry, Rx])
-
     def draw_camera_pos(self):
+        """Draw camera pose axis"""
         pybullet.removeAllUserDebugItems()
         start = self.camera_coords.worldpos()
         end_x = start + self.camera_coords.rotate_vector([0.1, 0, 0])
@@ -197,6 +234,7 @@ class Renderer:
         pybullet.addUserDebugLine(start, end_z, [0, 0, 1], 3)
 
     def change_light(self):
+        """Change light condition"""
         self.lightDirection = 10 * np.random.rand(3)
         self.lightDistance = 0.9 + 0.2 * np.random.rand()
         self.lightColor = 0.9 + 0.1 * np.random.rand(3)
@@ -205,6 +243,8 @@ class Renderer:
         self.lightSpecularCoeff = 0.85 + 0.1 * np.random.rand()
 
     def render(self):
+        """Render and get color, depth and segmentation image"""
+
         # If you comment this out, you cannot change the light state with the same pose.
         # if np.all(
         #         self._rendered_pos == self.camera_coords.worldpos()) and np.all(
@@ -238,31 +278,83 @@ class Renderer:
         return i_arr
 
     def get_depth(self):
+        """Get depth
+
+        Returns
+        -------
+        depth_buffer: numpy.ndarray
+        """
         return self.render()[3]
 
     def get_depth_metres(self, noise=0.001):
+        """Get depth metres
+
+        Parameters
+        ----------
+        noise : float, optional
+            by default 0.001
+
+        Returns
+        -------
+        depth_meres : numpy.ndarray
+        """
         d = self.render()[3]
         # Linearise to metres
         return 2 * self.far_plane * self.near_plane / (self.far_plane + self.near_plane - (
             self.far_plane - self.near_plane) * (2 * d - 1)) + np.random.randn(self.im_height, self.im_width) * noise
 
     def get_depth_milli_metres(self):
+        """Get depth metres
+
+        Returns
+        -------
+        depth_milli_meres : numpy.ndarray
+        """
         self.depth = (self.get_depth_metres() * 1000).astype(np.float32)
         return self.depth
 
     def get_rgb(self):
+        """Get rgb
+
+        Returns
+        -------
+        rgb : numpy.ndarray
+        """
         self.rgb = self.render()[2]
         return self.rgb
 
     def get_bgr(self):
+        """Get bgr
+
+        Returns
+        -------
+        bgr : numpy.ndarray
+        """
         self.bgr = cv2.cvtColor(self.get_rgb(), cv2.COLOR_RGB2BGR)
         return self.bgr
 
     def get_seg(self):
+        """Get segmentation image
+
+        Returns
+        -------
+        seg : numpy.ndarray
+        """
         self.seg = self.render()[4]
         return self.seg
 
     def get_object_mask(self, object_id):
+        """Get mask image of object
+
+        Parameters
+        ----------
+        object_id : int
+            target object id
+
+        Returns
+        -------
+        mask : numpy.ndarray
+        """
         if np.count_nonzero(self.seg == object_id) == 0:
             return None
         self.object_mask = np.where(self.seg == object_id)
@@ -271,11 +363,29 @@ class Renderer:
         return self.object_mask, self.non_object_mask
 
     def get_object_depth(self):
+        """Get depth of object
+
+        Returns
+        -------
+        depth : numpy.ndarray
+        """
         self.object_depth = r.get_depth_milli_metres()
         self.object_depth[self.non_object_mask] = 0
         return self.object_depth
 
     def get_roi(self, padding=0):
+        """Get roi from object mask
+
+        Parameters
+        ----------
+        padding : int, optional
+            by default 0
+
+        Returns
+        -------
+        roi : list[float]
+            [top, left, bottom, right] order
+        """
         ymin = np.max([np.min(self.object_mask[0]) -
                        np.random.randint(0, padding), 0])
         ymax = np.min([np.max(self.object_mask[0]) +
@@ -287,12 +397,25 @@ class Renderer:
                        np.random.randint(0, padding),
                        int(self.im_width - 1)])
 
-        # [top, left, bottom, right] order
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
 
     def transform_contact_points(self, contact_points,
                                  translate=[0, 0.01, 0]):
+        """Transform contact points
+
+        Parameters
+        ----------
+        contact_points : list[list[list[float], list[float]]]
+            [pos, rot] order
+        translate : list, optional
+            translate contact points for ray-trace,
+            by default [0, 0.01, 0]
+
+        Returns
+        -------
+        contact_points : list[list[list[], list[]]]
+        """
         contact_point_worldcoords_list = []
         contact_point_in_camera_coords_list = []
         for cp in contact_points:
@@ -313,6 +436,19 @@ class Renderer:
             contact_point_worldcoords_list
 
     def get_visible_coords(self, contact_points, debug_line=False):
+        """Get visible coords
+
+        Parameters
+        ----------
+        contact_points : list[list[list[float], list[float]]]
+        debug_line : bool, optional
+            visualize debug line from cam to points, by default False
+
+        Returns
+        -------
+        self.hanging_point_in_camera_coords_list : list[list[list[float], list[float]]]
+            visible coords list
+        """
         self.hanging_point_in_camera_coords_list = []
 
         contact_point_in_camera_coords_list, contact_point_worldcoords_list \
@@ -347,6 +483,12 @@ class Renderer:
         return self.hanging_point_in_camera_coords_list
 
     def move_to_coords(self, coords):
+        """Move camera to target coords
+
+        Parameters
+        ----------
+        coords : skrobot.coordinates.base.Coordinates
+        """
         self.camera_coords = coords
         pybullet.resetBasePositionAndOrientation(
             self.camera_id,
@@ -357,6 +499,13 @@ class Renderer:
         self.draw_camera_pos()
 
     def move_to(self, T):
+        """Move camera to target position
+
+        Parameters
+        ----------
+        T : list[float]
+            move to [x, y ,z]
+        """
         self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
             rot=r.camera_coords.worldrot())
@@ -368,12 +517,20 @@ class Renderer:
                     self.camera_coords.worldrot())))
 
     def move_to_random_pos(self):
+        """Move camera to random position"""
         newpos = [(np.random.rand() - 0.5) * 0.1,
                   (np.random.rand() - 0.5) * 0.1,
                   np.random.rand() * 0.7 + 0.3]
         self.move_to(newpos)
 
     def look_at(self, p):
+        """Look at target position
+
+        Parameters
+        ----------
+        p : list[float]
+            look at [x, y, z]
+        """
         p = np.array(p)
         if np.all(p == self.camera_coords.worldpos()):
             return
@@ -390,16 +547,36 @@ class Renderer:
         self.draw_camera_pos()
 
     def get_plane(self):
+        """Load plane
+
+        Returns
+        -------
+        self.plane_id : int
+        """
         self.plane_id = pybullet.loadURDF("plane.urdf", [0, 0, -0.5])
         return self.plane_id
 
     def save_intrinsics(self, save_dir):
+        """Save intrinsics
+
+        Saving cameara info is better.
+
+        Parameters
+        ----------
+        save_dir : str
+        """
         if not osp.isfile(
                 osp.join(save_dir, 'intrinsics', 'intrinsics.npy')):
             np.save(osp.join(
                 save_dir, 'intrinsics', 'intrinsics'), self.camera_model.K)
 
     def create_camera(self):
+        """Create camera object
+
+        Returns
+        -------
+        self.camera_id : int
+        """
         camera_length = 0.01
         camera_object = pybullet.createCollisionShape(
             pybullet.GEOM_BOX,
@@ -420,6 +597,12 @@ class Renderer:
         return self.camera_id
 
     def change_texture(self, object_id):
+        """Chage textuer of object
+
+        Parameters
+        ----------
+        object_id : int
+        """
         textureId = pybullet.loadTexture(
             self.texture_paths[np.random.randint(
                 0, len(self.texture_paths) - 1)])
@@ -427,13 +610,19 @@ class Renderer:
             object_id, -1, textureUniqueId=textureId)
 
     def crop(self):
+        """Crop bgr and depth using object mask"""
         self.get_roi(padding=50)
         self.bgr = self.camera_model.crop_resize_image(self.bgr)
         self.depth = self.camera_model.crop_resize_image(
             self.depth, interpolation=Image.NEAREST)
 
     def create_annotation_data(self):
+        """Get annotation data
 
+        Returns
+        -------
+        result : bool
+        """
         for hp in self.hanging_point_in_camera_coords_list:
             px, py = self.camera_model.project3d_to_pixel(hp.worldpos())
             if self.save_debug_axis:
@@ -471,10 +660,17 @@ class Renderer:
         return True
 
     def get_data_id(self):
+        """Get the number of saved data
+
+        Returns
+        -------
+        self.data_id : int
+        """
         self.data_id = len(glob.glob(osp.join(self.save_dir, 'depth', '*npy')))
         return self.data_id
 
     def save_data(self):
+        """Save training data"""
         self.get_data_id()
         print('Save {}'.format(self.data_id))
         cv2.imwrite(osp.join(self.save_dir, 'color', '{:06}.png'.format(
@@ -498,7 +694,18 @@ class Renderer:
                 self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
                 self.bgr_axis)
 
-    def create_data(self, urdf_file, contact_points, dataset_type='ycb'):
+    def create_data(self, urdf_file, contact_points):
+        """Create training data
+
+        Parameters
+        ----------
+        urdf_file : str
+        contact_points : list[list[list[float], list[float]]]
+
+        Returns
+        -------
+        result : bool
+        """
         self.get_plane()
         self.load_urdf(urdf_file)
         self.change_texture(self.plane_id)
@@ -535,10 +742,29 @@ class Renderer:
         return True
 
     def from_camera_pose(self, camera_pose_path):
+        """Load camera pose file and set camera coords
+
+        Parameters
+        ----------
+        camera_pose_path : str
+        """
         coords = load_camera_pose(camera_pose_path)
         self.move_to_coords(coords)
 
     def get_sim_images(self, urdf_file, camera_pose_path):
+        """Get simulation images
+
+        Used to obtain a simulation image from a mesh generated from real data.
+
+        Parameters
+        ----------
+        urdf_file : str
+        camera_pose_path : str
+
+        Returns
+        -------
+        self.bgr, self.depth
+        """
         self.load_urdf(urdf_file, random_pose=False)
         self.create_camera()
         self.from_camera_pose(camera_pose_path)
@@ -553,9 +779,20 @@ class Renderer:
         self.get_object_depth()
         self.crop()
 
+        cv2.imwrite(
+            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/color/000000.png',
+            self.bgr)
+        np.save(
+            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/depth/000000.npy',
+            self.depth)
+        self.camera_model.dump(
+            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/camera_info/000000.yaml')
+        print('sim img')
+
         return self.bgr, self.depth
 
     def finish(self):
+        """Finish simulation"""
         self.remove_all_objects()
         pybullet.resetSimulation()
         pybullet.disconnect()
@@ -563,6 +800,15 @@ class Renderer:
 
 class DepthMap():
     def __init__(self, width, height, circular=True):
+        """Depth map which store annotated depth value
+
+        Parameters
+        ----------
+        width : int
+        height : int
+        circular : bool, optional
+            Annotate the map in a circle
+        """
         self.width = width
         self.height = height
         self.size = width * height
@@ -572,6 +818,15 @@ class DepthMap():
         self.circular = circular
 
     def add_depth(self, px, py, d):
+        """Add depth to target pixel
+
+        Parameters
+        ----------
+        px : int
+        py : int
+        d : float
+            depth value
+        """
         if self.circular:
             iy, ix = np.where(
                 create_circular_mask(self.height, self.width, py, px))
@@ -583,17 +838,34 @@ class DepthMap():
             self._depth[idx] = d
 
     def calc_average_depth(self):
+        """Calculate average depth each pixel"""
         for idx in range(self.size):
             if self._depth_buffer[idx] != []:
                 self._depth[idx] = np.mean(self._depth_buffer[idx])
 
     @property
     def depth(self):
+        """Depth
+
+        Returns
+        -------
+        depth : numpy.ndarray
+        """
         if self.circular:
             self.calc_average_depth()
         return np.array(self._depth).reshape(self.height, self.width)
 
     def on_depth_image(self, depth_image):
+        """Overlay map depth on input depth
+
+        Parameters
+        ----------
+        depth_image : numpy.ndarray
+
+        Returns
+        -------
+        depth_image ; numpy.ndarray
+        """
         depth_image = depth_image.copy()
         mask = np.where(self.depth != 0)
         depth_image[mask] = self.depth[mask]
@@ -602,6 +874,13 @@ class DepthMap():
 
 class RotationMap():
     def __init__(self, width, height):
+        """Rotation map which store annotated quatenion
+
+        Parameters
+        ----------
+        width : int
+        height : int
+        """
         self.width = width
         self.height = height
         self.size = width * height
@@ -611,6 +890,15 @@ class RotationMap():
         self.rotations = [np.array([1, 0, 0, 0])] * self.size
 
     def add_quaternion(self, px, py, q):
+        """Add quaternion to target pixel
+
+        Parameters
+        ----------
+        px : int
+        py : int
+        q : list[flaot]
+            quaternion
+        """
         iy, ix = np.where(
             create_circular_mask(self.height, self.width, py, px))
         idices = ix + iy * self.width
@@ -618,16 +906,39 @@ class RotationMap():
             self.rotations_buffer[idx].append(q.tolist())
 
     def get_length(self, px, py):
+        """Get the number of stored quaternion in target pixel
+
+        Parameters
+        ----------
+        px : int
+        py : int
+
+        Returns
+        -------
+        len(self.rotations_buffer[idx]) : int
+        """
         idx = px + py * self.width
         return len(self.rotations_buffer[idx])
 
     def averageQuaternions(self, Q):
-        '''
+        """Calculate average quaternion
+
         https://github.com/christophhagen/averaging-quaternions/blob/master/LICENSE
         Q is a Nx4 numpy matrix and contains the quaternions to average in the rows.
         The quaternions are arranged as (w,x,y,z), with w being the scalar
         The result will be the average quaternion of the input. Note that the signs
         of the output quaternion can be reversed, since q and -q describe the same orientation
+
+        Parameters
+        ----------
+        Q : numpy.ndarray
+
+        Returns
+        -------
+        average quaternion : numpy.ndarray
+        """
+        '''
+
         '''
         M = Q.shape[0]
         A = npm.zeros(shape=(4, 4))
@@ -644,6 +955,7 @@ class RotationMap():
         return np.real(eigenVectors[:, 0].A1)
 
     def calc_average_rotations(self):
+        """Calculate average quaternion"""
         for idx in range(self.size):
             if self.rotations_buffer[idx] != []:
                 self.rotations[idx] = self.averageQuaternions(
@@ -654,6 +966,28 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
                        dataset_type='ycb', use_clustering=True,
                        use_filter_penetration=True,
                        inf_penetration_check=True):
+    """Get contact points from file
+
+    Parameters
+    ----------
+    contact_points_path : str
+        dir or file path.
+        if dir load multiple file.
+    json_name : str, optional
+        target json file name, by default 'contact_points.json'
+    dataset_type : str, optional
+        by default 'ycb'
+    use_clustering : bool, optional
+        by default True
+    use_filter_penetration : bool, optional
+        by default True
+    inf_penetration_check : bool, optional
+        by default True
+
+    Returns
+    -------
+    contact_points : list[list[list[float], list[float]]]
+    """
 
     if osp.isdir(contact_points_path):
         contact_points_dict = load_multiple_contact_points(
@@ -689,10 +1023,34 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
 
 
 def sample_contact_points(contact_points, num_samples):
+    """Sampling contact points for the specified number
+
+    Parameters
+    ----------
+    contact_points : list[list[list[float], list[float]]]
+    num_samples : int
+
+    Returns
+    -------
+    contact_points : list[list[list[float], list[float]]]
+    """
     idx = np.random.randint(0, len(contact_points), num_samples)
     return [contact_points[i] for i in idx]
 
+
 def make_save_dirs(save_dir):
+    """Make each save dir
+
+    Parameters
+    ----------
+    save_dir : str
+        base save dir
+
+    Returns
+    -------
+    save_dir ; str
+        save dir made by eos.make_fancy_output_dir
+    """
     save_dir = make_fancy_output_dir(save_dir)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
@@ -706,6 +1064,23 @@ def make_save_dirs(save_dir):
 
 
 def split_file_name(file, dataset_type='ycb'):
+    """Split object file name and get dirname, filename, category_name, idx
+
+    Parameters
+    ----------
+    file : str
+    dataset_type : str, optional
+        'ycb' or 'ObjectNet3D', by default 'ycb'
+
+    Returns
+    -------
+    dirname : str
+    filename : str
+    category_name : str
+    idx : int
+        if only 'ObjectNet3D'.
+        One type of object has multiple ids
+    """
     dirname, filename = osp.split(file)
     filename_without_ext, ext = osp.splitext(filename)
     if dataset_type == 'ycb':
