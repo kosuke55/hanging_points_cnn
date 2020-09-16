@@ -165,4 +165,5 @@ viewer.show()
 
 cv2.imshow('confidence', confidence_img)
 cv2.imshow('roi', cv_bgr)
-cv2.waitKey()
+cv2.waitKey(0)
+cv2.destroyAllWindows()

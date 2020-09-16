@@ -827,6 +827,9 @@ if __name__ == '__main__':
         for file in files:
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
+            print(category_name)
+            if category_name not in category_name_list:
+                continue
             save_dir = osp.join(save_dir_base, category_name)
             save_dir = make_save_dirs(save_dir)
 
