@@ -291,7 +291,7 @@ class Renderer:
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
 
-    def translate_contact_points(self, contact_points):
+    def transform_contact_points(self, contact_points):
         contact_point_worldcoords_list = []
         contact_point_in_camera_coords_list = []
         for cp in contact_points:
@@ -314,7 +314,7 @@ class Renderer:
         self.hanging_point_in_camera_coords_list = []
 
         contact_point_in_camera_coords_list, contact_point_worldcoords_list \
-            = self.translate_contact_points(contact_points)
+            = self.transform_contact_points(contact_points)
         ray_info_list = pybullet.rayTestBatch(
             [c.worldpos() for c in contact_point_worldcoords_list],
             [self.camera_coords.worldpos()] * len(
