@@ -692,16 +692,6 @@ def sample_contact_points(contact_points, num_samples):
     idx = np.random.randint(0, len(contact_points), num_samples)
     return [contact_points[i] for i in idx]
 
-# def move_contact_points(contact_points, axis='y', value=0.01):
-#     if axis == 'y':
-#         translate = np.array([0, value, 0])
-
-#     for i, cp in enumerate(contact_points):
-#         contact_points[i][0] = cp[0] + translate
-
-#     return contact_points
-
-
 def make_save_dirs(save_dir):
     save_dir = make_fancy_output_dir(save_dir)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
