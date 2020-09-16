@@ -138,6 +138,15 @@ class Renderer:
             self.remove_object(o_id, True)
         self.objects = []
 
+    def move_object_coords(self, coords):
+        self.object_coords = coords
+        pybullet.resetBasePositionAndOrientation(
+            self.object_id,
+            self.object_coords.worldpos(),
+            coordinates.math.wxyz2xyzw(
+                coordinates.math.matrix2quaternion(
+                    self.object_coords.worldrot())))
+
     def reset_object_pose(self):
         roll = np.random.rand() * np.pi
         pitch = np.random.rand() * np.pi
