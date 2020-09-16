@@ -235,3 +235,48 @@ def get_gradation(
     else:
         return np.tile(np.linspace(
             start_value, end_value, height), (width, 1)).T
+
+
+def depth_to_mask(depth):
+    """Create mask image from depth
+
+    Parameters
+    ----------
+    depth : numpy.ndarray
+
+    Returns
+    -------
+    mask : numpy.ndarray
+    """
+    mask = np.zeros_like(depth, np.uint8)
+    mask[depth > 0] = 255
+    return mask
+
+
+def depth_edges_noise(depth, value=5., copy=True):
+    """Add noise to depth edges
+
+    Parameters
+    ----------
+    depth : numpy.ndarray
+    value : float, optional
+        noise distacne value, by default 5.
+    copy : bool, optional
+        by default True
+
+    Returns
+    -------
+    depth : numpy.ndarray
+        depth with noise
+    """
+    if copy:
+        depth = depth.copy()
+    mask = depth_to_mask(depth)
+    edges = cv2.Canny(mask, 0, 255)
+    kernel = np.ones((5, 5), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
+    noise = (np.random.random_sample(edges.shape) - 0.5) * 2 * value
+    noise[edges == 0] = 0
+    noise[mask == 0] = 0
+    depth += noise
+    return depth
