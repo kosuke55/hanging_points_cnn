@@ -1221,10 +1221,12 @@ if __name__ == '__main__':
             if contact_points is None:
                 continue
 
-            data_count = 0
-            while data_count < data_num:
+            while True:
                 r = Renderer(DEBUG=gui, save_dir=save_dir)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
+                print(r.data_id)
+                if r.data_id == data_num:
+                    break
 
     except KeyboardInterrupt:
         sys.exit()
