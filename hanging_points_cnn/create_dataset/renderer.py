@@ -1034,6 +1034,8 @@ def sample_contact_points(contact_points, num_samples):
     -------
     contact_points : list[list[list[float], list[float]]]
     """
+    if num_samples > len(contact_points):
+        num_samples = len(contact_points)
     idx = np.random.randint(0, len(contact_points), num_samples)
     return [contact_points[i] for i in idx]
 
