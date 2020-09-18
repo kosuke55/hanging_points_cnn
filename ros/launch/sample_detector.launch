@@ -92,7 +92,7 @@
     <rosparam subst_value="true">
       gpu: $(arg gpu)
       predict_depth: $(arg predict_depth)
-      pretrained_model : "/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200917_1535.pt"w
+      pretrained_model : "/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200917_1535.pt"
     </rosparam>
   </node>
 
