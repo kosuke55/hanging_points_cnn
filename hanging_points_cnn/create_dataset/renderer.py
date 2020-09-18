@@ -658,9 +658,7 @@ class Renderer:
             = self.annotation_img / self.annotation_img.max() * 255
         self.annotation_img = self.annotation_img.astype(np.uint8)
 
-        self.rotation_map.calc_average_rotations()
-        self.rotations = np.array(self.rotation_map.rotations).reshape(
-            self.target_width, self.target_height, 4)
+        self.rotations = self.rotation_map.rotations
 
         self.hanging_points_depth = self.depth_map.on_depth_image(self.depth)
 
@@ -891,10 +889,9 @@ class RotationMap():
         self.width = width
         self.height = height
         self.size = width * height
-        self.rotations_buffer = [[] for _ in range(self.size)]
-        # self.rotations_buffer = []
+        self._rotations_buffer = [[] for _ in range(self.size)]
         # [w, x, y, z] quaternion
-        self.rotations = [np.array([1, 0, 0, 0])] * self.size
+        self._rotations = [np.array([1, 0, 0, 0])] * self.size
 
     def add_quaternion(self, px, py, q):
         """Add quaternion to target pixel
@@ -907,10 +904,10 @@ class RotationMap():
             quaternion
         """
         iy, ix = np.where(
-            create_circular_mask(self.height, self.width, py, px))
+            create_circular_mask(self.height, self.width, py, px, radius=50))
         idices = ix + iy * self.width
         for idx in idices:
-            self.rotations_buffer[idx].append(q.tolist())
+            self._rotations_buffer[idx].append(q.tolist())
 
     def get_length(self, px, py):
         """Get the number of stored quaternion in target pixel
@@ -925,7 +922,7 @@ class RotationMap():
         len(self.rotations_buffer[idx]) : int
         """
         idx = px + py * self.width
-        return len(self.rotations_buffer[idx])
+        return len(self._rotations_buffer[idx])
 
     def averageQuaternions(self, Q):
         """Calculate average quaternion
@@ -964,9 +961,14 @@ class RotationMap():
     def calc_average_rotations(self):
         """Calculate average quaternion"""
         for idx in range(self.size):
-            if self.rotations_buffer[idx] != []:
-                self.rotations[idx] = self.averageQuaternions(
-                    np.array(self.rotations_buffer[idx]))
+            if self._rotations_buffer[idx] != []:
+                self._rotations[idx] = self.averageQuaternions(
+                    np.array(self._rotations_buffer[idx]))
+
+    @property
+    def rotations(self):
+        self.calc_average_rotations()
+        return np.array(self._rotations).reshape(self.height, self.width, 4)
 
 
 def get_contact_points(contact_points_path, json_name='contact_points.json',
