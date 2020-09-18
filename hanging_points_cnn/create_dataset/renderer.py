@@ -120,9 +120,8 @@ class Renderer:
             self.cid = pybullet.connect(pybullet.DIRECT)
         self.debug_visible_line = False
 
-        self.texture_paths = glob.glob(
-            osp.join('/media/kosuke/SANDISK/dtd', '**', '*.jpg'),
-            recursive=True)
+        self.texture_paths = list(
+            map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
 
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
         pybullet.setPhysicsEngineParameter(enableFileCaching=0)
@@ -373,7 +372,7 @@ class Renderer:
         self.object_depth[self.non_object_mask] = 0
         return self.object_depth
 
-    def get_roi(self, padding=0):
+    def get_roi(self, padding=0, random=True):
         """Get roi from object mask
 
         Parameters
@@ -386,16 +385,24 @@ class Renderer:
         roi : list[float]
             [top, left, bottom, right] order
         """
-        ymin = np.max([np.min(self.object_mask[0]) -
-                       np.random.randint(0, padding), 0])
-        ymax = np.min([np.max(self.object_mask[0]) +
-                       np.random.randint(0, padding),
-                       int(self.im_height - 1)])
-        xmin = np.max([np.min(self.object_mask[1]) -
-                       np.random.randint(0, padding), 0])
-        xmax = np.min([np.max(self.object_mask[1]) +
-                       np.random.randint(0, padding),
-                       int(self.im_width - 1)])
+        if random:
+            ymin = np.max([np.min(self.object_mask[0]) -
+                           np.random.randint(0, padding), 0])
+            ymax = np.min([np.max(self.object_mask[0]) +
+                           np.random.randint(0, padding),
+                           int(self.im_height - 1)])
+            xmin = np.max([np.min(self.object_mask[1]) -
+                           np.random.randint(0, padding), 0])
+            xmax = np.min([np.max(self.object_mask[1]) +
+                           np.random.randint(0, padding),
+                           int(self.im_width - 1)])
+        else:
+            ymin = np.max([np.min(self.object_mask[0]) - padding, 0])
+            ymax = np.min([np.max(self.object_mask[0]) +
+                           padding, int(self.im_height - 1)])
+            xmin = np.max([np.min(self.object_mask[1]) - padding, 0])
+            xmax = np.min([np.max(self.object_mask[1]) +
+                           padding, int(self.im_width - 1)])
 
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
@@ -609,9 +616,9 @@ class Renderer:
         pybullet.changeVisualShape(
             object_id, -1, textureUniqueId=textureId)
 
-    def crop(self):
+    def crop(self, padding, random):
         """Crop bgr and depth using object mask"""
-        self.get_roi(padding=50)
+        self.get_roi(padding=padding, random=random)
         self.bgr = self.camera_model.crop_resize_image(self.bgr)
         self.depth = self.camera_model.crop_resize_image(
             self.depth, interpolation=Image.NEAREST)
@@ -731,7 +738,7 @@ class Renderer:
 
             self.get_object_depth()
 
-            self.crop()
+            self.crop(padding=50)
         align_coords(self.hanging_point_in_camera_coords_list, copy_list=False)
         if not self.create_annotation_data():
             self.finish()
@@ -777,7 +784,7 @@ class Renderer:
             return False
 
         self.get_object_depth()
-        self.crop()
+        self.crop(padding=10, random=False)
 
         cv2.imwrite(
             '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/color/000000.png',
