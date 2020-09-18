@@ -253,6 +253,25 @@ def depth_to_mask(depth):
     return mask
 
 
+def mask_to_edges(mask, kenel=(5, 5)):
+    """Convert mask to edges
+
+    Parameters
+    ----------
+    mask : numpy.ndarray
+    kenel : tuple, optional
+        dilate kernel, by default (5, 5)
+
+    Returns
+    -------
+    edges : numpy.ndarray
+    """
+    edges = cv2.Canny(mask, 0, 255)
+    kernel = np.ones((5, 5), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
+    return edges
+
+
 def depth_edges_noise(depth, value=5., copy=True):
     """Add noise to depth edges
 
@@ -272,9 +291,7 @@ def depth_edges_noise(depth, value=5., copy=True):
     if copy:
         depth = depth.copy()
     mask = depth_to_mask(depth)
-    edges = cv2.Canny(mask, 0, 255)
-    kernel = np.ones((5, 5), np.uint8)
-    edges = cv2.dilate(edges, kernel, iterations=1)
+    edges = mask_to_edges(mask)
     noise = (np.random.random_sample(edges.shape) - 0.5) * 2 * value
     noise[edges == 0] = 0
     noise[mask == 0] = 0
