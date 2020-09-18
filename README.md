@@ -16,7 +16,7 @@ you can get contact_points.json like
 Next, load the generated contact points and generate training data by rendering on the simulator.
 ```
 cd hangning_points_cnn/create_dataset
-python run_many.py 'python renderer.py -n 1000 -i \<path to ycb urdf\> -s <save dir>'
+python run_many.py 'python renderer.py -n 1000 -i <path to ycb urdf> -s <save dir>'
 ```
 For example,
 Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'`
