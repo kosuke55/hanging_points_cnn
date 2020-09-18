@@ -35,4 +35,4 @@ python train_hpnet.py -g 2 -c config/gray_model.yaml  -bs 16 -dp <save dir>
 ```
 ipython -i -- infer_pose_from_data.py -i <save dir>/<fancy dir> --idx 10 -p <your trained model path>
 ```
-\< fancy dir\>  is made by [eos](https://github.com/iory/eos)
+\<fancy dir\>  is made by [eos](https://github.com/iory/eos)
