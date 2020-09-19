@@ -49,8 +49,10 @@ np.set_printoptions(precision=3, suppress=True)
 
 class Renderer:
     def __init__(
-            self, im_width=512, im_height=424, fov=42.5,
-            near_plane=0.1, far_plane=2.0, target_width=256, target_height=256,
+            self, im_width=512,
+            im_height=424, fov=42.5,
+            near_plane=0.1, far_plane=30.0,
+            target_width=256, target_height=256,
             save_dir='./', DEBUG=False):
         """Create training data of CNN
 
