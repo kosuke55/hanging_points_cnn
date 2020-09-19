@@ -409,13 +409,15 @@ class Renderer:
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         return [ymin, ymax, xmin, xmax]
 
-    def transform_contact_points(self, contact_points,
+    def transform_contact_points(self, contact_points_coords,
                                  translate=[0, 0.01, 0]):
         """Transform contact points
 
         Parameters
         ----------
         contact_points : list[list[list[float], list[float]]]
+
+        contact_points_coords : list[skrobot.coordinates.Coordinates]
             [pos, rot] order
         translate : list, optional
             translate contact points for ray-trace,
@@ -427,10 +429,7 @@ class Renderer:
         """
         contact_point_worldcoords_list = []
         contact_point_in_camera_coords_list = []
-        for cp in contact_points:
-            contact_point_coords = coordinates.Coordinates(
-                pos=(cp[0] - self.object_center),
-                rot=cp[1:]).translate(translate, 'local')
+        for contact_point_coords in contact_points_coords:
             contact_point_worldcoords \
                 = self.object_coords.copy().transform(
                     contact_point_coords)
@@ -444,24 +443,58 @@ class Renderer:
         return contact_point_in_camera_coords_list, \
             contact_point_worldcoords_list
 
-    def get_visible_coords(self, contact_points, debug_line=False):
-        """Get visible coords
+    def make_contact_points_coords(self, contact_points):
+        """Make contact points coords
 
         Parameters
         ----------
         contact_points : list[list[list[float], list[float]]]
+
+        Returns
+        -------
+        contact_points_coords:  list[skrobot.coordinates.Coordinates]
+        """
+        contact_points_coords = []
+        for cp in contact_points:
+            contact_point_coords = coordinates.Coordinates(
+                pos=(cp[0] - self.object_center), rot=cp[1:])
+            contact_points_coords.append(contact_point_coords)
+        return contact_points_coords
+
+    def make_average_coords_list(self, coords_list):
+        """
+
+        Parameters
+        ----------
+        coords_list : list[skrobot.coordinates.Coordinates]
+
+        Returns
+        -------
+        coords_list : list[skrobot.coordinates.Coordinates]
+        """
+        q_average = average_coords(coords_list)
+        for i in len(coords_list):
+            coords_list[i].rot = q_average
+        return coords_list
+
+    def get_visible_coords(self, contact_points_coords, debug_line=False):
+        """Get visible coords
+
+        Parameters
+        ----------
+        contact_points_coords : list[skrobot.coordinates.Coordinates]
         debug_line : bool, optional
             visualize debug line from cam to points, by default False
 
         Returns
         -------
-        self.hanging_point_in_camera_coords_list : list[list[list[float], list[float]]]
+        self.hanging_point_in_camera_coords_list
+            : list[skrobot.coordinates.Coordinates]
             visible coords list
         """
         self.hanging_point_in_camera_coords_list = []
-
         contact_point_in_camera_coords_list, contact_point_worldcoords_list \
-            = self.transform_contact_points(contact_points)
+            = self.transform_contact_points(contact_points_coords)
         ray_info_list = pybullet.rayTestBatch(
             [c.worldpos() for c in contact_point_worldcoords_list],
             [self.camera_coords.worldpos()] * len(
@@ -715,6 +748,7 @@ class Renderer:
         """
         self.get_plane()
         self.load_urdf(urdf_file)
+        contact_points_coords = self.make_contact_points_coords(contact_points)
         self.change_texture(self.plane_id)
         self.change_texture(self.object_id)
         self.create_camera()
@@ -723,7 +757,7 @@ class Renderer:
             self.move_to_random_pos()
             self.look_at(self.object_coords.worldpos() - self.object_center)
             self.step(1)
-            if not self.get_visible_coords(contact_points):
+            if not self.get_visible_coords(contact_points_coords):
                 self.reset_object_pose()
                 continue
             else:
@@ -926,45 +960,11 @@ class RotationMap():
         idx = px + py * self.width
         return len(self._rotations_buffer[idx])
 
-    def averageQuaternions(self, Q):
-        """Calculate average quaternion
-
-        https://github.com/christophhagen/averaging-quaternions/blob/master/LICENSE
-        Q is a Nx4 numpy matrix and contains the quaternions to average in the rows.
-        The quaternions are arranged as (w,x,y,z), with w being the scalar
-        The result will be the average quaternion of the input. Note that the signs
-        of the output quaternion can be reversed, since q and -q describe the same orientation
-
-        Parameters
-        ----------
-        Q : numpy.ndarray
-
-        Returns
-        -------
-        average quaternion : numpy.ndarray
-        """
-        '''
-
-        '''
-        M = Q.shape[0]
-        A = npm.zeros(shape=(4, 4))
-
-        for i in range(0, M):
-            q = Q[i, :]
-            A = np.outer(q, q) + A
-
-        A = (1.0 / M) * A
-        eigenValues, eigenVectors = np.linalg.eig(A)
-        eigenVectors = eigenVectors[:, eigenValues.argsort()[::-1]]
-
-        # return the real part of the largest eigenvector (has only real part)
-        return np.real(eigenVectors[:, 0].A1)
-
     def calc_average_rotations(self):
         """Calculate average quaternion"""
         for idx in range(self.size):
             if self._rotations_buffer[idx] != []:
-                self._rotations[idx] = self.averageQuaternions(
+                self._rotations[idx] = averageQuaternions(
                     np.array(self._rotations_buffer[idx]))
 
     @property
@@ -1135,11 +1135,7 @@ def align_coords(coords_list, eps=0.005, min_sample=2,
         [coords.worldpos() for coords in coords_list])
 
     for label in range(np.max(dbscan.labels_) + 1):
-        if np.count_nonzero(dbscan.labels_ == label) <= 1:
-            continue
-
         q_base = None
-
         for idx, coords in enumerate(coords_list):
             if dbscan.labels_[idx] == label:
                 if q_base is None:
@@ -1152,6 +1148,46 @@ def align_coords(coords_list, eps=0.005, min_sample=2,
                     coords_list[idx].rotate(np.pi, 'y')
 
     return coords_list
+
+
+def averageQuaternions(Q):
+    """Calculate average quaternion
+
+    https://github.com/christophhagen/averaging-quaternions/blob/master/LICENSE
+    Q is a Nx4 numpy matrix and contains the quaternions to average in the rows.
+    The quaternions are arranged as (w,x,y,z), with w being the scalar
+    The result will be the average quaternion of the input. Note that the signs
+    of the output quaternion can be reversed, since q and -q describe the same orientation
+
+    Parameters
+    ----------
+    Q : numpy.ndarray or list[float]
+
+    Returns
+    -------
+    average quaternion : numpy.ndarray
+    """
+
+    np.array(Q)
+    M = Q.shape[0]
+    A = npm.zeros(shape=(4, 4))
+
+    for i in range(0, M):
+        q = Q[i, :]
+        A = np.outer(q, q) + A
+
+    A = (1.0 / M) * A
+    eigenValues, eigenVectors = np.linalg.eig(A)
+    eigenVectors = eigenVectors[:, eigenValues.argsort()[::-1]]
+
+    # return the real part of the largest eigenvector (has only real part)
+    return np.real(eigenVectors[:, 0].A1)
+
+
+def average_coords(coords_list):
+    q_list = [c.quaternion for c in coords_list]
+    q_average = averageQuaternions(q_list)
+    return q_average
 
 
 if __name__ == '__main__':
