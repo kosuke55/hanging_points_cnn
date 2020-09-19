@@ -651,7 +651,7 @@ class Renderer:
         pybullet.changeVisualShape(
             object_id, -1, textureUniqueId=textureId)
 
-    def crop(self, padding, random):
+    def crop(self, padding, random=True):
         """Crop bgr and depth using object mask"""
         self.get_roi(padding=padding, random=random)
         self.bgr = self.camera_model.crop_resize_image(self.bgr)
@@ -870,7 +870,8 @@ class DepthMap():
         """
         if self.circular:
             iy, ix = np.where(
-                create_circular_mask(self.height, self.width, py, px))
+                create_circular_mask(
+                    self.height, self.width, py, px, radius=50))
             idices = ix + iy * self.width
             for idx in idices:
                 self._depth_buffer[idx].append(d)
