@@ -1,6 +1,8 @@
 import argparse
 import os.path as osp
+from six.moves import input
 import sys
+import time
 
 import cameramodels
 import open3d as o3d
@@ -35,56 +37,74 @@ parser.add_argument(
 
 args = parser.parse_args()
 base_dir = args.input_dir
-idx = args.idx
+start_idx = args.idx
+
 
 viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 
-color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
-color = o3d.io.read_image(color_path)
+for idx in range(start_idx, 100000):
+    print(idx)
+    if idx != start_idx:
+        viewer.delete(pc)
+        for c in contact_point_sphere_list:
+            viewer.delete(c)
 
-depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
-depth = np.load(depth_path)
-depth = o3d.geometry.Image(depth)
+    color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
+    color = o3d.io.read_image(color_path)
 
-camera_info_path = osp.join(
-    base_dir, 'camera_info', '{:06}.yaml'.format(idx))
-cameramodel = cameramodels.PinholeCameraModel.from_yaml_file(
-    camera_info_path)
-intrinsics = cameramodel.open3d_intrinsic
-rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-    color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
-pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
-    rgbd, intrinsics)
-# o3d.visualization.draw_geometries([pcd])
+    depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
+    depth = np.load(depth_path)
+    depth = o3d.geometry.Image(depth)
 
-rotations_path = osp.join(
-    base_dir, 'rotations', '{:06}.npy'.format(idx))
-rotations = np.load(rotations_path)
+    camera_info_path = osp.join(
+        base_dir, 'camera_info', '{:06}.yaml'.format(idx))
+    cameramodel = cameramodels.PinholeCameraModel.from_yaml_file(
+        camera_info_path)
+    intrinsics = cameramodel.open3d_intrinsic
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
+    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+        rgbd, intrinsics)
+    # o3d.visualization.draw_geometries([pcd])
 
-hanging_points_depth_path = osp.join(
-    base_dir, 'hanging_points_depth', '{:06}.npy'.format(idx))
-hanging_points_depth = np.load(hanging_points_depth_path)
+    rotations_path = osp.join(
+        base_dir, 'rotations', '{:06}.npy'.format(idx))
+    rotations = np.load(rotations_path)
 
-confidence_path = osp.join(
-    base_dir, 'heatmap', '{:06}.png'.format(idx))
-confidence = cv2.imread(
-    confidence_path, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.
+    hanging_points_depth_path = osp.join(
+        base_dir, 'hanging_points_depth', '{:06}.npy'.format(idx))
+    hanging_points_depth = np.load(hanging_points_depth_path)
 
-_, rois_center = find_rois(confidence)
-rois_center = rois_center[0]
-for roi_center in rois_center:
-    cx, cy = roi_center
-    q = rotations[cy, cx]
-    dep = hanging_points_depth[cy, cx]
-    print(cx, cy)
-    pos = np.array(
-        cameramodel.project_pixel_to_3d_ray([cx, cy])) * dep * 0.001
-    contact_point_sphere = skrobot.models.Sphere(0.001, color=[255, 0, 0])
-    contact_point_sphere.newcoords(
-        skrobot.coordinates.Coordinates(pos=pos, rot=q))
-    viewer.add(contact_point_sphere)
+    confidence_path = osp.join(
+        base_dir, 'heatmap', '{:06}.png'.format(idx))
+    confidence = cv2.imread(
+        confidence_path, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.
 
-trimesh_pc = trimesh.PointCloud(np.asarray(pcd.points), np.asarray(pcd.colors))
-viewer.scene.add_geometry(trimesh_pc)
+    _, rois_center = find_rois(confidence)
+    rois_center = rois_center[0]
+    contact_point_sphere_list = []
+    for roi_center in rois_center:
+        cx, cy = roi_center
+        q = rotations[cy, cx]
+        dep = hanging_points_depth[cy, cx]
+        print(cx, cy)
+        pos = np.array(
+            cameramodel.project_pixel_to_3d_ray([cx, cy])) * dep * 0.001
+        contact_point_sphere = skrobot.models.Sphere(0.001, color=[255, 0, 0])
+        contact_point_sphere.newcoords(
+            skrobot.coordinates.Coordinates(pos=pos, rot=q))
+        viewer.add(contact_point_sphere)
+        contact_point_sphere_list.append(contact_point_sphere)
 
-viewer.show()
+    trimesh_pc = trimesh.PointCloud(
+        np.asarray(
+            pcd.points), np.asarray(
+            pcd.colors))
+    pc = skrobot.models.PointCloudLink(trimesh_pc)
+
+    viewer.add(pc)
+
+    if idx == start_idx:
+        viewer.show()
+
+    input('')
