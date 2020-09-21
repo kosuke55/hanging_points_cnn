@@ -9,6 +9,7 @@ import numpy.matlib as npm
 import os
 import os.path as osp
 import sys
+from operator import itemgetter
 from pathlib import Path
 from PIL import Image
 
@@ -147,6 +148,7 @@ class Renderer:
         -------
         self.object_id : int
         """
+        self.urdf_file = urdf
         self.object_id = pybullet.loadURDF(urdf, [0, 0, 0], [0, 0, 0, 1])
         if random_pose:
             self.reset_object_pose()
@@ -461,6 +463,98 @@ class Renderer:
             contact_points_coords.append(contact_point_coords)
         return contact_points_coords
 
+    def coords_to_dict(self, coords_list):
+        """Cover coords list to dict for json
+
+        Parameters
+        ----------
+        coords_list : list[skrobot.coordinates.Coordinates]
+
+        Returns
+        -------
+        contact_points_dict : dict
+        """
+        contact_points_list = []
+        contact_points_dict = {
+            'urdf_file': self.urdf_file,
+            'contact_points': []}
+        for coords in coords_list:
+            pose = np.concatenate(
+                [coords.T()[:3, 3][None, :],
+                 coords.T()[:3, :3]]).tolist()
+            contact_points_list.append(pose)
+        contact_points_dict['contact_points'] = contact_points_list
+        return contact_points_dict
+
+    def dbscan_coords(self, coords_list, eps=0.01, min_sample=2):
+        self.dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
+            [coords.worldpos() for coords in coords_list])
+
+    def align_coords(self, coords_list, eps=0.03,
+                     min_sample=2, angle_thresh=135., copy_list=True):
+        """Align the x-axis of coords
+
+        invert coordinates above the threshold.
+        If you do not align, the average value of the
+        rotation map will be incorrect.
+
+        Parameters
+        ----------
+        coords_list : list[skrobot.coordinates.base.Coordinates]
+        eps : float, optional
+            eps paramerter of sklearn dbscan, by default 0.005
+        min_sample : int, optional
+            min_sample paramerter of sklearn dbscan, by default 2
+        angle_thresh : float, optional
+            invert coordinates above the threshold, by default 135.0
+        copy_list ; bool, optional
+            If True copy coords_list, by default True
+
+        Returns
+        -------
+        coords_list : list[skrobot.coordinates.base.Coordinates]
+        """
+        if copy_list:
+            coords_list = copy.copy(coords_list)
+
+        # dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
+        #     [coords.worldpos() for coords in coords_list])
+        self.dbscan_coords(coords_list, eps, min_sample)
+        for label in range(np.max(self.dbscan.labels_) + 1):
+            q_base = None
+            for idx, coords in enumerate(coords_list):
+                if self.dbscan.labels_[idx] == label:
+                    if q_base is None:
+                        q_base = coords.quaternion
+                    q_distance \
+                        = coordinates.math.quaternion_distance(
+                            q_base, coords.quaternion)
+
+                    if np.rad2deg(q_distance) > angle_thresh:
+                        coords_list[idx].rotate(np.pi, 'y')
+
+        return coords_list
+
+    def split_label_coords(self, coords_list):
+        """Split coords based on label
+
+        Parameters
+        ----------
+        coords_list : list[skrobot.coordinates.Coordinates]
+
+        Returns
+        -------
+        coords_clusters :list[list[skrobot.coordinates.Coordinates]]
+        """
+        coords_clusters = []
+
+        for label in range(np.max(self.dbscan.labels_) + 1):
+            idx = tuple(np.where(self.dbscan.labels_ == label)[0])
+            coords_cluster = itemgetter(*idx)(coords_list)
+
+            coords_clusters.append(coords_cluster)
+        return coords_clusters
+
     def make_average_coords_list(self, coords_list):
         """
 
@@ -472,10 +566,15 @@ class Renderer:
         -------
         coords_list : list[skrobot.coordinates.Coordinates]
         """
-        q_average = average_coords(coords_list)
-        for i in len(coords_list):
-            coords_list[i].rot = q_average
-        return coords_list
+        average_coords_list = []
+        coords_clusters = self.split_label_coords(coords_list)
+        for coords_cluster in coords_clusters:
+            coords_average = average_coords(coords_cluster)
+            for coords in coords_cluster:
+                coords.rotation = coords_average.rotation
+                average_coords_list.append(coords)
+
+        return average_coords_list
 
     def get_visible_coords(self, contact_points_coords, debug_line=False):
         """Get visible coords
@@ -562,7 +661,7 @@ class Renderer:
         """Move camera to random position"""
         newpos = [(np.random.rand() - 0.5) * 0.1,
                   (np.random.rand() - 0.5) * 0.1,
-                  np.random.rand() * 0.7 + 0.3]
+                  np.random.rand() * 0.9 + 0.1]
         self.move_to(newpos)
 
     def look_at(self, p):
@@ -711,7 +810,6 @@ class Renderer:
 
     def save_data(self):
         """Save training data"""
-        self.get_data_id()
         print('Save {}'.format(self.data_id))
         cv2.imwrite(osp.join(self.save_dir, 'color', '{:06}.png'.format(
             self.data_id)), self.bgr)
@@ -746,13 +844,20 @@ class Renderer:
         -------
         result : bool
         """
+        self.get_data_id()
         self.get_plane()
         self.load_urdf(urdf_file)
         contact_points_coords = self.make_contact_points_coords(contact_points)
+        contact_points_coords \
+            = self.align_coords(
+                contact_points_coords, copy_list=False)
+        contact_points_coords \
+            = self.make_average_coords_list(contact_points_coords)
         self.change_texture(self.plane_id)
         self.change_texture(self.object_id)
         self.create_camera()
         loop = True
+
         while loop:
             self.move_to_random_pos()
             self.look_at(self.object_coords.worldpos() - self.object_center)
@@ -773,7 +878,7 @@ class Renderer:
             self.get_object_depth()
 
             self.crop(padding=50)
-        align_coords(self.hanging_point_in_camera_coords_list, copy_list=False)
+
         if not self.create_annotation_data():
             self.finish()
             return False
@@ -807,6 +912,10 @@ class Renderer:
         self.bgr, self.depth
         """
         self.load_urdf(urdf_file, random_pose=False)
+        self.get_plane()
+        self.change_texture(self.plane_id)
+        self.change_texture(self.object_id)
+
         self.create_camera()
         self.from_camera_pose(camera_pose_path)
         self.step(1)
@@ -1106,51 +1215,6 @@ def split_file_name(file, dataset_type='ycb'):
     return dirname, filename, category_name, idx
 
 
-def align_coords(coords_list, eps=0.005, min_sample=2,
-                 angle_thresh=135., copy_list=True):
-    """Align the x-axis of coords
-
-    invert coordinates above the threshold.
-    If you do not align, the average value of the
-    rotation map will be incorrect.
-
-    Parameters
-    ----------
-    coords_list : list[skrobot.coordinates.base.Coordinates]
-    eps : float, optional
-        eps paramerter of sklearn dbscan, by default 0.005
-    min_sample : int, optional
-        min_sample paramerter of sklearn dbscan, by default 2
-    angle_thresh : float, optional
-        invert coordinates above the threshold, by default 135.0
-    copy_list ; bool, optional
-        If True copy coords_list, by default True
-
-    Returns
-    -------
-    coords_list : list[skrobot.coordinates.base.Coordinates]
-    """
-    if copy_list:
-        coords_list = copy.copy(coords_list)
-    dbscan = DBSCAN(eps=eps, min_samples=min_sample).fit(
-        [coords.worldpos() for coords in coords_list])
-
-    for label in range(np.max(dbscan.labels_) + 1):
-        q_base = None
-        for idx, coords in enumerate(coords_list):
-            if dbscan.labels_[idx] == label:
-                if q_base is None:
-                    q_base = coords.quaternion
-                q_distance \
-                    = coordinates.math.quaternion_distance(
-                        q_base, coords.quaternion)
-
-                if np.rad2deg(q_distance) > angle_thresh:
-                    coords_list[idx].rotate(np.pi, 'y')
-
-    return coords_list
-
-
 def averageQuaternions(Q):
     """Calculate average quaternion
 
@@ -1169,7 +1233,7 @@ def averageQuaternions(Q):
     average quaternion : numpy.ndarray
     """
 
-    np.array(Q)
+    Q = np.array(Q)
     M = Q.shape[0]
     A = npm.zeros(shape=(4, 4))
 
@@ -1186,9 +1250,21 @@ def averageQuaternions(Q):
 
 
 def average_coords(coords_list):
+    """Caluc average coords
+
+    Parameters
+    ----------
+    coords_list : list[skrobot.coordinates.Coordinates]
+
+    Returns
+    -------
+    coords_average : skrobot.coordinates.Coordinates
+    """
     q_list = [c.quaternion for c in coords_list]
     q_average = averageQuaternions(q_list)
-    return q_average
+    pos_average = np.mean([c.worldpos() for c in coords_list], axis=0)
+    coords_average = coordinates.Coordinates(pos_average, q_average)
+    return coords_average
 
 
 if __name__ == '__main__':
