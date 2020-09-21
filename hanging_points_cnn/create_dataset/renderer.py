@@ -372,7 +372,7 @@ class Renderer:
         -------
         depth : numpy.ndarray
         """
-        self.object_depth = r.get_depth_milli_metres()
+        self.object_depth = self.get_depth_milli_metres()
         self.object_depth[self.non_object_mask] = 0
         return self.object_depth
 
@@ -731,9 +731,9 @@ class Renderer:
             baseMass=0.,
             baseCollisionShapeIndex=camera_object,
             baseVisualShapeIndex=camera_object_visual,
-            basePosition=r.camera_coords.worldpos(),
+            basePosition=self.camera_coords.worldpos(),
             baseOrientation=[0, 0, 0, 1.])
-        r.objects.append(self.camera_id)
+        self.objects.append(self.camera_id)
 
         return self.camera_id
 
