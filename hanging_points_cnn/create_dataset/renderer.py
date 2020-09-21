@@ -556,7 +556,7 @@ class Renderer:
         return coords_clusters
 
     def make_average_coords_list(self, coords_list):
-        """
+        """Make average coords list
 
         Parameters
         ----------
