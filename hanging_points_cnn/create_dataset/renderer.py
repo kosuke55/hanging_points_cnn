@@ -121,7 +121,7 @@ class Renderer:
                 cameraTargetPosition=[0, 0, 0.1])
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
-        self.debug_visible_line = False
+        self.debug_visible_line = DEBUG
 
         self.texture_paths = list(
             map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
@@ -463,7 +463,7 @@ class Renderer:
             contact_points_coords.append(contact_point_coords)
         return contact_points_coords
 
-    def coords_to_dict(self, coords_list):
+    def coords_to_dict(self, coords_list, traslate=True):
         """Cover coords list to dict for json
 
         Parameters
@@ -479,6 +479,9 @@ class Renderer:
             'urdf_file': self.urdf_file,
             'contact_points': []}
         for coords in coords_list:
+            if traslate:
+                coords = coords.copy_worldcoords().translate(
+                    self.object_center, 'world')
             pose = np.concatenate(
                 [coords.T()[:3, 3][None, :],
                  coords.T()[:3, :3]]).tolist()
