@@ -297,3 +297,41 @@ def depth_edges_noise(depth, value=5., copy=True):
     noise[mask == 0] = 0
     depth += noise
     return depth
+
+
+def depth_edges_erase(depth, max_sample=100, copy=True):
+    """Erase depth edge
+
+    Parameters
+    ----------
+    depth : numpy.ndarray
+    max_sample : int, optional
+        max value of sample, by default 100
+    copy : bool, optional
+        by default True
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
+    if copy:
+        depth = depth.copy()
+    mask = depth_to_mask(depth)
+    edges = mask_to_edges(mask)
+    edges_idx = np.where(edges == 255)
+    length = len(edges_idx[0])
+    num_samples = np.random.randint(0, min(max_sample, length))
+    samples_idx = np.unique(np.random.randint(0, length, num_samples))
+    py_list = edges_idx[0][samples_idx]
+    px_list = edges_idx[1][samples_idx]
+
+    erase_mask = np.zeros_like(mask, dtype=np.uint8)
+    for i in range(len(px_list)):
+        _erase_mask = create_circular_mask(
+            erase_mask.shape[0], erase_mask.shape[1],
+            py_list[i], px_list[i], radius=np.random.randint(1, 10))
+        erase_mask[_erase_mask] = 255
+
+    depth[erase_mask == 255] = 0
+    return depth
