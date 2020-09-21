@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--input-dir', '-i', type=str,
     help='input urdf',
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_hanging_object/0808/pocky-2020-08-08-18-44-42-555262-14432')
+    default=None)
 
 parser.add_argument(
     '--idx', type=int,
@@ -42,34 +42,51 @@ parser.add_argument(
     default=0)
 
 parser.add_argument(
+    '--color', '-c', type=str,
+    help='color', default=None)
+parser.add_argument(
+    '--depth', '-d', type=str,
+    help='depth', default=None)
+parser.add_argument(
+    '--camera-info', '-ci', type=str,
+    help='camera info', default=None)
+
+parser.add_argument(
     '--pretrained_model',
     '-p',
     type=str,
     help='Pretrained model',
-    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200827_0552.pt')
+    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200920_1206.pt')
 
 args = parser.parse_args()
 base_dir = args.input_dir
 idx = args.idx
 pretrained_model = args.pretrained_model
 
-camera_info_path = osp.join(
-    base_dir, 'camera_info', '{:06}.yaml'.format(idx))
+if base_dir is not None:
+    camera_info_path = osp.join(
+        base_dir, 'camera_info', '{:06}.yaml'.format(idx))
+    color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
+    depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
+else:
+    camera_info_path = args.camera_info
+    color_path = args.color
+    depth_path = args.depth
+
 camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
     camera_info_path)
 intrinsics = camera_model.open3d_intrinsic
 
 viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 
-color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
 cv_bgr = cv2.imread(color_path)
 cv_bgr = cv2.resize(cv_bgr, (256, 256))
 cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
 color = o3d.geometry.Image(cv_rgb)
 # color = o3d.io.read_image(color_path)
 
-depth_path = osp.join(base_dir, 'depth', '{:06}.npy'.format(idx))
 cv_depth = np.load(depth_path)
+# cv_depth = cv2.imread(depth_path, cv2.IMREAD_ANYDEPTH).astype(np.float32)
 cv_depth = cv2.resize(cv_depth, (256, 256),
                       interpolation=cv2.INTER_NEAREST)
 
@@ -143,8 +160,7 @@ for i, roi in enumerate(model.rois_list[0]):
 
     hanging_point = np.array(
         camera_model_crop_resize.project_pixel_to_3d_ray(
-            [int(hanging_point_x),
-             int(hanging_point_y)]))
+            [int(hanging_point_x), int(hanging_point_y)]))
 
     dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
     dep = unnormalize_depth(

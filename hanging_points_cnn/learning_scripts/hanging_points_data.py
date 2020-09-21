@@ -12,6 +12,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import depth_edges_erase
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import resize_np_img
 from hanging_points_cnn.utils.random_eraser import get_random_eraser
@@ -79,7 +80,7 @@ class HangingPointsDataset(Dataset):
         self.inshape = (256, 256)
 
         self.aug_seq = iaa.Sequential([
-            iaa.Dropout([0, 0.2]),
+            iaa.Dropout([0, 0.8]),
             iaa.MultiplyElementwise((0.95, 1.05)),
             # iaa.GaussianBlur((0, 1.0)),
         ], random_order=True)
@@ -94,6 +95,7 @@ class HangingPointsDataset(Dataset):
         if self.test:
             depth = resize_np_img(depth, self.inshape, Image.NEAREST)
         else:
+            depth = depth_edges_erase(depth)
             depth = self.aug_seq.augment_image(depth)
             nonzero_depth = depth.copy()
             nonzero_depth[nonzero_depth == 0] = depth.max()
