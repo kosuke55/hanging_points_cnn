@@ -39,7 +39,7 @@
     <remap from="~input/mask" to="/expand_mask/output" />
     <remap from="~input/camera_info" to="$(arg camera_info)" />
     <rosparam>
-        approximate_sync: true
+        approximate_sync: false
         queue_size: 300
         clip: true
         use_rectified_image: false
@@ -51,7 +51,7 @@
     <remap from="~input/mask" to="/expand_mask/output" />
     <remap from="~input/camera_info" to="$(arg camera_info)" />
     <rosparam>
-        approximate_sync: true
+        approximate_sync: false
         queue_size: 300
         clip: true
         use_rectified_image: false
@@ -63,7 +63,7 @@
     <remap from="~input/mask" to="/expand_mask/output" />
     <remap from="~input/camera_info" to="$(arg camera_info)" />
     <rosparam>
-        approximate_sync: true
+        approximate_sync: false
         queue_size: 300
         clip: true
         use_rectified_image: false
@@ -75,7 +75,7 @@
     <remap from="~input/mask" to="/apply_mask_image_mask/output" />
     <remap from="~input/camera_info" to="$(arg camera_info)" />
     <rosparam>
-        approximate_sync: true
+        approximate_sync: false
         queue_size: 300
         clip: false
         use_rectified_image: false
