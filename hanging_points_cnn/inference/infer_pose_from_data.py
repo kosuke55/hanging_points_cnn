@@ -55,8 +55,11 @@ parser.add_argument(
     '--pretrained_model',
     '-p',
     type=str,
-    help='Pretrained model',
-    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200922_1626.pt')
+    help='Pretrained modesel',
+    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200923_1755.pt')
+parser.add_argument(
+    '--predict-depth', '-pd', type=int,
+    help='predict-depth', default=1)
 
 args = parser.parse_args()
 base_dir = args.input_dir
@@ -66,7 +69,7 @@ pretrained_model = args.pretrained_model
 config = {
     'output_channels': 1,
     'feature_extractor_name': 'resnet50',
-    'confidence_thresh': 0.3,
+    'confidence_thresh': 0.1,
     'depth_range': [100, 1500],
     'use_bgr': True,
     'use_bgr2gray': True,
@@ -178,10 +181,21 @@ for idx in range(start_idx, 100000):
             camera_model_crop_resize.project_pixel_to_3d_ray(
                 [int(hanging_point_x), int(hanging_point_y)]))
 
-        dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
-        dep = unnormalize_depth(
-            dep, depth_range[0], depth_range[1]) * 0.001
-        length = float(dep) / hanging_point[2]
+        if args.predict_depth:
+            dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+            dep = unnormalize_depth(
+                dep, depth_range[0], depth_range[1]) * 0.001
+            length = float(dep) / hanging_point[2]
+        else:
+            depth_roi_clip = cv_depth[int(roi[1]):int(roi[3]),
+                                      int(roi[0]):int(roi[2])]
+            dep_roi_clip = depth_roi_clip[np.where(
+                np.logical_and(config['depth_range'][0] < depth_roi_clip,
+                               depth_roi_clip < config['depth_range'][1]))]
+            dep_roi_clip = np.median(dep_roi_clip) * 0.001
+            if dep_roi_clip == np.nan:
+                continue
+            length = float(dep_roi_clip) / hanging_point[2]
 
         hanging_point *= length
 
