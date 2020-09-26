@@ -1030,7 +1030,7 @@ class DepthMap():
 
 
 class RotationMap():
-    def __init__(self, width, height):
+    def __init__(self, width, height, average=False):
         """Rotation map which store annotated quatenion
 
         Parameters
@@ -1041,6 +1041,7 @@ class RotationMap():
         self.width = width
         self.height = height
         self.size = width * height
+        self.average = average
         self._rotations_buffer = [[] for _ in range(self.size)]
         # [w, x, y, z] quaternion
         self._rotations = [np.array([1, 0, 0, 0])] * self.size
@@ -1059,7 +1060,9 @@ class RotationMap():
             create_circular_mask(self.height, self.width, py, px, radius=50))
         idices = ix + iy * self.width
         for idx in idices:
-            self._rotations_buffer[idx].append(q.tolist())
+            if self.average:
+                self._rotations_buffer[idx].append(q.tolist())
+            self._rotations[idx] = q.tolist()
 
     def get_length(self, px, py):
         """Get the number of stored quaternion in target pixel
@@ -1085,7 +1088,8 @@ class RotationMap():
 
     @property
     def rotations(self):
-        self.calc_average_rotations()
+        if self.average:
+            self.calc_average_rotations()
         return np.array(self._rotations).reshape(self.height, self.width, 4)
 
 
