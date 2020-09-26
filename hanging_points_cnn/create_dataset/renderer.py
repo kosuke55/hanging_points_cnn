@@ -5,7 +5,6 @@ import argparse
 import copy
 import glob
 import json
-import numpy.matlib as npm
 import os
 import os.path as osp
 import sys
@@ -15,6 +14,7 @@ from PIL import Image
 
 import cameramodels
 import numpy as np
+import numpy.matlib as npm
 import pybullet
 import pybullet_data
 # import skrobot
@@ -24,9 +24,10 @@ from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
 from hanging_points_generator.create_mesh import load_camera_pose
-from hanging_points_generator.hp_generator import cluster_hanging_points
+from hanging_points_generator.hp_generator import cluster_contact_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
+from hanging_points_generator.generator_utils import load_bad_list
 from hanging_points_generator.generator_utils import load_multiple_contact_points
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_circular_mask
@@ -34,6 +35,7 @@ from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import draw_axis
 
+from hanging_points_generator.generator_utils import save_contact_points
 
 try:
     import cv2
@@ -494,7 +496,7 @@ class Renderer:
             [coords.worldpos() for coords in coords_list])
 
     def align_coords(self, coords_list, eps=0.03,
-                     min_sample=2, angle_thresh=135., copy_list=True):
+                     min_sample=2, angle_thresh=90., copy_list=True):
         """Align the x-axis of coords
 
         invert coordinates above the threshold.
@@ -505,7 +507,7 @@ class Renderer:
         ----------
         coords_list : list[skrobot.coordinates.base.Coordinates]
         eps : float, optional
-            eps paramerter of sklearn dbscan, by default 0.005
+            eps paramerter of cdrn dbscan, by default 0.005
         min_sample : int, optional
             min_sample paramerter of sklearn dbscan, by default 2
         angle_thresh : float, optional
@@ -789,6 +791,7 @@ class Renderer:
                     hp.worldpos()[2] * 1000)
 
         if np.all(self.annotation_img == 0):
+            print('out of camera')
             return False
 
         self.annotation_img \
@@ -915,9 +918,9 @@ class Renderer:
         self.bgr, self.depth
         """
         self.load_urdf(urdf_file, random_pose=False)
-        self.get_plane()
-        self.change_texture(self.plane_id)
-        self.change_texture(self.object_id)
+        # self.get_plane()
+        # self.change_texture(self.plane_id)
+        # self.change_texture(self.object_id)
 
         self.create_camera()
         self.from_camera_pose(camera_pose_path)
@@ -1121,7 +1124,7 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
     contact_points = contact_points_dict['contact_points']
 
     if use_clustering:
-        contact_points = cluster_hanging_points(
+        contact_points = cluster_contact_points(
             contact_points, min_samples=-1)
 
     if use_filter_penetration:
@@ -1158,9 +1161,8 @@ def sample_contact_points(contact_points, num_samples):
     -------
     contact_points : list[list[list[float], list[float]]]
     """
-    if num_samples > len(contact_points):
-        num_samples = len(contact_points)
-    idx = np.random.randint(0, len(contact_points), num_samples)
+    num_samples = min(len(contact_points), num_samples)
+    idx = np.unique(np.random.randint(0, len(contact_points), num_samples))
     return [contact_points[i] for i in idx]
 
 
@@ -1209,12 +1211,13 @@ def split_file_name(file, dataset_type='ycb'):
     """
     dirname, filename = osp.split(file)
     filename_without_ext, ext = osp.splitext(filename)
-    if dataset_type == 'ycb':
-        category_name = dirname.split("/")[-1]
-        idx = None
-    elif dataset_type == 'ObjectNet3D':
+
+    if dataset_type == 'ObjectNet3D':
         category_name = dirname.split("/")[-2]
         idx = dirname.split("/")[-1]
+    else:  # ycb
+        category_name = dirname.split("/")[-1]
+        idx = None
     return dirname, filename, category_name, idx
 
 
@@ -1285,15 +1288,15 @@ if __name__ == '__main__':
     parser.add_argument(
         '--input-dir', '-i',
         type=str, help='input dir',
-        default='/media/kosuke/SANDISK/meshdata/ycb_hanging_object/urdf2/')
+        default='/media/kosuke/SANDISK/meshdata/hanging_object')
     parser.add_argument(
         '--dataset-type', '-dt',
         type=str, help='dataset type',
-        default='ycb')
+        default='')
     parser.add_argument(
         '--urdf-name', '-u',
         type=str, help='save dir',
-        default='textured.urdf')
+        default='base.urdf')
     parser.add_argument(
         '--gui', '-g',
         type=int, help='debug gui',
@@ -1316,6 +1319,12 @@ if __name__ == '__main__':
         input_dir).glob(osp.join('*', urdf_name))))
     files = list(map(str, file_paths))
 
+    bad_list_file = str(Path(input_dir) / 'skip_list.txt')
+    bad_list = []
+    if osp.isfile(bad_list_file):
+        bad_list = load_bad_list(osp.join(input_dir, 'skip_list.txt'))
+
+    category_name_list = None
     if dataset_type == 'ycb':
         category_name_list = [
             "019_pitcher_base",
@@ -1338,17 +1347,28 @@ if __name__ == '__main__':
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
             print(category_name)
-            if category_name not in category_name_list:
+            if category_name_list is not None:
+                if category_name not in category_name_list:
+                    continue
+            if category_name in bad_list:
+                print('Skipped %s because it is in bad_list' % category_name)
                 continue
+
             save_dir = osp.join(save_dir_base, category_name)
             save_dir = make_save_dirs(save_dir)
 
             # load multiple json
+            # contact_points = get_contact_points(
+            #     osp.join(dirname, 'contact_points'))
+
+            # load filtered points
+            print(dirname)
             contact_points = get_contact_points(
-                osp.join(dirname, 'contact_points'))
-            contact_points = sample_contact_points(contact_points, 30)
+                osp.join(dirname, 'filtered_contact_points.json'))
+
             if contact_points is None:
                 continue
+            contact_points = sample_contact_points(contact_points, 30)
 
             while True:
                 r = Renderer(DEBUG=gui, save_dir=save_dir)
