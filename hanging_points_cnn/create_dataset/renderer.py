@@ -316,6 +316,7 @@ class Renderer:
         depth_milli_meres : numpy.ndarray
         """
         self.depth = (self.get_depth_metres() * 1000).astype(np.float32)
+        self.full_depth = copy.copy(self.depth)
         return self.depth
 
     def get_rgb(self):
@@ -326,6 +327,7 @@ class Renderer:
         rgb : numpy.ndarray
         """
         self.rgb = self.render()[2]
+        self.full_rgb = self.rgb.copy()
         return self.rgb
 
     def get_bgr(self):
@@ -336,6 +338,7 @@ class Renderer:
         bgr : numpy.ndarray
         """
         self.bgr = cv2.cvtColor(self.get_rgb(), cv2.COLOR_RGB2BGR)
+        self.full_bgr = self.bgr.copy()
         return self.bgr
 
     def get_seg(self):
@@ -935,14 +938,6 @@ class Renderer:
         self.get_object_depth()
         self.crop(padding=10, random=False)
 
-        cv2.imwrite(
-            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/color/000000.png',
-            self.bgr)
-        np.save(
-            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/depth/000000.npy',
-            self.depth)
-        self.camera_model.dump(
-            '/home/kosuke55/catkin_ws/src/hanging_points_cnn/hanging_points_cnn/create_dataset/sim_images/camera_info/000000.yaml')
         print('sim img')
 
         return self.bgr, self.depth
