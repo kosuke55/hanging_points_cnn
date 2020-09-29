@@ -81,7 +81,7 @@ class HangingPointsDataset(Dataset):
 
         self.aug_seq = iaa.Sequential([
             iaa.Dropout([0, 0.8]),
-            iaa.MultiplyElementwise((0.95, 1.05)),
+            iaa.MultiplyElementwise((0.99, 1.01)),
             # iaa.GaussianBlur((0, 1.0)),
         ], random_order=True)
 
@@ -128,8 +128,8 @@ class HangingPointsDataset(Dataset):
                 cv2.IMREAD_COLOR)
             if self.test:
                 color = resize_np_img(color, self.inshape)
-            else:
-                color = self.aug_seq.augment_image(color)
+            # else:
+            #     color = self.aug_seq.augment_image(color)
             if self.use_bgr2gray:
                 # 0~1
                 gray = cv2.cvtColor(

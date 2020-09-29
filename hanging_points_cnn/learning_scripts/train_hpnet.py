@@ -194,7 +194,7 @@ class Trainer(object):
                     confidence, hp_data_gt, pos_weight,
                     depth_and_rotation, annotated_rois)
 
-                loss = confidence_loss * 0.1 + rotation_loss * 0.1 + depth_loss
+                loss = confidence_loss + rotation_loss + depth_loss
 
                 if torch.isnan(loss):
                     print('loss is nan!!')
@@ -459,16 +459,16 @@ class Trainer(object):
 
             self.vis.line(
                 X=np.array([self.epo]), Y=np.array([avg_confidence_loss]),
-                win='loss', name='{}_confidence_loss'.format(mode),
+                win='confidence loss', name='{}_confidence_loss'.format(mode),
                 update='append')
             if rotation_loss_count > 0:
                 self.vis.line(
                     X=np.array([self.epo]), Y=np.array([avg_rotation_loss]),
-                    win='loss', name='{}_rotation_loss'.format(mode),
+                    win='rotation loss', name='{}_rotation_loss'.format(mode),
                     update='append')
                 self.vis.line(
                     X=np.array([self.epo]), Y=np.array([avg_depth_loss]),
-                    win='loss', name='{}_depth_loss'.format(mode),
+                    win='depth loss', name='{}_depth_loss'.format(mode),
                     update='append')
                 self.vis.line(
                     X=np.array([self.epo]), Y=np.array([avg_loss]),

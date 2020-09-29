@@ -86,7 +86,7 @@ class HPNET(nn.Module):
         if config is None:
             config = {
                 'output_channels': 1,
-                'depth_range': [200, 1500],
+                'depth_range': [100, 1500],
                 'feature_extractor_name': 'resnet50',
                 'confidence_thresh': 0.3,
                 'use_bgr': True,

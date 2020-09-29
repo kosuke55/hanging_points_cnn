@@ -50,7 +50,7 @@ class HPNETLoss(Module):
         confidence_diff = confidence[:, 0, ...] - confidence_gt[:, 0, ...]
         confidence_loss = torch.sum(
             weight * torch.where(
-                confidence_diff <= sigma,
+                torch.abs(confidence_diff) <= sigma,
                 0.5 * (confidence_diff ** 2),
                 sigma * torch.abs(confidence_diff) - 0.5 * (sigma ** 2)
             )) / (256 ** 2)
@@ -62,7 +62,13 @@ class HPNETLoss(Module):
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
                 # print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
-                depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
+                depth_diff = depth_and_rotation[i, 0] - ar[1][0]
+                sigma = 0.01  # huber
+                depth_loss += 1000 * torch.where(
+                    torch.abs(depth_diff) <= sigma,
+                    0.5 * (depth_diff ** 2),
+                    sigma * torch.abs(depth_diff) - 0.5 * (sigma ** 2))
+                # depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
 
                 # 1 dof
                 if self.use_coords:

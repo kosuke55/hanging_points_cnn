@@ -89,7 +89,9 @@ for idx in range(start_idx, 100000):
         dep = hanging_points_depth[cy, cx]
         print(cx, cy)
         pos = np.array(
-            cameramodel.project_pixel_to_3d_ray([cx, cy])) * dep * 0.001
+            cameramodel.project_pixel_to_3d_ray([cx, cy]))
+        length = dep * 0.001 / pos[2]
+        pos = pos * length
         contact_point_sphere = skrobot.models.Sphere(0.001, color=[255, 0, 0])
         contact_point_sphere.newcoords(
             skrobot.coordinates.Coordinates(pos=pos, rot=q))
