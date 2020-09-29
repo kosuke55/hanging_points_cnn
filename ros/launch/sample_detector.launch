@@ -23,7 +23,7 @@
 
   <param name="/use_sim_time" value="true" />
 
-  <node name="rosbag_play" pkg="rosbag" type="play" args="$(find hanging_points_generator)/create_mesh_handeye_sample_rosbag/create_mesh_handeye.bag --clock -r 0.3"></node>
+  <node name="rosbag_play" pkg="rosbag" type="play" args="$(find hanging_points_generator)/create_mesh_handeye_sample_rosbag/create_mesh_handeye.bag --clock -r 1"></node>
 
   <include file="$(find hanging_points_generator)/ros/launch/republish_image_handeye.launch" />
 
@@ -92,7 +92,7 @@
     <rosparam subst_value="true">
       gpu: $(arg gpu)
       predict_depth: $(arg predict_depth)
-      pretrained_model : "/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20200917_1535.pt"
+      pretrained_model : "/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200922_1626.pt"
     </rosparam>
   </node>
 
