@@ -37,12 +37,12 @@ def find_contour_center(img):
     ret, thresh = cv2.threshold(img.copy(), int(255 * 0.5), 255, 0)
     if cv2.getVersionMajor() in [2, 4]:
         contours, hierarchy = cv2.findContours(
-            confidence_mask,
+            thresh,
             cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE)
     else:
         _, contours, hierarchy = cv2.findContours(
-            confidence_mask,
+            thresh,
             cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE)
     print(len(contours))
