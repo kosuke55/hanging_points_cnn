@@ -27,7 +27,7 @@ from hanging_points_generator.create_mesh import load_camera_pose
 from hanging_points_generator.hp_generator import cluster_contact_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
-from hanging_points_generator.generator_utils import load_bad_list
+from hanging_points_generator.generator_utils import load_list
 from hanging_points_generator.generator_utils import load_multiple_contact_points
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_circular_mask
@@ -1324,7 +1324,7 @@ if __name__ == '__main__':
     bad_list_file = str(Path(input_dir) / 'skip_list.txt')
     bad_list = []
     if osp.isfile(bad_list_file):
-        bad_list = load_bad_list(osp.join(input_dir, 'skip_list.txt'))
+        bad_list = load_list(osp.join(input_dir, 'skip_list.txt'))
 
     category_name_list = None
     if dataset_type == 'ycb':
