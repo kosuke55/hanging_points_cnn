@@ -29,6 +29,7 @@ from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
 from hanging_points_generator.generator_utils import load_list
 from hanging_points_generator.generator_utils import load_multiple_contact_points
+from hanging_points_generator.generator_utils import save_json
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_circular_mask
 from hanging_points_cnn.utils.image import create_depth_circle
@@ -106,6 +107,8 @@ class Renderer:
         self.save_debug_axis = False
         self.annotation_img = np.zeros(
             (target_width, target_height), dtype=np.uint32)
+
+        self.annotation_data = []
         self.rotation_map = RotationMap(target_width, target_height)
         self.rotations = None
         self.depth_map = DepthMap(target_width, target_height, circular=True)
@@ -786,6 +789,10 @@ class Renderer:
                     self.annotation_img,
                     int(py), int(px))
 
+                self.annotation_data.append(
+                    {'xy_depth': [int(px), int(py), hp.worldpos()[2] * 1000],
+                     'quaternion': hp.quaternion.tolist()}
+                )
                 self.rotation_map.add_quaternion(
                     int(px), int(py), hp.quaternion)
 
@@ -830,6 +837,9 @@ class Renderer:
         np.save(osp.join(
             self.save_dir, 'rotations', '{:06}'.format(
                 self.data_id)), self.rotations)
+        save_json(osp.join(self.save_dir, 'annotation',
+                           '{:06}.json'.format(self.data_id)),
+                  self.annotation_data)
         cv2.imwrite(osp.join(
             self.save_dir, 'heatmap', '{:06}.png'.format(self.data_id)),
             self.annotation_img)
@@ -1188,6 +1198,7 @@ def make_save_dirs(save_dir):
     os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'camera_info'), exist_ok=True)
+    os.makedirs(osp.join(save_dir, 'annotation'), exist_ok=True)
 
     os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
     return save_dir
