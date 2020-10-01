@@ -791,7 +791,8 @@ class Renderer:
                     int(py), int(px))
 
                 self.annotation_data.append(
-                    {'xy_depth': [int(px), int(py), hp.worldpos()[2] * 1000],
+                    {'xy': [int(px), int(py)],
+                     'depth': hp.worldpos()[2] * 1000,
                      'quaternion': hp.quaternion.tolist()}
                 )
                 self.rotation_map.add_quaternion(
