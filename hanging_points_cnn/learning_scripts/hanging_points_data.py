@@ -8,10 +8,14 @@ from PIL import Image
 
 import numpy as np
 import imgaug.augmenters as iaa
+from hanging_points_generator.generator_utils import load_json
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, random_split
 
+from hanging_points_cnn.create_dataset.renderer import DepthMap
+from hanging_points_cnn.create_dataset.renderer import RotationMap
 from hanging_points_cnn.utils.image import colorize_depth
+from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import depth_edges_erase
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import resize_np_img
@@ -77,7 +81,7 @@ class HangingPointsDataset(Dataset):
             self.use_bgr = True
         self.use_bgr2gray = use_bgr2gray
         self.depth_range = depth_range
-        self.inshape = (256, 256)
+        self.data_shape = (256, 256)
 
         self.aug_seq = iaa.Sequential([
             iaa.Dropout([0, 0.8]),
@@ -93,7 +97,7 @@ class HangingPointsDataset(Dataset):
         depth = np.load(depth_filepath).astype(np.float32)
 
         if self.test:
-            depth = resize_np_img(depth, self.inshape, Image.NEAREST)
+            depth = resize_np_img(depth, self.data_shape, Image.NEAREST)
         else:
             depth = depth_edges_erase(depth)
             depth = self.aug_seq.augment_image(depth)
@@ -127,7 +131,7 @@ class HangingPointsDataset(Dataset):
                     depth_filepath.with_suffix('.png').name),
                 cv2.IMREAD_COLOR)
             if self.test:
-                color = resize_np_img(color, self.inshape)
+                color = resize_np_img(color, self.data_shape)
             # else:
             #     color = self.aug_seq.augment_image(color)
             if self.use_bgr2gray:
@@ -156,6 +160,35 @@ class HangingPointsDataset(Dataset):
                 depth = self.transform(depth)
                 return in_feature, depth, camera_info_path, 'dummy'
 
+        annotation_data = load_json(
+            str(depth_filepath.parent.parent / 'annotation' /
+                depth_filepath.with_suffix('.json').name)
+        )
+
+        confidence = np.zeros(self.data_shape, dtype=np.uint32)
+        depth_map = DepthMap(
+            self.data_shape[1],
+            self.data_shape[0],
+            circular=True)
+        rotation_map = RotationMap(self.data_shape[1], self.data_shape[0])
+
+        for annotation in annotation_data:
+            px = annotation['xy'][0]
+            py = annotation['xy'][1]
+            depth_value = annotation['depth']
+            quaternion = np.array(annotation['quaternion'])
+
+            create_gradient_circle(
+                confidence, py, px)
+            rotation_map.add_quaternion(
+                px, py, quaternion)
+            depth_map.add_depth(px, py, depth_value)
+
+        confidence = (confidence / confidence.max()).astype(np.float32)
+        rotations = rotation_map.rotations.astype(np.float32)
+        hanging_point_depth \
+            = depth_map.on_depth_image(depth).astype(np.float32)
+
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
 
@@ -165,16 +198,16 @@ class HangingPointsDataset(Dataset):
             cv2.IMREAD_GRAYSCALE).astype(np.float32)
         confidence /= 255.
 
-        hanging_point_depth = np.load(
-            depth_filepath.parent.parent / 'hanging_points_depth' /
-            depth_filepath.name).astype(np.float32)
+        # hanging_point_depth = np.load(
+        #     depth_filepath.parent.parent / 'hanging_points_depth' /
+        #     depth_filepath.name).astype(np.float32)
 
-        hanging_point_depth = normalize_depth(
-            hanging_point_depth, self.depth_range[0], self.depth_range[1])
+        # hanging_point_depth = normalize_depth(
+        #     hanging_point_depth, self.depth_range[0], self.depth_range[1])
 
-        rotations = np.load(
-            depth_filepath.parent.parent / 'rotations' /
-            depth_filepath.name).astype(np.float32)
+        # rotations = np.load(
+        #     depth_filepath.parent.parent / 'rotations' /
+        #     depth_filepath.name).astype(np.float32)
 
         ground_truth = np.concatenate(
             [confidence[..., None],
