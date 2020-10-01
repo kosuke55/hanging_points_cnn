@@ -1178,7 +1178,10 @@ def make_save_dirs(save_dir):
     save_dir ; str
         save dir made by eos.make_fancy_output_dir
     """
-    save_dir = make_fancy_output_dir(save_dir)
+    save_dir = make_fancy_output_dir(save_dir,
+                                     save_environ=False, save_command=False,
+                                     save_git=False, save_gitignore=False,
+                                     save_pip=False)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
