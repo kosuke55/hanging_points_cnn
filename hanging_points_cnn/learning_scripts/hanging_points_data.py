@@ -192,11 +192,11 @@ class HangingPointsDataset(Dataset):
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
 
-        confidence = cv2.imread(
-            str(depth_filepath.parent.parent / 'heatmap' /
-                depth_filepath.with_suffix('.png').name),
-            cv2.IMREAD_GRAYSCALE).astype(np.float32)
-        confidence /= 255.
+        # confidence = cv2.imread(
+        #     str(depth_filepath.parent.parent / 'heatmap' /
+        #         depth_filepath.with_suffix('.png').name),
+        #     cv2.IMREAD_GRAYSCALE).astype(np.float32)
+        # confidence /= 255.
 
         # hanging_point_depth = np.load(
         #     depth_filepath.parent.parent / 'hanging_points_depth' /
