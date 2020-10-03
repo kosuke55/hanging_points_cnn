@@ -61,8 +61,7 @@ def find_contour_center(img):
 
 data_path = '/media/kosuke/SANDISK/meshdata/Hanging-ObjectNet3D-DoubleFaces/rotations'
 idx = 1
-data_name_list = os.listdir(os.path.join(data_path, 'color'))
-data_name_list.sort()
+data_name_list = sorted(os.listdir(os.path.join(data_path, 'color')))
 
 try:
     for data_name in data_name_list:

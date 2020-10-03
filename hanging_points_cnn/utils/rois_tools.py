@@ -22,7 +22,19 @@ except ImportError:
             sys.path.append(path)
 
 
-def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.3):
+def get_value_gt(xy, annotation_data):
+    # import ipdb
+    # ipdb.set_trace()
+    # from IPython import embed
+    # embed()
+    xys = np.array([(data['xy']) for data in annotation_data])
+    nearest_idx = np.argmin(np.sum((xy - xys) ** 2, axis=1))
+    depth_gt = annotation_data[nearest_idx]['depth']
+    rotation_gt = annotation_data[nearest_idx]['quaternion']
+    return [depth_gt] + rotation_gt
+
+
+def annotate_rois(rois_list, rois_list_gt, annotation_data, iou_thresh=0.3):
     """rois_listに対して正しいgt_roiをiouを計算することによって見つける.
 
     Parametersa
@@ -54,9 +66,12 @@ def annotate_rois(rois_list, rois_list_gt, feature, iou_thresh=0.3):
         for i, p in enumerate(pred.tolist()):
             try:
                 roi_gt = gt.tolist()[max_iou_index.tolist()[i]]
-                val_gt = get_val_in_roi(roi_gt, feature[n, ...])
+                xy = [int((roi_gt[0] + roi_gt[2]) / 2),
+                      int((roi_gt[1] + roi_gt[3]) / 2)]
+                value_gt = get_value_gt(xy, annotation_data[n])
+                # val_gt = get_val_in_roi(roi_gt, feature[n, ...])
                 annotated_rois.append([p,
-                                       val_gt.tolist(),
+                                       value_gt,
                                        max_iou.tolist()[i] > iou_thresh,
                                        max_iou.tolist()[i]])
             except Exception:

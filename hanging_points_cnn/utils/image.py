@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+import copy
 import sys
 from PIL import Image
 
@@ -43,20 +44,24 @@ def remove_nan(img):
 
 
 def normalize_depth(depth, min_value=None, max_value=None):
-    min_value = np.nanmin(depth) if min_value is None else min_value
-    max_value = np.nanmax(depth) if max_value is None else max_value
-    normalized_depth = depth.copy()
-    remove_nan(normalized_depth)
-    normalized_depth = (normalized_depth - min_value) / (max_value - min_value)
-    normalized_depth[normalized_depth <= 0] = 0
-    normalized_depth[normalized_depth > 1] = 1
+    normalized_depth = copy.copy(depth)
+    if isinstance(depth, np.ndarray):
+        min_value = np.nanmin(depth) if min_value is None else min_value
+        max_value = np.nanmax(depth) if max_value is None else max_value
+        remove_nan(normalized_depth)
+        normalized_depth = (normalized_depth - min_value) / (max_value - min_value)
+        normalized_depth[normalized_depth <= 0] = 0
+        normalized_depth[normalized_depth > 1] = 1
+    else:
+        normalized_depth = (normalized_depth - min_value) / (max_value - min_value)
 
     return normalized_depth
 
 
 def unnormalize_depth(normalized_depth, min_value, max_value):
-    depth = normalized_depth.copy()
-    remove_nan(depth)
+    depth = copy.copy(normalized_depth)
+    if isinstance(depth, np.ndarray):
+        remove_nan(depth)
     depth = depth * (max_value - min_value) + min_value
 
     return depth

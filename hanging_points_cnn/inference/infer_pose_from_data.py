@@ -69,7 +69,7 @@ pretrained_model = args.pretrained_model
 config = {
     'output_channels': 1,
     'feature_extractor_name': 'resnet50',
-    'confidence_thresh': 0.1,
+    'confidence_thresh': 0.3,
     'depth_range': [100, 1500],
     'use_bgr': True,
     'use_bgr2gray': True,

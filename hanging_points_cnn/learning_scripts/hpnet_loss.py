@@ -61,10 +61,11 @@ class HPNETLoss(Module):
 
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
-                # print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
+                print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
+                print(depth_and_rotation[i, 0], ar[1][0])
                 depth_diff = depth_and_rotation[i, 0] - ar[1][0]
-                sigma = 0.01  # huber
-                depth_loss += 1000 * torch.where(
+                sigma = 0.1  # huber
+                depth_loss += 10 * torch.where(
                     torch.abs(depth_diff) <= sigma,
                     0.5 * (depth_diff ** 2),
                     sigma * torch.abs(depth_diff) - 0.5 * (sigma ** 2))
@@ -79,9 +80,11 @@ class HPNETLoss(Module):
                 else:
                     v_pred = depth_and_rotation[i, 1:4]
                     v_pred = v_pred / torch.norm(v_pred)
-                    # print(v_pred)
-                    # import ipdb; ipdb.set_trace()
 
+                if torch.any(v_pred == torch.tensor([np.inf] * 3).to('cuda')) \
+                        or torch.any(
+                            v_pred == torch.tensor([np.nan] * 3).to('cuda')):
+                    continue
                 m_gt = quaternion2matrix(ar[1][1:])
                 v_gt = torch.matmul(m_gt, self.vx)
                 rotation_loss += torch.min(
@@ -102,7 +105,7 @@ class HPNETLoss(Module):
             rotation_loss /= len(annotated_rois)
         # depth_loss *= 10000
         # rotation_loss *= 10000
-
+        print('confidence_diff', float(torch.sum(confidence_diff)))
         print('confidence_loss', float(confidence_loss))
         print('depth_loss', float(depth_loss))
         print('rotation_loss', float(rotation_loss))

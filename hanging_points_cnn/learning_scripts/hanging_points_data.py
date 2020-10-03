@@ -8,6 +8,7 @@ from PIL import Image
 
 import numpy as np
 import imgaug.augmenters as iaa
+import torch
 from hanging_points_generator.generator_utils import load_json
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -32,6 +33,27 @@ for path in sys.path:
         import cv2
 
 
+def collate_fn(batch):
+    in_features = []
+    depths = []
+    camera_info_paths = []
+    ground_truths = []
+    annotations = []
+    for in_feature, depth, camera_info_path, ground_truth, annotation in batch:
+        in_features.append(in_feature)
+        depths.append(depth)
+        camera_info_paths.append(camera_info_path)
+        ground_truths.append(ground_truth)
+        annotations.append(annotation)
+
+    in_features = torch.stack(in_features, dim=0)
+    depths = torch.stack(depths, dim=0)
+    # camera_info_paths = torch.stack(camera_info_paths, dim=0)
+    ground_truths = torch.stack(ground_truths, dim=0)
+
+    return in_features, depths, camera_info_paths, ground_truths, annotations
+
+
 def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
     transform = transforms.Compose([
         transforms.ToTensor()])
@@ -45,9 +67,11 @@ def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
         hp_data, [train_size, val_size])
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
+        train_dataset, batch_size=batch_size,
+        shuffle=False, num_workers=1, collate_fn=collate_fn)
     val_dataloader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
+        val_dataset, batch_size=batch_size,
+        shuffle=False, num_workers=1, collate_fn=collate_fn)
 
     return train_dataloader, val_dataloader
 
@@ -158,7 +182,7 @@ class HangingPointsDataset(Dataset):
             if self.transform:
                 in_feature = self.transform(in_feature)
                 depth = self.transform(depth)
-                return in_feature, depth, camera_info_path, 'dummy'
+                return in_feature, depth, camera_info_path, 'dummy', 'dummy'
 
         annotation_data = load_json(
             str(depth_filepath.parent.parent / 'annotation' /
@@ -166,28 +190,31 @@ class HangingPointsDataset(Dataset):
         )
 
         confidence = np.zeros(self.data_shape, dtype=np.uint32)
-        depth_map = DepthMap(
-            self.data_shape[1],
-            self.data_shape[0],
-            circular=True)
-        rotation_map = RotationMap(self.data_shape[1], self.data_shape[0])
+        # depth_map = DepthMap(
+        #     self.data_shape[1],
+        #     self.data_shape[0],
+        #     circular=True)
+        # rotation_map = RotationMap(self.data_shape[1], self.data_shape[0])
 
-        for annotation in annotation_data:
+        for i, annotation in enumerate(annotation_data):
             px = annotation['xy'][0]
             py = annotation['xy'][1]
-            depth_value = annotation['depth']
-            quaternion = np.array(annotation['quaternion'])
+            annotation_data[i]['depth'] = normalize_depth(
+                annotation_data[i]['depth'],
+                self.depth_range[0], self.depth_range[1])
+            # depth_value = annotation['depth']
+            # quaternion = np.array(annotation['quaternion'])
 
             create_gradient_circle(
                 confidence, py, px)
-            rotation_map.add_quaternion(
-                px, py, quaternion)
-            depth_map.add_depth(px, py, depth_value)
+            # rotation_map.add_quaternion(
+            #     px, py, quaternion)
+            # depth_map.add_depth(px, py, depth_value)
 
         confidence = (confidence / confidence.max()).astype(np.float32)
-        rotations = rotation_map.rotations.astype(np.float32)
-        hanging_point_depth \
-            = depth_map.on_depth_image(depth).astype(np.float32)
+        # rotations = rotation_map.rotations.astype(np.float32)
+        # hanging_point_depth \
+        #     = depth_map.on_depth_image(depth).astype(np.float32)
 
         # clip_info = np.load(
         #     depth_filepath.parent.parent / 'clip_info' / depth_filepath.name)
@@ -209,14 +236,16 @@ class HangingPointsDataset(Dataset):
         #     depth_filepath.parent.parent / 'rotations' /
         #     depth_filepath.name).astype(np.float32)
 
-        ground_truth = np.concatenate(
-            [confidence[..., None],
-             hanging_point_depth[..., None],
-             rotations], axis=2)
+        # ground_truth = np.concatenate(
+        # [confidence[..., None],
+        #  hanging_point_depth[..., None],
+        #  rotations], axis=2)
+
+        ground_truth = confidence[..., None]
 
         if self.transform:
             in_feature = self.transform(in_feature)
             depth = self.transform(depth)
             ground_truth = self.transform(ground_truth)
 
-        return in_feature, depth, camera_info_path, ground_truth
+        return in_feature, depth, camera_info_path, ground_truth, annotation_data
