@@ -128,6 +128,8 @@ class Renderer:
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
         self.debug_visible_line = DEBUG
+        self.no_visible_count = 0
+        self.no_visible_skip_num = 30
 
         self.texture_paths = list(
             map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
@@ -833,25 +835,25 @@ class Renderer:
             self.data_id)), self.bgr)
         np.save(osp.join(
             self.save_dir, 'depth', '{:06}'.format(self.data_id)), self.depth)
-        np.save(osp.join(
-            self.save_dir, 'hanging_points_depth', '{:06}'.format(
-                self.data_id)), self.hanging_points_depth)
-        np.save(osp.join(
-            self.save_dir, 'rotations', '{:06}'.format(
-                self.data_id)), self.rotations)
+        # np.save(osp.join(
+        #     self.save_dir, 'hanging_points_depth', '{:06}'.format(
+        #         self.data_id)), self.hanging_points_depth)
+        # np.save(osp.join(
+        #     self.save_dir, 'rotations', '{:06}'.format(
+        #         self.data_id)), self.rotations)
         save_json(osp.join(self.save_dir, 'annotation',
                            '{:06}.json'.format(self.data_id)),
                   self.annotation_data)
-        cv2.imwrite(osp.join(
-            self.save_dir, 'heatmap', '{:06}.png'.format(self.data_id)),
-            self.annotation_img)
+        # cv2.imwrite(osp.join(
+        #     self.save_dir, 'heatmap', '{:06}.png'.format(self.data_id)),
+        #     self.annotation_img)
         self.camera_model.dump(osp.join(
             self.save_dir, 'camera_info', '{:06}.yaml'.format(self.data_id)))
 
-        if self.save_debug_axis:
-            cv2.imwrite(osp.join(
-                self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
-                self.bgr_axis)
+        # if self.save_debug_axis:
+        #     cv2.imwrite(osp.join(
+        #         self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
+        #         self.bgr_axis)
 
     def create_data(self, urdf_file, contact_points):
         """Create training data
@@ -879,15 +881,21 @@ class Renderer:
         self.create_camera()
         loop = True
 
+        self.no_visible_count = 0
         while loop:
             self.move_to_random_pos()
             self.look_at(self.object_coords.worldpos() - self.object_center)
             self.step(1)
+            print('self.no_visible_count %d' % self.no_visible_count)
+            if self.no_visible_count >= self.no_visible_skip_num:
+                return False
             if not self.get_visible_coords(contact_points_coords):
                 self.reset_object_pose()
+                self.no_visible_count += 1
                 continue
             else:
                 loop = False
+            self.no_visible_count = 0
 
             self.get_bgr()
             self.get_seg()
@@ -1196,13 +1204,13 @@ def make_save_dirs(save_dir):
                                      save_pip=False)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
-    os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
-    os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
-    os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
+    # os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
+    # os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
+    # os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'camera_info'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'annotation'), exist_ok=True)
 
-    os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
+    # os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
     return save_dir
 
 
@@ -1330,6 +1338,14 @@ if __name__ == '__main__':
     urdf_name = args.urdf_name
     show_image = args.show_image
 
+    # r = Renderer(DEBUG=gui, save_dir='./hoge')
+    # r.get_sim_images(
+    #     # '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/mesh_voxelize_marching_cubes_urdf/base.urdf',
+    #     '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/tsdf_urdf/base.urdf',
+    #     # '/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/urdf2/025_mug/base.urdf',
+    #     '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/camera_pose/camera_pose_icp004.txt')
+    # sys.exit()
+
     file_paths = list(sorted(Path(
         input_dir).glob(osp.join('*', urdf_name))))
     files = list(map(str, file_paths))
@@ -1384,10 +1400,12 @@ if __name__ == '__main__':
             if contact_points is None:
                 continue
             contact_points = sample_contact_points(contact_points, 30)
-
             while True:
                 r = Renderer(DEBUG=gui, save_dir=save_dir)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
+                if r.no_visible_count >= r.no_visible_skip_num:
+                    print('Skip because this object has no visible points')
+                    break
                 print(r.data_id)
                 if r.data_id == data_num:
                     break
