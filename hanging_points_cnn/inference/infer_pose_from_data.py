@@ -152,7 +152,7 @@ try:
         in_feature = in_feature.to(device)
         in_feature = in_feature.unsqueeze(0)
 
-        confidence, depth_and_rotation = model(in_feature)
+        confidence, depth, rotation = model(in_feature)
 
         confidence = confidence[0, 0:1, ...]
         confidence_np = confidence.cpu().detach().numpy().copy() * 255
@@ -170,8 +170,7 @@ try:
             cv_bgr = draw_roi(cv_bgr, roi)
             hanging_point_x = int((roi[0] + roi[2]) / 2)
             hanging_point_y = int((roi[1] + roi[3]) / 2)
-
-            v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
+            v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
             rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
             q = matrix2quaternion(rot)
@@ -184,7 +183,7 @@ try:
                     [int(hanging_point_x), int(hanging_point_y)]))
 
             if args.predict_depth:
-                dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+                dep = depth[i].cpu().detach().numpy().copy()
                 dep = unnormalize_depth(
                     dep, depth_range[0], depth_range[1]) * 0.001
                 length = float(dep) / hanging_point[2]
