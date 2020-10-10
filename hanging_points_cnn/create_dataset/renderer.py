@@ -1385,6 +1385,17 @@ if __name__ == '__main__':
                 print('Skipped %s because it is in bad_list' % category_name)
                 continue
 
+            if not osp.isfile(
+                    osp.join(dirname, 'filtered_contact_points.json')):
+                print('Skipped %s because no ' % category_name
+                      + 'filtered_contact_points.json')
+                continue
+            contact_points = get_contact_points(
+                osp.join(dirname, 'filtered_contact_points.json'))
+
+            if contact_points is None:
+                continue
+
             save_dir = osp.join(save_dir_base, category_name)
             save_dir = make_save_dirs(save_dir)
 
@@ -1394,11 +1405,7 @@ if __name__ == '__main__':
 
             # load filtered points
             print(dirname)
-            contact_points = get_contact_points(
-                osp.join(dirname, 'filtered_contact_points.json'))
 
-            if contact_points is None:
-                continue
             contact_points = sample_contact_points(contact_points, 30)
             while True:
                 r = Renderer(DEBUG=gui, save_dir=save_dir)
