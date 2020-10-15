@@ -674,7 +674,7 @@ class Renderer:
         """
         self.camera_coords = coordinates.Coordinates(
             pos=np.array(T),
-            rot=r.camera_coords.worldrot())
+            rot=self.camera_coords.worldrot())
         pybullet.resetBasePositionAndOrientation(
             self.camera_id,
             self.camera_coords.worldpos(),
@@ -1177,6 +1177,7 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
         else:
             box_size = [0.1, 0.0001, 0.0001]
 
+        dirname = osp.dirname(contact_points_path)
         if dataset_type == 'ycb':
             contact_points, _ = filter_penetration(
                 osp.join(dirname, 'base.urdf'),
