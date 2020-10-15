@@ -675,7 +675,7 @@ class Renderer:
         """Move camera to random position"""
         newpos = [(np.random.rand() - 0.5) * 0.1,
                   (np.random.rand() - 0.5) * 0.1,
-                  np.random.rand() * 0.9 + 0.1]
+                  np.random.rand() * 0.9 + 0.2]
         self.move_to(newpos)
 
     def look_at(self, p):
