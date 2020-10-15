@@ -55,8 +55,11 @@ parser.add_argument(
     '--pretrained_model',
     '-p',
     type=str,
-    help='Pretrained modesel',
-    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200923_1755.pt')
+    help='Pretrained models',
+    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200929_1003.pt')
+    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200927_2249.pt')
+    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201009_0639.pt')
+    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_2002.pt')
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=1)
@@ -163,13 +166,14 @@ try:
 
         print(model.rois_list)
         contact_point_sphere_list = []
-        for i, roi in enumerate(model.rois_list[0]):
+        for i, (roi, roi_center) in enumerate(
+                zip(model.rois_list[0], model.rois_center_list[0])):
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
             cv_bgr = draw_roi(cv_bgr, roi)
-            hanging_point_x = int((roi[0] + roi[2]) / 2)
-            hanging_point_y = int((roi[1] + roi[3]) / 2)
+            hanging_point_x = roi_center[0]
+            hanging_point_y = roi_center[1]
             v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
             rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
