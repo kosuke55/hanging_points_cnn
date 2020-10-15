@@ -144,7 +144,7 @@ class Renderer:
         self._rendered_pos = None
         self._rendered_rot = None
 
-    def load_urdf(self, urdf, random_pose=True):
+    def load_urdf(self, urdf, random_pose=True, random_texture=True):
         """Load urdf
 
         Parameters
@@ -164,7 +164,9 @@ class Renderer:
 
         self.object_center = get_urdf_center(urdf)
         self.objects.append(self.object_id)
-        pybullet.changeVisualShape(self.object_id, -1, rgbaColor=[1, 1, 1, 1])
+        if random_texture:
+            pybullet.changeVisualShape(
+                self.object_id, -1, rgbaColor=[1, 1, 1, 1])
 
         pos, rot = pybullet.getBasePositionAndOrientation(self.object_id)
         self.object_coords = coordinates.Coordinates(
@@ -861,7 +863,8 @@ class Renderer:
         #         self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
         #         self.bgr_axis)
 
-    def create_data(self, urdf_file, contact_points):
+    def create_data(self, urdf_file, contact_points,
+                    random_pose=True, random_texture=True):
         """Create training data
 
         Parameters
@@ -875,22 +878,28 @@ class Renderer:
         """
         self.get_data_id()
         self.get_plane()
-        self.load_urdf(urdf_file)
+        self.load_urdf(
+            urdf_file,
+            random_pose=random_pose,
+            random_texture=random_texture)
         contact_points_coords = self.make_contact_points_coords(contact_points)
         contact_points_coords \
             = self.align_coords(
                 contact_points_coords, copy_list=False)
         contact_points_coords \
             = self.make_average_coords_list(contact_points_coords)
-        self.change_texture(self.plane_id)
-        self.change_texture(self.object_id)
+        if random_texture:
+            self.change_texture(self.plane_id)
+        if random_texture:
+            self.change_texture(self.object_id)
         self.create_camera()
         loop = True
 
         self.no_visible_count = 0
         while loop:
             self.move_to_random_pos()
-            self.look_at(self.object_coords.worldpos() - self.object_center)
+            self.look_at(self.object_coords.worldpos()
+                         - self.object_center + np.random.rand(3) * 0.1)
             self.step(1)
             print('self.no_visible_count %d' % self.no_visible_count)
             if self.no_visible_count >= self.no_visible_skip_num:
