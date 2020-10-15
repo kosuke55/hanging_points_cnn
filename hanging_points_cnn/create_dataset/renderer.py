@@ -59,6 +59,7 @@ class Renderer:
             im_height=424, fov=42.5,
             near_plane=0.1, far_plane=30.0,
             target_width=256, target_height=256,
+            use_change_light=True,
             save_dir='./', DEBUG=False):
         """Create training data of CNN
 
@@ -139,7 +140,14 @@ class Renderer:
         pybullet.setPhysicsEngineParameter(enableFileCaching=0)
 
         self.draw_camera_pos()
-        self.change_light()
+        self.lightDirection = [1, 1, 1]
+        self.lightDistance = 1
+        self.lightColor = [1, 1, 1]
+        self.lightAmbientCoeff = 0.2
+        self.lightDiffuseCoeff = 0.9
+        self.lightSpecularCoeff = 0.9
+        if use_change_light:
+            self.change_light()
         self._rendered = None
         self._rendered_pos = None
         self._rendered_rot = None
