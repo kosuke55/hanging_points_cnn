@@ -925,10 +925,12 @@ class Renderer:
 
         if not self.create_annotation_data():
             self.finish()
+            self.remove_all_objects()
             return False
 
         self.save_data()
         self.finish()
+        self.remove_all_objects()
         return True
 
     def from_camera_pose(self, camera_pose_path):
