@@ -800,9 +800,9 @@ class Renderer:
                 self.rotation_map.add_quaternion(
                     int(px), int(py), hp.quaternion)
 
-                self.depth_map.add_depth(
-                    int(px), int(py),
-                    hp.worldpos()[2] * 1000)
+                # self.depth_map.add_depth(
+                #     int(px), int(py),
+                #     hp.worldpos()[2] * 1000)
 
         if np.all(self.annotation_img == 0):
             print('out of camera')
@@ -814,7 +814,7 @@ class Renderer:
 
         self.rotations = self.rotation_map.rotations
 
-        self.hanging_points_depth = self.depth_map.on_depth_image(self.depth)
+        # self.hanging_points_depth = self.depth_map.on_depth_image(self.depth)
 
         return True
 
