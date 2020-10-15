@@ -38,6 +38,7 @@ from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import draw_axis
 
 from hanging_points_generator.generator_utils import save_contact_points
+from skrobot.coordinates.math import rotation_matrix_from_axis
 
 try:
     import cv2
@@ -678,7 +679,7 @@ class Renderer:
                   np.random.rand() * 0.9 + 0.2]
         self.move_to(newpos)
 
-    def look_at(self, p):
+    def look_at(self, p, horizontal=False):
         """Look at target position
 
         Parameters
@@ -691,6 +692,11 @@ class Renderer:
             return
         z = p - self.camera_coords.worldpos()
         coordinates.geo.orient_coords_to_axis(self.camera_coords, z)
+        if horizontal:
+            self.camera_coords.newcoords(
+                coordinates.Coordinates(
+                    pos=self.camera_coords.worldpos(),
+                    rot=rotation_matrix_from_axis(z, [0, 0, -1], axes='zy')))
 
         pybullet.resetBasePositionAndOrientation(
             self.camera_id,
