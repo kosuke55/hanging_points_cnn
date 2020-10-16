@@ -1504,7 +1504,9 @@ if __name__ == '__main__':
                       + 'filtered_contact_points.json')
                 continue
             contact_points = get_contact_points(
-                osp.join(dirname, 'filtered_contact_points.json'))
+                osp.join(dirname, 'filtered_contact_points.json'),
+                use_clustering=False, use_filter_penetration=False,
+                inf_penetration_check=False)
 
             if contact_points is None:
                 continue
