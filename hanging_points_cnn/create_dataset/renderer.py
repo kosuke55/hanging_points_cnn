@@ -1429,6 +1429,10 @@ if __name__ == '__main__':
         type=str, help='save dir',
         default='base.urdf')
     parser.add_argument(
+        '--skip-list', '-sl',
+        type=str, help='skip list file name',
+        default='filter_skip_list.txt')
+    parser.add_argument(
         '--gui', '-g',
         type=int, help='debug gui',
         default=0)
@@ -1444,6 +1448,7 @@ if __name__ == '__main__':
     input_dir = args.input_dir
     save_dir_base = args.save_dir
     urdf_name = args.urdf_name
+    skip_list = args.skip_list
     show_image = args.show_image
 
     # r = Renderer(DEBUG=gui, save_dir='./hoge')
@@ -1458,10 +1463,10 @@ if __name__ == '__main__':
         input_dir).glob(osp.join('*', urdf_name))))
     files = list(map(str, file_paths))
 
-    bad_list_file = str(Path(input_dir) / 'skip_list.txt')
+    bad_list_file = str(Path(input_dir) / skip_list)
     bad_list = []
     if osp.isfile(bad_list_file):
-        bad_list = load_list(osp.join(input_dir, 'skip_list.txt'))
+        bad_list = load_list(osp.join(input_dir, skip_list))
 
     category_name_list = None
     if dataset_type == 'ycb':
