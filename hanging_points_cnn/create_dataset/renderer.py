@@ -152,7 +152,8 @@ class Renderer:
         self._rendered_pos = None
         self._rendered_rot = None
 
-    def load_urdf(self, urdf, random_pose=True, random_texture=True):
+    def load_urdf(self, urdf, pos=[0, 0, 0], rot=[1, 0, 0, 0],
+                  random_pose=True, random_texture=True):
         """Load urdf
 
         Parameters
@@ -160,13 +161,16 @@ class Renderer:
         urdf : str
         random_pose : bool, optional
             If true, rotate object to random pose, by default True
-
+        pos ; list[float]
+        rot : list[float]
         Returns
         -------
         self.object_id : int
         """
+        c = coordinates.Coordinates(pos=pos, rot=rot)
+        rot = coordinates.math.wxyz2xyzw(c.quaternion)
         self.urdf_file = urdf
-        self.object_id = pybullet.loadURDF(urdf, [0, 0, 0], [0, 0, 0, 1])
+        self.object_id = pybullet.loadURDF(urdf, pos, rot)
         if random_pose:
             self.reset_object_pose()
 
