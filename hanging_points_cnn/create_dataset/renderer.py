@@ -876,7 +876,7 @@ class Renderer:
         #         self.bgr_axis)
 
     def create_data(self, urdf_file, contact_points,
-                    random_pose=True, random_texture=True):
+                    random_pose=True, random_texture=True, use_align_coords=False):
         """Create training data
 
         Parameters
@@ -895,11 +895,13 @@ class Renderer:
             random_pose=random_pose,
             random_texture=random_texture)
         contact_points_coords = self.make_contact_points_coords(contact_points)
+
         contact_points_coords \
             = self.align_coords(
                 contact_points_coords, copy_list=False)
-        contact_points_coords \
-            = self.make_average_coords_list(contact_points_coords)
+        if use_align_coords:
+            contact_points_coords \
+                = self.make_average_coords_list(contact_points_coords)
         if random_texture:
             self.change_texture(self.plane_id)
         if random_texture:
