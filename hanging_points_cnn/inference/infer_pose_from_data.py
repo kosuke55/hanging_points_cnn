@@ -16,7 +16,9 @@ from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.image import overlay_heatmap
 from hanging_points_cnn.utils.rois_tools import find_rois
+
 
 try:
     import cv2
@@ -166,12 +168,13 @@ try:
 
         print(model.rois_list)
         contact_point_sphere_list = []
+        roi_image = cv_bgr.copy()
         for i, (roi, roi_center) in enumerate(
                 zip(model.rois_list[0], model.rois_center_list[0])):
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
-            cv_bgr = draw_roi(cv_bgr, roi)
+            roi_image = draw_roi(roi_image, roi)
             hanging_point_x = roi_center[0]
             hanging_point_y = roi_center[1]
             v = rotation[i].cpu().detach().numpy()
@@ -215,8 +218,9 @@ try:
         if idx == start_idx:
             viewer.show()
 
-        cv2.imshow('confidence', confidence_img)
-        cv2.imshow('roi', cv_bgr)
+        heatmap = overlay_heatmap(cv_bgr, confidence_img)
+        cv2.imshow('heatmap', heatmap)
+        cv2.imshow('roi', roi_image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 except KeyboardInterrupt:
