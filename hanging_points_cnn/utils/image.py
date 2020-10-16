@@ -340,3 +340,20 @@ def depth_edges_erase(depth, max_sample=100, copy=True):
 
     depth[erase_mask == 255] = 0
     return depth
+
+
+def overlay_heatmap(image, heatmap):
+    """Overlay heatmap on image
+
+    Parameters
+    ----------
+    image : numpy.ndarray
+    heatmap : numpy.ndarray
+
+    Returns
+    -------
+    added_image : numpy.ndarray
+    """
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    added_image = cv2.addWeighted(image, 0.3, heatmap, 0.7, 0)
+    return added_image
