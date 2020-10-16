@@ -945,6 +945,84 @@ class Renderer:
         self.remove_all_objects()
         return True
 
+    def create_eval_data(
+            self, urdf_file, contact_points, camera_pos, obj_pos, obj_rot,
+            random_pose=False, random_texture=False):
+        """Create ycb eval data
+
+        Parameters
+        ----------
+        urdf_file : str
+        contact_points : list[list[list[float], list[float]]]
+
+        Returns
+        -------
+        result : bool
+        """
+        self.get_data_id()
+        self.get_plane()
+        self.load_urdf(
+            urdf_file,
+            random_pose=random_pose,
+            random_texture=random_texture,
+            pos=obj_pos,
+            rot=obj_rot)
+        contact_points_coords = self.make_contact_points_coords(contact_points)
+        contact_points_coords \
+            = self.align_coords(
+                contact_points_coords, copy_list=False)
+        contact_points_coords \
+            = self.make_average_coords_list(contact_points_coords)
+        if random_texture:
+            self.change_texture(self.plane_id)
+        if random_texture:
+            self.change_texture(self.object_id)
+        self.create_camera()
+
+        self.no_visible_count = 0
+        self.move_to(camera_pos)
+        self.look_at(self.object_coords.worldpos()
+                     - self.object_center + [0, 0, 0.1], horizontal=True)
+        self.step(1)
+        print('self.no_visible_count %d' % self.no_visible_count)
+        if self.no_visible_count >= self.no_visible_skip_num:
+            self.finish()
+            return False
+        if not self.get_visible_coords(contact_points_coords):
+            self.no_visible_count += 1
+            self.finish()
+            return False
+
+        self.no_visible_count = 0
+
+        bgr = self.get_bgr()
+        cv2.imshow('bgr', bgr)
+        if cv2.waitKey(0) != ord('y'):
+            print('skip image')
+            cv2.destroyAllWindows()
+            self.finish()
+            return False
+        print('save image')
+        cv2.destroyAllWindows()
+
+        self.get_seg()
+
+        if self.get_object_mask(self.object_id) is None:
+            self.finish()
+            return False
+
+        self.get_object_depth()
+
+        self.crop(padding=50)
+
+        if not self.create_annotation_data():
+            self.finish()
+            return False
+
+        self.save_data()
+        self.finish()
+        return True
+
     def from_camera_pose(self, camera_pose_path):
         """Load camera pose file and set camera coords
 
