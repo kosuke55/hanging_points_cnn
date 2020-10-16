@@ -192,8 +192,9 @@ try:
                     dep, depth_range[0], depth_range[1]) * 0.001
                 length = float(dep) / hanging_point[2]
             else:
-                depth_roi_clip = cv_depth[int(roi[1]):int(roi[3]),
-                                          int(roi[0]):int(roi[2])]
+                depth_roi_clip = cv_depth[
+                    roi_center[1] - 10:roi_center[1] + 10,
+                    roi_center[0] - 10:roi_center[0] + 10]
                 dep_roi_clip = depth_roi_clip[np.where(
                     np.logical_and(config['depth_range'][0] < depth_roi_clip,
                                    depth_roi_clip < config['depth_range'][1]))]
