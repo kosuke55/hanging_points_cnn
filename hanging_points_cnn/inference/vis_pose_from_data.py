@@ -9,6 +9,7 @@ import open3d as o3d
 import numpy as np
 import skrobot
 import trimesh
+from hanging_points_generator.generator_utils import load_json
 
 from hanging_points_cnn.utils.rois_tools import find_rois
 
@@ -28,7 +29,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--input-dir', '-i', type=str,
     help='input urdf',
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_hanging_object/0808/pocky-2020-08-08-18-44-42-555262-14432')
+    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-481902-45682')
 
 parser.add_argument(
     '--idx', type=int,
@@ -49,6 +50,10 @@ for idx in range(start_idx, 100000):
         for c in contact_point_sphere_list:
             viewer.delete(c)
 
+    annotation_path = osp.join(
+        base_dir, 'annotation', '{:06}.json'.format(idx))
+    annotation_data = load_json(annotation_path)
+
     color_path = osp.join(base_dir, 'color', '{:06}.png'.format(idx))
     color = o3d.io.read_image(color_path)
 
@@ -65,28 +70,13 @@ for idx in range(start_idx, 100000):
         color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
         rgbd, intrinsics)
-    # o3d.visualization.draw_geometries([pcd])
 
-    rotations_path = osp.join(
-        base_dir, 'rotations', '{:06}.npy'.format(idx))
-    rotations = np.load(rotations_path)
-
-    hanging_points_depth_path = osp.join(
-        base_dir, 'hanging_points_depth', '{:06}.npy'.format(idx))
-    hanging_points_depth = np.load(hanging_points_depth_path)
-
-    confidence_path = osp.join(
-        base_dir, 'heatmap', '{:06}.png'.format(idx))
-    confidence = cv2.imread(
-        confidence_path, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.
-
-    _, rois_center = find_rois(confidence)
-    rois_center = rois_center[0]
     contact_point_sphere_list = []
-    for roi_center in rois_center:
-        cx, cy = roi_center
-        q = rotations[cy, cx]
-        dep = hanging_points_depth[cy, cx]
+    for annotation in annotation_data:
+        cx = annotation['xy'][0]
+        cy = annotation['xy'][1]
+        q = np.array(annotation['quaternion'])
+        dep = annotation['depth']
         print(cx, cy)
         pos = np.array(
             cameramodel.project_pixel_to_3d_ray([cx, cy]))
