@@ -59,7 +59,7 @@ class Renderer:
             im_height=424, fov=42.5,
             near_plane=0.1, far_plane=30.0,
             target_width=256, target_height=256,
-            use_change_light=True,
+            use_change_light=True, labels=None,
             save_dir='./', DEBUG=False):
         """Create training data of CNN
 
@@ -119,6 +119,9 @@ class Renderer:
         self.object_coords = coordinates.Coordinates(
             pos=np.array([0, 0, 0.1]),
             rot=coordinates.math.rotation_matrix_from_rpy([0, 0, 0]))
+
+        self.labels = labels
+        self.visible_labels = []
 
         if DEBUG:
             self.cid = pybullet.connect(pybullet.GUI)
@@ -627,13 +630,14 @@ class Renderer:
             [c.worldpos() for c in contact_point_worldcoords_list],
             [self.camera_coords.worldpos()] * len(
                 contact_point_in_camera_coords_list))
-
-        for coords_w, coords_c, ray_info in zip(
+        for i, (coords_w, coords_c, ray_info) in enumerate(zip(
                 contact_point_worldcoords_list,
                 contact_point_in_camera_coords_list,
-                ray_info_list):
+                ray_info_list)):
             if ray_info[0] == self.camera_id:
                 self.hanging_point_in_camera_coords_list.append(coords_c)
+                if self.labels is not None:
+                    self.visible_labels.append(self.labels[i])
                 if self.debug_visible_line:
                     pybullet.addUserDebugLine(
                         coords_w.worldpos(),
@@ -649,7 +653,6 @@ class Renderer:
             return False
         else:
             print('-- Find visible hanging point --')
-
         return self.hanging_point_in_camera_coords_list
 
     def move_to_coords(self, coords):
@@ -798,7 +801,7 @@ class Renderer:
         -------
         result : bool
         """
-        for hp in self.hanging_point_in_camera_coords_list:
+        for i, hp in enumerate(self.hanging_point_in_camera_coords_list):
             px, py = self.camera_model.project3d_to_pixel(hp.worldpos())
             if self.save_debug_axis:
                 self.bgr_axis = self.bgr.copy()
@@ -811,12 +814,19 @@ class Renderer:
                 create_gradient_circle(
                     self.annotation_img,
                     int(py), int(px))
-
-                self.annotation_data.append(
-                    {'xy': [int(px), int(py)],
-                     'depth': hp.worldpos()[2] * 1000,
-                     'quaternion': hp.quaternion.tolist()}
-                )
+                if self.visible_labels == []:
+                    self.annotation_data.append(
+                        {'xy': [int(px), int(py)],
+                         'depth': hp.worldpos()[2] * 1000,
+                         'quaternion': hp.quaternion.tolist()}
+                    )
+                else:
+                    self.annotation_data.append(
+                        {'xy': [int(px), int(py)],
+                         'depth': hp.worldpos()[2] * 1000,
+                         'quaternion': hp.quaternion.tolist(),
+                         'label': self.visible_labels[i]}
+                    )
                 self.rotation_map.add_quaternion(
                     int(px), int(py), hp.quaternion)
 
@@ -876,7 +886,7 @@ class Renderer:
         #         self.bgr_axis)
 
     def create_data(self, urdf_file, contact_points,
-                    random_pose=True, random_texture=True, use_align_coords=False):
+                    random_pose=True, random_texture=True, use_align_coords=False, use_average_coords=False):
         """Create training data
 
         Parameters
@@ -896,12 +906,14 @@ class Renderer:
             random_texture=random_texture)
         contact_points_coords = self.make_contact_points_coords(contact_points)
 
-        contact_points_coords \
-            = self.align_coords(
-                contact_points_coords, copy_list=False)
         if use_align_coords:
             contact_points_coords \
-                = self.make_average_coords_list(contact_points_coords)
+                = self.align_coords(
+                    contact_points_coords, copy_list=False)
+            if use_average_coords:
+                contact_points_coords \
+                    = self.make_average_coords_list(contact_points_coords)
+
         if random_texture:
             self.change_texture(self.plane_id)
         if random_texture:
@@ -970,11 +982,6 @@ class Renderer:
             pos=obj_pos,
             rot=obj_rot)
         contact_points_coords = self.make_contact_points_coords(contact_points)
-        contact_points_coords \
-            = self.align_coords(
-                contact_points_coords, copy_list=False)
-        contact_points_coords \
-            = self.make_average_coords_list(contact_points_coords)
         if random_texture:
             self.change_texture(self.plane_id)
         if random_texture:
@@ -1220,7 +1227,7 @@ class RotationMap():
 def get_contact_points(contact_points_path, json_name='contact_points.json',
                        dataset_type='ycb', use_clustering=True,
                        use_filter_penetration=True,
-                       inf_penetration_check=True):
+                       inf_penetration_check=True, get_label=False):
     """Get contact points from file
 
     Parameters
@@ -1238,6 +1245,10 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
         by default True
     inf_penetration_check : bool, optional
         by default True
+    get_label : bool, optional
+        by default True
+        This only works if use_clustering, use_filter_penetration
+        and inf_penetration_check are all false.
 
     Returns
     -------
@@ -1251,9 +1262,12 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
         contact_points_dict = json.load(open(contact_points_path, 'r'))
     contact_points = contact_points_dict['contact_points']
 
+
+
     if use_clustering:
         contact_points = cluster_contact_points(
             contact_points, min_samples=-1)
+        get_label = False
 
     if use_filter_penetration:
         if inf_penetration_check:
@@ -1270,15 +1284,20 @@ def get_contact_points(contact_points_path, json_name='contact_points.json',
             contact_points, _ = filter_penetration(
                 osp.join(dirname, urdf_name),
                 contact_points, box_size=box_size)
+        get_label = False
 
     if len(contact_points) == 0:
         print('num of hanging points: {}'.format(len(contact_points)))
         return None
 
-    return contact_points
+    if get_label:
+        labels = contact_points_dict['labels']
+        return contact_points, labels
+    else:
+        return contact_points
 
 
-def sample_contact_points(contact_points, num_samples):
+def sample_contact_points(contact_points, num_samples, get_idx=False):
     """Sampling contact points for the specified number
 
     Parameters
@@ -1292,7 +1311,10 @@ def sample_contact_points(contact_points, num_samples):
     """
     num_samples = min(len(contact_points), num_samples)
     idx = np.unique(np.random.randint(0, len(contact_points), num_samples))
-    return [contact_points[i] for i in idx]
+    if get_idx:
+        return [contact_points[i] for i in idx], idx
+    else:
+        return [contact_points[i] for i in idx]
 
 
 def make_save_dirs(save_dir):
