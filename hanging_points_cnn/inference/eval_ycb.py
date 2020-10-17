@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -8,11 +9,15 @@ import numpy as np
 import skrobot
 import torch
 import trimesh
+from hanging_points_generator.generator_utils import load_json
 from skrobot.coordinates.math import matrix2quaternion
 from skrobot.coordinates.math import rotation_matrix_from_axis
+from skrobot.coordinates.math import quaternion2matrix
+from hanging_points_generator.generator_utils import save_json
 from torchvision import transforms
 
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
+from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
@@ -29,6 +34,17 @@ except ImportError:
             import cv2
             sys.path.append(path)
 
+
+def quaternion2xvec(q):
+    m = quaternion2matrix(q)
+    return m[:, 0]
+
+
+def two_vectors_angle(v1, v2):
+    cos = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    return np.arccos(cos)
+
+
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -42,8 +58,9 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained models',
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201016_0452.pt') # shapenet
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt') # gan
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201016_0452.pt')
+    # # shapenet
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -69,7 +86,7 @@ model.load_state_dict(torch.load(pretrained_model))
 model.eval()
 
 viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
-
+thresh_distance = 0.03
 
 color_paths = Path(base_dir).glob('*/*/color/*.png')
 first = True
@@ -79,22 +96,26 @@ try:
             viewer.delete(pc)
             for c in contact_point_sphere_list:
                 viewer.delete(c)
+        annotation_path = color_path.parent.parent / \
+            'annotation' / color_path.with_suffix('.json').name
+        camera_info_path = color_path.parent.parent / \
+            'camera_info' / color_path.with_suffix('.yaml').name
+        depth_path = color_path.parent.parent / \
+            'depth' / color_path.with_suffix('.npy').name
+        # color_path = str(color_path)
 
-        camera_info_path = str(color_path.parent.parent / 'camera_info' / color_path.with_suffix('.yaml').name)
-        depth_path = str(color_path.parent.parent / 'depth' / color_path.with_suffix('.npy').name)
-        color_path = str(color_path)
-
+        annotation_data = load_json(str(annotation_path))
         camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
-            camera_info_path)
+            str(camera_info_path))
         camera_model.target_size = (256, 256)
         intrinsics = camera_model.open3d_intrinsic
 
-        cv_bgr = cv2.imread(color_path)
+        cv_bgr = cv2.imread(str(color_path))
         cv_bgr = cv2.resize(cv_bgr, (256, 256))
         cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
         color = o3d.geometry.Image(cv_rgb)
 
-        cv_depth = np.load(depth_path)
+        cv_depth = np.load(str(depth_path))
         cv_depth = cv2.resize(cv_depth, (256, 256),
                               interpolation=cv2.INTER_NEAREST)
         depth = o3d.geometry.Image(cv_depth)
@@ -141,7 +162,10 @@ try:
 
         print(model.rois_list)
         contact_point_sphere_list = []
+        pos_list = []
+        quaternion_list = []
         roi_image = cv_bgr.copy()
+        axis_image = cv_bgr.copy()
         for i, (roi, roi_center) in enumerate(
                 zip(model.rois_list[0], model.rois_center_list[0])):
             if roi.tolist() == [0, 0, 0, 0]:
@@ -162,6 +186,10 @@ try:
                 camera_model_crop_resize.project_pixel_to_3d_ray(
                     [int(hanging_point_x), int(hanging_point_y)]))
 
+            draw_axis(axis_image,
+                      rot,
+                      hanging_point,
+                      camera_model.K)
             if args.predict_depth:
                 dep = depth[i].cpu().detach().numpy().copy()
                 dep = unnormalize_depth(
@@ -180,6 +208,8 @@ try:
                 length = float(dep_roi_clip) / hanging_point[2]
 
             hanging_point *= length
+            pos_list.append(hanging_point)
+            quaternion_list.append(q)
 
             contact_point_sphere = skrobot.models.Sphere(
                 0.001, color=[255, 0, 0])
@@ -193,9 +223,115 @@ try:
             first = False
 
         heatmap = overlay_heatmap(cv_bgr, confidence_img)
-        cv2.imshow('heatmap', heatmap)
-        cv2.imshow('roi', roi_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.imshow('heatmap', heatmap)
+        # cv2.imshow('roi', roi_image)
+        # cv2.imshow('axis', axis_image)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        gt_pos_list = []
+        gt_quaternon_list = []
+        gt_labels = []
+        for annotation in annotation_data:
+            cx = annotation['xy'][0]
+            cy = annotation['xy'][1]
+            q = np.array(annotation['quaternion'])
+            dep = annotation['depth']
+            label = annotation['label']
+            print(cx, cy)
+            pos = np.array(
+                camera_model.project_pixel_to_3d_ray([cx, cy]))
+            length = dep * 0.001 / pos[2]
+            pos = pos * length
+            gt_pos_list.append(pos)
+            gt_quaternon_list.append(q)
+            gt_labels.append(label)
+
+        # Calculate diff
+        diff_dict = {}
+        diff_dict['-1'] = {}
+        diff_dict['-1']['pos_diff'] = []
+        diff_dict['-1']['distance'] = []
+        diff_dict['-1']['angle'] = []
+
+        for pos, quaternion in zip(pos_list, quaternion_list):
+            pos = np.array(pos)
+            pos_diff = pos - gt_pos_list
+            distances = np.linalg.norm(pos_diff, axis=1)
+            min_idx = np.argmin(distances)
+            min_distance = np.min(distances)
+
+            if str(gt_labels[min_idx]) not in diff_dict:
+                diff_dict[str(gt_labels[min_idx])] = {}
+                diff_dict[str(gt_labels[min_idx])]['pos_diff'] = []
+                diff_dict[str(gt_labels[min_idx])]['distance'] = []
+                diff_dict[str(gt_labels[min_idx])]['angle'] = []
+
+            pos_diff = pos_diff[min_idx].tolist()
+            vec = quaternion2xvec(quaternion)
+            gt_vec = quaternion2xvec(gt_quaternon_list[min_idx])
+            angle = min(two_vectors_angle(vec, gt_vec),
+                        two_vectors_angle(vec, -gt_vec))
+
+            if min_distance > thresh_distance:
+                diff_dict['-1']['pos_diff'].append(pos_diff)
+                diff_dict['-1']['distance'].append(min_distance)
+                diff_dict['-1']['angle'].append(angle)
+            else:
+                diff_dict[str(gt_labels[min_idx])]['pos_diff'].append(pos_diff)
+                diff_dict[str(gt_labels[min_idx])
+                          ]['distance'].append(min_distance)
+                diff_dict[str(gt_labels[min_idx])]['angle'].append(angle)
+
+        for key in diff_dict:
+            print('----label %s ----' % key)
+            print('len: %d' % len(diff_dict[key]['angle']))
+            if key == '-1':
+                continue
+            pos_diff = np.array(diff_dict[key]['pos_diff'])
+            if pos_diff.size == 0:
+                continue
+            diff_dict[key]['pos_diff_mean'] = np.mean(
+                pos_diff, axis=0).tolist()
+            diff_dict[key]['pos_diff_max'] = np.max(pos_diff, axis=0).tolist()
+            diff_dict[key]['pos_diff_min'] = np.min(pos_diff, axis=0).tolist()
+
+            print('pos_diff_max %f %f %f' %
+                  tuple(diff_dict[key]['pos_diff_max']))
+            print('pos_diff_mean %f %f %f' %
+                  tuple(diff_dict[key]['pos_diff_mean']))
+            print('pos_diff_min %f %f %f' %
+                  tuple(diff_dict[key]['pos_diff_min']))
+
+            angle = np.array(diff_dict[key]['angle'])
+            diff_dict[key]['angle_mean'] = np.mean(angle).tolist()
+            diff_dict[key]['angle_max'] = np.max(angle).tolist()
+            diff_dict[key]['angle_min'] = np.min(angle).tolist()
+
+            print('angle_max %f' % diff_dict[key]['angle_max'])
+            print('angle_mean %f' % diff_dict[key]['angle_mean'])
+            print('angle_min %f' % diff_dict[key]['angle_min'])
+
+        # import ipdb
+        # ipdb.set_trace()
+        pred_heatmap_dir = color_path.parent.parent.parent.parent / 'pred' / 'heatmap'
+        pred_diff_dir = color_path.parent.parent.parent.parent / 'pred' / 'diff'
+        pred_axis_dir = color_path.parent.parent.parent.parent / 'pred' / 'axis'
+        category_name = color_path.parent.parent.parent.name
+        os.makedirs(str(pred_heatmap_dir), exist_ok=True)
+        os.makedirs(str(pred_axis_dir), exist_ok=True)
+        cv2.imwrite(str(pred_diff_dir / Path(
+            category_name +
+            '_' +
+            color_path.name)), heatmap)
+        cv2.imwrite(str(pred_axis_dir / Path(
+            category_name +
+            '_' +
+            color_path.name)), axis_image)
+        save_json(str(pred_diff_dir / Path(
+            category_name +
+            '_' +
+            color_path.with_suffix('.json').name)), diff_dict)
+
 except KeyboardInterrupt:
     pass
