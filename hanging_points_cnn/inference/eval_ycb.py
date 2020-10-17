@@ -58,9 +58,8 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained models',
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201016_0452.pt')
-    # # shapenet
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
+    default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201016_0452.pt')  # shapenet
+    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -312,15 +311,17 @@ try:
             print('angle_mean %f' % diff_dict[key]['angle_mean'])
             print('angle_min %f' % diff_dict[key]['angle_min'])
 
-        # import ipdb
-        # ipdb.set_trace()
-        pred_heatmap_dir = color_path.parent.parent.parent.parent / 'pred' / 'heatmap'
-        pred_diff_dir = color_path.parent.parent.parent.parent / 'pred' / 'diff'
-        pred_axis_dir = color_path.parent.parent.parent.parent / 'pred' / 'axis'
+        # pred_dir = color_path.parent.parent.parent.parent / 'pred_shapenet'
+        pred_dir = color_path.parent.parent.parent.parent / 'pred'
+        pred_heatmap_dir = pred_dir / 'heatmap'
+        pred_diff_dir = pred_dir / 'diff'
+        pred_axis_dir = pred_dir / 'axis'
         category_name = color_path.parent.parent.parent.name
+        os.makedirs(str(pred_dir), exist_ok=True)
         os.makedirs(str(pred_heatmap_dir), exist_ok=True)
         os.makedirs(str(pred_axis_dir), exist_ok=True)
-        cv2.imwrite(str(pred_diff_dir / Path(
+        os.makedirs(str(pred_diff_dir), exist_ok=True)
+        cv2.imwrite(str(pred_heatmap_dir / Path(
             category_name +
             '_' +
             color_path.name)), heatmap)
