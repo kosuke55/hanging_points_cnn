@@ -123,7 +123,7 @@ def draw_axis(img, R, t, K, axis_length=0.1, copy=False):
     axis_points, _ = cv2.projectPoints(points, rotV, t, K, (0, 0, 0, 0))
 
     for color, axis_point in zip(
-            [(0, 0, 255), (0, 255, 0), (255, 0, 0)], axis_points):
+            [(255, 0, 0), (0, 255, 0), (0, 0, 255)], axis_points[:3][::-1]):
         img = cv2.line(
             img, tuple(axis_points[3].ravel()), tuple(axis_point.ravel()),
             color, 2)
