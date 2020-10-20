@@ -1552,6 +1552,7 @@ if __name__ == '__main__':
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points')
                     break
+                r.get_data_id()
                 print(r.data_id)
                 if r.data_id == data_num:
                     break
