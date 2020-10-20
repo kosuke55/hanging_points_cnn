@@ -61,10 +61,11 @@ parser.add_argument(
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200929_1003.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200927_2249.pt')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201009_0639.pt')
-    default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_2002.pt')
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt')  # shapenet
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
-    help='predict-depth', default=1)
+    help='predict-depth', default=0)
 
 args = parser.parse_args()
 base_dir = args.input_dir
@@ -74,7 +75,7 @@ pretrained_model = args.pretrained_model
 config = {
     'output_channels': 1,
     'feature_extractor_name': 'resnet50',
-    'confidence_thresh': 0.3,
+    'confidence_thresh': 0.1,
     'depth_range': [100, 1500],
     'use_bgr': True,
     'use_bgr2gray': True,

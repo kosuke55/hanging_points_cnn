@@ -58,8 +58,8 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained models',
-    default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201016_0452.pt')  # shapenet
-    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt')  # shapenet
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -159,7 +159,6 @@ try:
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
 
-        print(model.rois_list)
         contact_point_sphere_list = []
         pos_list = []
         quaternion_list = []
@@ -217,16 +216,7 @@ try:
             viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
 
-        if first:
-            viewer.show()
-            first = False
-
         heatmap = overlay_heatmap(cv_bgr, confidence_img)
-        # cv2.imshow('heatmap', heatmap)
-        # cv2.imshow('roi', roi_image)
-        # cv2.imshow('axis', axis_image)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
         gt_pos_list = []
         gt_quaternon_list = []
@@ -237,7 +227,6 @@ try:
             q = np.array(annotation['quaternion'])
             dep = annotation['depth']
             label = annotation['label']
-            print(cx, cy)
             pos = np.array(
                 camera_model.project_pixel_to_3d_ray([cx, cy]))
             length = dep * 0.001 / pos[2]
@@ -281,7 +270,9 @@ try:
                 diff_dict[str(gt_labels[min_idx])
                           ]['distance'].append(min_distance)
                 diff_dict[str(gt_labels[min_idx])]['angle'].append(angle)
-
+        
+        print('\n\n')
+        print(color_path)
         for key in diff_dict:
             print('----label %s ----' % key)
             print('len: %d' % len(diff_dict[key]['angle']))
@@ -333,6 +324,16 @@ try:
             category_name +
             '_' +
             color_path.with_suffix('.json').name)), diff_dict)
+
+        if first:
+            viewer.show()
+            first = False
+        cv2.imshow('heatmap', heatmap)
+        cv2.imshow('roi', roi_image)
+        cv2.imshow('axis', axis_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
 
 except KeyboardInterrupt:
     pass

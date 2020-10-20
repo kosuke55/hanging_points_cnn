@@ -4,6 +4,7 @@
 
 import numpy as np
 import torch
+import torch.nn as nn
 from skrobot import coordinates
 from torch.nn import Module
 
@@ -45,7 +46,7 @@ class HPNETLoss(Module):
         self.use_coords = use_coords
 
     def forward(self, confidence, confidence_gt,
-                weight, depth_and_rotation, annotated_rois):
+                weight, depth, rotation, annotated_rois):
         sigma = 1.0  # huber
         confidence_diff = confidence[:, 0, ...] - confidence_gt[:, 0, ...]
         confidence_loss = torch.sum(
@@ -61,15 +62,22 @@ class HPNETLoss(Module):
 
         for i, ar in enumerate(annotated_rois):
             if ar[2]:
-                print('dep pred gt', float(depth_and_rotation[i, 0]), ar[1][0])
-                print(depth_and_rotation[i, 0], ar[1][0])
-                depth_diff = depth_and_rotation[i, 0] - ar[1][0]
+                # print(depth[i])
+                depth_diff = depth[i][0] - ar[1][0]
+
+                # depth_diff = depth[i][0] - torch.tensor(0.7)
+                # depth_diff = depth[i]- ar[1][0]
+                # print(depth_diff)
+
                 sigma = 0.1  # huber
+                # import ipdb
+                # ipdb.set_trace()
                 depth_loss += 10 * torch.where(
                     torch.abs(depth_diff) <= sigma,
                     0.5 * (depth_diff ** 2),
                     sigma * torch.abs(depth_diff) - 0.5 * (sigma ** 2))
-                # depth_loss += (depth_and_rotation[i, 0] - ar[1][0]) ** 2
+                # depth_loss = depth_loss + torch.abs(depth_diff)
+                # print('depth  ', depth[i], depth_loss)
 
                 # 1 dof
                 if self.use_coords:
@@ -78,7 +86,8 @@ class HPNETLoss(Module):
                     m_pred = quaternion2matrix(q)
                     v_pred = torch.matmul(m_pred, self.vx)
                 else:
-                    v_pred = depth_and_rotation[i, 1:4]
+                    # v_pred = depth_and_rotation[i, 1:4]
+                    v_pred = rotation[i]
                     v_pred = v_pred / torch.norm(v_pred)
 
                 if torch.any(v_pred == torch.tensor([np.inf] * 3).to('cuda')) \
@@ -87,7 +96,7 @@ class HPNETLoss(Module):
                     continue
                 m_gt = quaternion2matrix(ar[1][1:])
                 v_gt = torch.matmul(m_gt, self.vx)
-                rotation_loss += torch.min(
+                rotation_loss += 0.1 * torch.min(
                     two_vectors_angle(v_pred, v_gt),
                     two_vectors_angle(v_pred, -v_gt))
 

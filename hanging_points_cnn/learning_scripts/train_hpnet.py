@@ -19,7 +19,6 @@ import visdom
 from skrobot.coordinates.math import rotation_matrix_from_axis
 from skrobot.coordinates.math import quaternion2matrix
 
-sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))  # noqa:
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.learning_scripts.hpnet_loss import HPNETLoss
 from hanging_points_cnn.learning_scripts.hanging_points_data import load_dataset
@@ -134,7 +133,7 @@ class Trainer(object):
         rotation_loss_sum = 0
         rotation_loss_count = 0
 
-        for index, (hp_data, depth, camera_info_path, hp_data_gt, annotation_data) in tqdm.tqdm(
+        for index, (hp_data, depth_image, camera_info_path, hp_data_gt, annotation_data) in tqdm.tqdm(
                 enumerate(dataloader), total=len(dataloader),
                 desc='{} epoch={}'.format(mode, self.epo), leave=False):
 
@@ -146,19 +145,19 @@ class Trainer(object):
                     camera_info_path[0])
             self.cameramodel.target_size = self.target_size
 
-            depth = hp_data.numpy().copy()[0, 0, ...]
-            depth = np.nan_to_num(depth)
-            depth = unnormalize_depth(
-                depth, self.depth_range[0], self.depth_range[1])
+            depth_image = hp_data.numpy().copy()[0, 0, ...]
+            depth_image = np.nan_to_num(depth_image)
+            depth_image = unnormalize_depth(
+                depth_image, self.depth_range[0], self.depth_range[1])
             hp_data = hp_data.to(self.device)
 
-            depth_bgr = colorize_depth(depth, ignore_value=self.depth_range[0])
+            depth_image_bgr = colorize_depth(depth_image, ignore_value=self.depth_range[0])
 
             if mode == 'train':
-                confidence, depth_and_rotation = self.model(hp_data)
+                confidence, depth, rotation = self.model(hp_data)
             elif mode == 'val' or mode == 'test':
                 with torch.no_grad():
-                    confidence, depth_and_rotation = self.model(hp_data)
+                    confidence, depth, rotation = self.model(hp_data)
 
             confidence_np = confidence[0, ...].cpu(
             ).detach().numpy().copy()
@@ -195,9 +194,15 @@ class Trainer(object):
 
                 confidence_loss, depth_loss, rotation_loss = criterion(
                     confidence, hp_data_gt, pos_weight,
-                    depth_and_rotation, annotated_rois)
+                    depth, rotation, annotated_rois)
 
-                loss = confidence_loss + rotation_loss + depth_loss
+                # loss =depth_loss
+                # if confidence_loss < 0.1 and rotation_loss < 0.1 and depth_loss != 0:
+                #     print('************depth*******')
+                #     loss =depth_loss
+                # else:
+                # loss = confidence_loss + rotation_loss + depth_loss
+                loss = confidence_loss + rotation_loss
 
                 if torch.isnan(loss):
                     print('loss is nan!!')
@@ -241,7 +246,7 @@ class Trainer(object):
                 #     hanging_point_depth_gt_bgr,
                 #     cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
-                axis_gt = depth_bgr.copy()
+                axis_gt = depth_image_bgr.copy()
 
                 confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
                 ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
@@ -261,7 +266,7 @@ class Trainer(object):
                     # depth_gt_val = depth_gt[cy, cx]
                     # unnormalized_depth_gt_val = unnormalized_depth_gt[cy, cx]
                     depth_and_rotation_gt = get_value_gt([cx, cy], annotation_data[0])
-                    rotation = depth_and_rotation_gt[1:]
+                    rotation_gt= depth_and_rotation_gt[1:]
                     depth_gt_val = depth_and_rotation_gt[0]
                     unnormalized_depth_gt_val = unnormalize_depth(
                         depth_gt_val, self.depth_range[0], self.depth_range[1])
@@ -271,10 +276,10 @@ class Trainer(object):
                             [int(cx), int(cy)])) * unnormalized_depth_gt_val * 0.001
 
                     if self.use_coords:
-                        rot = quaternion2matrix(rotation),
+                        rot = quaternion2matrix(rotation_gt),
 
                     else:
-                        v = np.matmul(quaternion2matrix(rotation),
+                        v = np.matmul(quaternion2matrix(rotation_gt),
                                       [1, 0, 0])
                         rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
                     try:
@@ -291,8 +296,8 @@ class Trainer(object):
                     axis_gt = draw_roi(axis_gt, roi, val=depth_gt_val, gt=True)
 
             # Visualize pred axis and roi
-            axis_pred = depth_bgr.copy()
-            hanging_point_depth_pred = depth.copy()
+            axis_pred = depth_image_bgr.copy()
+            hanging_point_depth_image_pred = depth_image.copy()
 
             for i, (roi, roi_c) in enumerate(
                     zip(self.model.rois_list[0],
@@ -304,11 +309,11 @@ class Trainer(object):
                 cx = roi_c[0]
                 cy = roi_c[1]
 
-                dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
+                dep = depth[i].cpu().detach().numpy().copy()
                 normalized_dep_pred = float(dep)
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
-                dep_pred = trim_depth(dep, depth)
+                dep_pred = trim_depth(dep, depth_image)
 
                 confidence_vis = draw_roi(
                     confidence_vis, roi, val=normalized_dep_pred)
@@ -336,7 +341,9 @@ class Trainer(object):
                     rot = quaternion2matrix(q)
 
                 else:
-                    v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
+                    # import ipdb
+                    # ipdb.set_trace()
+                    v = rotation[i].cpu().detach().numpy()
                     v /= np.linalg.norm(v)
                     rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
 
@@ -388,8 +395,9 @@ class Trainer(object):
                 if rotation_loss.item() > 0:
                     depth_loss_sum += depth_loss.item()
                     rotation_loss_sum += rotation_loss.item()
-                    loss_sum = loss_sum + confidence_loss.item() + \
-                        rotation_loss.item() + depth_loss.item()
+                    # loss_sum = loss_sum + confidence_loss.item() + \
+                    #     rotation_loss.item() + depth_loss.item()
+                    loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item()
                     rotation_loss_count += 1
 
                 if np.mod(index, 1) == 0:
@@ -444,6 +452,14 @@ class Trainer(object):
                         opts=dict(
                             title='{}-{} hanging_point_depth (pred)'.format(
                                 mode, index)))
+
+            if np.mod(index, 1000) == 0:
+                save_file = osp.join(
+                    self.save_dir,
+                    'hpnet_latestmodel_' + self.time_now + '.pt')
+                print('save {}'.format(save_file))
+                torch.save(
+                    self.model.state_dict(), save_file)
 
         if mode != 'test':
             if len(dataloader) > 0:
@@ -528,7 +544,7 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training and Validation data path',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/0824')
+        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/0927')
     parser.add_argument(
         '--test-data-path',
         '-tdp',
@@ -546,7 +562,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200826_0304.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_0347.pt')
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
@@ -567,6 +583,7 @@ if __name__ == "__main__":
         help='pt model save dir',
         default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray')
     # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
+    # parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
 
     args = parser.parse_args()
@@ -583,7 +600,7 @@ if __name__ == "__main__":
         pretrained_model=args.pretrained_model,
         train_data_num=args.train_data_num,
         val_data_num=args.val_data_num,
-        save_dir=args.save_dir,
+        save_dir=args.data_path,
         lr=args.lr,
         config=config,
         port=args.port)

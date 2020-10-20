@@ -182,7 +182,7 @@ def expand_box(box, img_shape, scale=None, padding=None):
 def find_rois(confidence,
               confidence_gt=None,
               confidence_thresh=0.5,
-              area_thresh=100, padding=50):
+              area_thresh=50, padding=50):
     """Find rois
 
     gtとの比較はlossの方で行う.ここではconfidenceの推論からroiを提案すればよい.

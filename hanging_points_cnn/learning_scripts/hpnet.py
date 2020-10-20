@@ -69,7 +69,7 @@ class Decoder(nn.Module):
                 128, self.output_channels, kernel_size=16, stride=8, padding=4)  # *8
         self.conv3 = Conv2DBatchNormRelu(
             self.output_channels, self.output_channels, kernel_size=3, stride=1, padding=1)
-
+        
     def forward(self, x):
         h = x
         # h = self.conv0(h)
@@ -133,17 +133,43 @@ class HPNET(nn.Module):
         self.decoder = Decoder(
             self.output_channels, config['feature_extractor_name'])
 
-        self.conv_to_head = nn.Sequential(
+        self.conv_to_rotation = nn.Sequential(
             Conv2DBatchNormRelu(
                 self.feature_extractor_out_channels, 128,
                 kernel_size=3, stride=1, padding=1),
             nn.Flatten(),
             nn.Linear(128 * 8 * 8, 128 * 8 * 8),
-            nn.Linear(128 * 8 * 8, 5)
+            nn.Linear(128 * 8 * 8, 3)
+            # nn.Tanh()
+        )
+
+        self.conv_to_depth = nn.Sequential(
+            Conv2DBatchNormRelu(
+                self.feature_extractor_out_channels, 128,
+                kernel_size=3, stride=1, padding=1),
+            nn.Flatten(),
+            nn.Linear(128 * 8 * 8, 128 * 8 * 8),
+            nn.ReLU(),
+            nn.Linear(128 * 8 * 8, 1),
+            nn.Sigmoid()
+            # nn.Linear(1, 1)
+            # nn.ReLU()
+
+        )
+
+        hoge = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128 * 8 * 8, 128 * 8 * 8),
+            nn.Linear(128 * 8 * 8, 1),
+            nn.Sigmoid()
+            # nn.ReLU()
         )
 
         self.roi_align = RoIAlign(
             self.feature_extractor_out_size, self.roi_align_spatial_scale, -1)
+
+        self.sigmoid = nn.Sigmoid()
+        self.li = nn.Linear(1, 1)
 
     def forward(self, x):
         h = x
@@ -159,6 +185,15 @@ class HPNET(nn.Module):
                 [[0, 0, 0, 0]], dtype=torch.float32).to(
                     self.device) for _ in range(confidence.shape[0])]
         rois = self.roi_align(feature, self.rois_list)
-        depth_and_rotation = self.conv_to_head(rois)
+        rotation = self.conv_to_rotation(rois)
+        depth = self.conv_to_depth(rois)
+        # depth = self.sigmoid(self.conv_to_depth(rois))
+        
+        # print(depth.shape)
+        # print('sig' ,depth)
+        # depth = self.li(depth)
+        # print(depth.shape)
+        # print('li', depth)
+        
 
-        return confidence, depth_and_rotation
+        return confidence, depth, rotation

@@ -641,12 +641,12 @@ class Renderer:
                 if self.debug_visible_line:
                     pybullet.addUserDebugLine(
                         coords_w.worldpos(),
-                        self.camera_coords.worldpos(), [1, 1, 1], 1)
+                        self.camera_coords.worldpos(), [1, 1, 1], 3)
             else:
                 if self.debug_visible_line:
                     pybullet.addUserDebugLine(
                         coords_w.worldpos(),
-                        self.camera_coords.worldpos(), [1, 0, 0], 1)
+                        self.camera_coords.worldpos(), [1, 0, 0], 3)
 
         if len(self.hanging_point_in_camera_coords_list) == 0:
             print('-- No visible hanging point --')
@@ -953,7 +953,6 @@ class Renderer:
             self.finish()
             self.remove_all_objects()
             return False
-
         self.save_data()
         self.finish()
         self.remove_all_objects()
@@ -1435,7 +1434,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save-dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering')
+        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/hoge')
     parser.add_argument(
         '--data-num', '-n',
         type=int, help='num of data per object',
