@@ -93,8 +93,9 @@ try:
     for color_path in color_paths:
         if not first:
             viewer.delete(pc)
-            for c in contact_point_sphere_list:
+            for c, gt_c in zip(contact_point_sphere_list, gt_contact_point_sphere_list):
                 viewer.delete(c)
+                viewer.delete(gt_c)
         annotation_path = color_path.parent.parent / \
             'annotation' / color_path.with_suffix('.json').name
         camera_info_path = color_path.parent.parent / \
@@ -160,6 +161,7 @@ try:
         confidence_img = confidence_np.astype(np.uint8)
 
         contact_point_sphere_list = []
+        gt_contact_point_sphere_list = []
         pos_list = []
         quaternion_list = []
         roi_image = cv_bgr.copy()
@@ -195,8 +197,10 @@ try:
                 length = float(dep) / hanging_point[2]
             else:
                 depth_roi_clip = cv_depth[
-                    roi_center[1] - 10:roi_center[1] + 10,
-                    roi_center[0] - 10:roi_center[0] + 10]
+                    max(0, roi_center[1] - 10):
+                    min(roi_center[1] + 10, cv_depth.shape[0]),
+                    max(0, roi_center[0] - 10):
+                    min(roi_center[0] + 10, cv_depth.shape[1])]
                 dep_roi_clip = depth_roi_clip[np.where(
                     np.logical_and(config['depth_range'][0] < depth_roi_clip,
                                    depth_roi_clip < config['depth_range'][1]))]
@@ -269,9 +273,17 @@ try:
             contact_point_sphere = skrobot.models.Sphere(
                 0.01, color=color)
             contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(pos=pos, rot=q))
+                skrobot.coordinates.Coordinates(pos=pos, rot=quaternion))
             viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
+
+            # gt            gt_quaternon_list[min_idx]
+            gt_contact_point_sphere = skrobot.models.Sphere(
+                0.01, color=[0, 255, 0])
+            gt_contact_point_sphere.newcoords(
+                skrobot.coordinates.Coordinates(pos=gt_pos_list[min_idx], rot=gt_quaternon_list[min_idx]))
+            viewer.add(gt_contact_point_sphere)
+            gt_contact_point_sphere_list.append(gt_contact_point_sphere)
 
         print('\n\n')
         print(color_path)
@@ -300,12 +312,12 @@ try:
             diff_dict[key]['angle_max'] = np.max(angle).tolist()
             diff_dict[key]['angle_min'] = np.min(angle).tolist()
 
-            print('angle_max %f' % diff_dict[key]['angle_max'])
-            print('angle_mean %f' % diff_dict[key]['angle_mean'])
-            print('angle_min %f' % diff_dict[key]['angle_min'])
+            print('angle_max %f' % (diff_dict[key]['angle_max'] / np.pi * 180))
+            print('angle_mean %f' % (diff_dict[key]['angle_mean'] / np.pi * 180))
+            print('angle_min %f' % (diff_dict[key]['angle_min'] / np.pi * 180))
 
         # eval_dir = color_path.parent.parent.parent.parent / 'eval_shapenet'
-        eval_dir = color_path.parent.parent.parent.parent / 'eval_gan'
+        eval_dir = color_path.parent.parent.parent.aarent / 'eval_gan'
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
         eval_axis_dir = eval_dir / 'axis'
