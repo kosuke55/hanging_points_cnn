@@ -8,6 +8,7 @@ import glob
 import json
 import os
 import os.path as osp
+import random
 import sys
 from operator import itemgetter
 from pathlib import Path
@@ -608,7 +609,7 @@ class Renderer:
 
         return average_coords_list
 
-    def get_visible_coords(self, contact_points_coords, debug_line=False):
+    def get_visible_coords(self, contact_points_coords, debug_line=False, all_visible=False):
         """Get visible coords
 
         Parameters
@@ -1309,7 +1310,7 @@ def sample_contact_points(contact_points, num_samples, get_idx=False):
     contact_points : list[list[list[float], list[float]]]
     """
     num_samples = min(len(contact_points), num_samples)
-    idx = np.unique(np.random.randint(0, len(contact_points), num_samples))
+    idx = random.sample(range(0, len(contact_points)), num_samples)
     if get_idx:
         return [contact_points[i] for i in idx], idx
     else:
