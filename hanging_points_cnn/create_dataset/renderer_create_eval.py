@@ -65,22 +65,23 @@ if __name__ == '__main__':
 
     file_paths = list(sorted(Path(
         input_dir).glob(osp.join('*', urdf_name))))
-    files = list(map(str, file_paths))
+    annotation_path = Path('/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/urdf2/annotation_obj')
+    # files = list(map(str, file_paths))
 
 
     category_name_list = None
     category_name_list = [
-        # "019_pitcher_base",
-        # "022_windex_bottle",
-        # "025_mug",
-        # "033_spatula", # no contact pointsa
-        # "035_power_drill",
-        # "037_scissors",
-        # "042_adjustable_wrench",
-        # "048_hammer",
+        "019_pitcher_base",
+        "022_windex_bottle",
+        "025_mug",
+        "033_spatula", # no contact pointsa
+        "035_power_drill",
+        "037_scissors",
+        "042_adjustable_wrench",
+        "048_hammer",
         "050_medium_clamp",
-        "051_large_clamp"
-        # "052_extra_large_clamp"
+        "051_large_clamp",
+        "052_extra_large_clamp"
     ]
 
     obj_rot_list = [[0, 0, 0],  # 019_pitcher_base
@@ -95,27 +96,26 @@ if __name__ == '__main__':
                     [0, 0, np.pi / 2],  # 051_large_clamp
                     [0, np.pi / 2, 0],  # 052_extra_large_clamp
                     ]
-
     try:
-        for file, obj_rot in zip(files, obj_rot_list):
+        for file_path, obj_rot in zip(file_paths, obj_rot_list):
             dirname, filename, category_name, idx \
-                = split_file_name(file, dataset_type)
+                = split_file_name(str(file_path), dataset_type)
             print(dirname)
             print(category_name)
             if category_name_list is not None:
                 if category_name not in category_name_list:
                     continue
 
-            if not osp.isfile(
-                    osp.join(dirname, 'filtered_contact_points.json')):
-                print('Skipped %s because no ' % category_name
-                      + 'filtered_contact_points.json')
-                continue
+            # if not osp.isfile(
+            #         osp.join(dirname, 'filtered_contact_points.json')):
+            #     print('Skipped %s because no ' % category_name
+            #           + 'filtered_contact_points.json')
+            #     continue
             contact_points, labels = get_contact_points(
-                osp.join(dirname, 'filtered_contact_points.json'),
+                str(annotation_path / Path(category_name).with_suffix('.json')),
                 use_clustering=False, use_filter_penetration=False,
                 inf_penetration_check=False, get_label=True)
-
+            print(len(contact_points))
             if contact_points is None:
                 continue
 
@@ -124,16 +124,14 @@ if __name__ == '__main__':
 
             print(dirname)
             rad = 0.5
-            contact_points, idx = sample_contact_points(contact_points, 30, get_idx=True)
-            
+            contact_points, idx = sample_contact_points(contact_points, 100, get_idx=True)
+            print(len(contact_points))
             labels = [labels[i] for i in idx]
 
-            num_scene = 36
+            num_scene = 12
             required_data = 5
             save_data = 0
-            # for i in range(num_scene):
             i = 0
-            
             while save_data < required_data:
                 if i == num_scene:
                     i = 0
