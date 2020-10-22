@@ -58,8 +58,8 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained models',
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt')  # shapenet
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapene # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -71,7 +71,7 @@ pretrained_model = args.pretrained_model
 config = {
     'output_channels': 1,
     'feature_extractor_name': 'resnet50',
-    'confidence_thresh': 0.3,
+    'confidence_thresh': 0.25,
     'depth_range': [100, 1500],
     'use_bgr': True,
     'use_bgr2gray': True,
@@ -209,13 +209,6 @@ try:
             pos_list.append(hanging_point)
             quaternion_list.append(q)
 
-            contact_point_sphere = skrobot.models.Sphere(
-                0.001, color=[255, 0, 0])
-            contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
-            viewer.add(contact_point_sphere)
-            contact_point_sphere_list.append(contact_point_sphere)
-
         heatmap = overlay_heatmap(cv_bgr, confidence_img)
 
         gt_pos_list = []
@@ -262,15 +255,24 @@ try:
                         two_vectors_angle(vec, -gt_vec))
 
             if min_distance > thresh_distance:
+                color = [0, 0, 255]
                 diff_dict['-1']['pos_diff'].append(pos_diff)
                 diff_dict['-1']['distance'].append(min_distance)
                 diff_dict['-1']['angle'].append(angle)
             else:
+                color = [255, 0, 0]
                 diff_dict[str(gt_labels[min_idx])]['pos_diff'].append(pos_diff)
                 diff_dict[str(gt_labels[min_idx])
                           ]['distance'].append(min_distance)
                 diff_dict[str(gt_labels[min_idx])]['angle'].append(angle)
-        
+
+            contact_point_sphere = skrobot.models.Sphere(
+                0.01, color=color)
+            contact_point_sphere.newcoords(
+                skrobot.coordinates.Coordinates(pos=pos, rot=q))
+            viewer.add(contact_point_sphere)
+            contact_point_sphere_list.append(contact_point_sphere)
+
         print('\n\n')
         print(color_path)
         for key in diff_dict:
@@ -302,25 +304,25 @@ try:
             print('angle_mean %f' % diff_dict[key]['angle_mean'])
             print('angle_min %f' % diff_dict[key]['angle_min'])
 
-        # pred_dir = color_path.parent.parent.parent.parent / 'pred_shapenet'
-        pred_dir = color_path.parent.parent.parent.parent / 'pred'
-        pred_heatmap_dir = pred_dir / 'heatmap'
-        pred_diff_dir = pred_dir / 'diff'
-        pred_axis_dir = pred_dir / 'axis'
+        # eval_dir = color_path.parent.parent.parent.parent / 'eval_shapenet'
+        eval_dir = color_path.parent.parent.parent.parent / 'eval_gan'
+        eval_heatmap_dir = eval_dir / 'heatmap'
+        eval_diff_dir = eval_dir / 'diff'
+        eval_axis_dir = eval_dir / 'axis'
         category_name = color_path.parent.parent.parent.name
-        os.makedirs(str(pred_dir), exist_ok=True)
-        os.makedirs(str(pred_heatmap_dir), exist_ok=True)
-        os.makedirs(str(pred_axis_dir), exist_ok=True)
-        os.makedirs(str(pred_diff_dir), exist_ok=True)
-        cv2.imwrite(str(pred_heatmap_dir / Path(
+        os.makedirs(str(eval_dir), exist_ok=True)
+        os.makedirs(str(eval_heatmap_dir), exist_ok=True)
+        os.makedirs(str(eval_axis_dir), exist_ok=True)
+        os.makedirs(str(eval_diff_dir), exist_ok=True)
+        cv2.imwrite(str(eval_heatmap_dir / Path(
             category_name +
             '_' +
             color_path.name)), heatmap)
-        cv2.imwrite(str(pred_axis_dir / Path(
+        cv2.imwrite(str(eval_axis_dir / Path(
             category_name +
             '_' +
             color_path.name)), axis_image)
-        save_json(str(pred_diff_dir / Path(
+        save_json(str(eval_diff_dir / Path(
             category_name +
             '_' +
             color_path.with_suffix('.json').name)), diff_dict)
