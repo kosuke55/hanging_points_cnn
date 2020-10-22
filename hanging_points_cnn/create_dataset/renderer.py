@@ -609,15 +609,17 @@ class Renderer:
 
         return average_coords_list
 
-    def get_visible_coords(self, contact_points_coords, debug_line=False, all_visible=False):
-        """Get visible coords
+    def get_visible_coords(self, contact_points_coords,
+                           debug_line=False, all_visible=False):
+        """Transform and get visible coords
 
         Parameters
         ----------
         contact_points_coords : list[skrobot.coordinates.Coordinates]
         debug_line : bool, optional
             visualize debug line from cam to points, by default False
-
+        all_visible : bool, optional
+            If True, just transform coords and don't filter non-visible points ,by default False
         Returns
         -------
         self.hanging_point_in_camera_coords_list
@@ -635,7 +637,7 @@ class Renderer:
                 contact_point_worldcoords_list,
                 contact_point_in_camera_coords_list,
                 ray_info_list)):
-            if ray_info[0] == self.camera_id:
+            if ray_info[0] == self.camera_id or all_visible:
                 self.hanging_point_in_camera_coords_list.append(coords_c)
                 if self.labels is not None:
                     self.visible_labels.append(self.labels[i])
@@ -997,7 +999,7 @@ class Renderer:
         if self.no_visible_count >= self.no_visible_skip_num:
             self.finish()
             return False
-        if not self.get_visible_coords(contact_points_coords):
+        if not self.get_visible_coords(contact_points_coords, all_visible=True):
             self.no_visible_count += 1
             self.finish()
             return False
