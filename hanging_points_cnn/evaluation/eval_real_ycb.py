@@ -1,5 +1,6 @@
 import argparse
 import os
+import os.path as osp
 import sys
 from pathlib import Path
 
@@ -58,8 +59,8 @@ parser.add_argument(
     '-p',
     type=str,
     help='Pretrained models',
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapenet  # noqa
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan  # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapenet  # noqa
+    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan  # noqa
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -68,6 +69,15 @@ parser.add_argument(
     '--gui', '-g', type=int,
     help='visualzie', default=0)
 
+parser.add_argument(
+    '--save-dir', '-sd', type=srt,
+    help='directory to save evaluation result', default='eval_gan')
+    # help='directory to save evaluation result', default='eval_shapnet')
+
+parser.add_argument(
+    '--image-dir', '-id', type=srt,
+    help='directory to save image', default='')
+
 args = parser.parse_args()
 base_dir = args.input_dir
 pretrained_model = args.pretrained_model
@@ -75,7 +85,7 @@ pretrained_model = args.pretrained_model
 config = {
     'output_channels': 1,
     'feature_extractor_name': 'resnet50',
-    'confidence_thresh': 0.3,
+    'confidence_thresh': 0.25,
     'depth_range': [100, 1500],
     'use_bgr': True,
     'use_bgr2gray': True,
@@ -97,25 +107,23 @@ first = True
 annotation_dir = '/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/real_ycb_annotation'
 
 gui = args.gui
+save_dir = args.save_dir
+image_dir = args.image_dir
 
 try:
     for color_path in color_paths:
         print(color_path)
-        # continue
         if gui:
             if not first:
                 viewer.delete(pc)
                 for c in contact_point_sphere_list:
                     viewer.delete(c)
-        # annotation_path = color_path.parent.parent / \
-        #     'annotation' / color_path.with_suffix('.json').name
+
         camera_info_path = color_path.parent.parent / \
             'camera_info' / color_path.with_suffix('.yaml').name
         depth_path = color_path.parent.parent / \
             'depth' / color_path.with_suffix('.npy').name
-        # color_path = str(color_path)
 
-        # annotation_data = load_json(str(annotation_path))
         camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
             str(camera_info_path))
         camera_model.target_size = (256, 256)
@@ -130,7 +138,6 @@ try:
         cv_depth = cv2.resize(cv_depth, (256, 256),
                               interpolation=cv2.INTER_NEAREST)
         depth = o3d.geometry.Image(cv_depth)
-        # depth = o3d.geometry.Image(np.load(depth_path))
 
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
             color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
@@ -144,7 +151,6 @@ try:
 
         if gui:
             viewer.add(pc)
-            # o3d.visualization.draw_geometries([pcd])
 
         if config['use_bgr2gray']:
             gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY)
@@ -225,10 +231,14 @@ try:
             vec_list.append(v)
             quaternion_list.append(q)
 
-            contact_point_sphere = skrobot.models.Sphere(
-                0.001, color=[255, 0, 0])
+            # contact_point_sphere = skrobot.models.Sphere(
+            #     0.001, color=[255, 0, 0])
+            contact_point_sphere = skrobot.models.Axis(0.003, 0.05)
+            # contact_point_sphere.newcoords(
+            #     skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
             contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
+                skrobot.coordinates.Coordinates(
+                    pos=hanging_point, rot=q).rotate(np.pi, 'y'))
             if gui:
                 viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
@@ -256,8 +266,8 @@ try:
         diff_dict['-1']['distance'] = []
         diff_dict['-1']['angle'] = []
 
-        if pos_list == []:
-            continue
+        # if pos_list == []:
+        #     continue
 
         for pos, vec in zip(pos_list, vec_list):
             pos = np.array(pos)
@@ -315,16 +325,56 @@ try:
             print('angle_mean %f' % diff_dict[key]['angle_mean'])
             print('angle_min %f' % diff_dict[key]['angle_min'])
 
-        save_json(str(color_path.parent.parent / 'eval.json'), diff_dict)
+        eval_dir = color_path.parent.parent.parent / save_dir
+        eval_heatmap_dir = eval_dir / 'heatmap'
+        eval_diff_dir = eval_dir / 'diff'
+        eval_axis_dir = eval_dir / 'axis'
+        os.makedirs(str(eval_dir), exist_ok=True)
+        os.makedirs(str(eval_heatmap_dir), exist_ok=True)
+        os.makedirs(str(eval_axis_dir), exist_ok=True)
+        os.makedirs(str(eval_diff_dir), exist_ok=True)
+        cv2.imwrite(str(eval_heatmap_dir / Path(
+            category +
+            '_' +
+            color_path.name)), heatmap)
+        cv2.imwrite(str(eval_axis_dir / Path(
+            category +
+            '_' +
+            color_path.name)), axis_image)
+        save_json(str(eval_diff_dir / Path(
+            category +
+            '_' +
+            color_path.with_suffix('.json').name)), diff_dict)
+
         if gui:
             if first:
-                viewer.show()
+                if image_dir == '':
+                    viewer.show()
+
                 first = False
             cv2.imshow('heatmap', heatmap)
             cv2.imshow('roi', roi_image)
             cv2.imshow('axis', axis_image)
+            if image_dir != '':
+                viewer._init_and_start_app()
             cv2.waitKey(0)
             cv2.destroyAllWindows()
+
+        if image_dir != '':
+            image_file = osp.join(
+                image_dir,
+                color_path.parent.parent.name + '_' + color_path.name)
+            from PIL import Image
+            loop = True
+            while loop:
+                try:
+                    data = viewer.scene.save_image(visible=True)
+                    rendered = Image.open(trimesh.util.wrap_as_stream(data))
+                    rendered.save(image_file)
+                    loop = False
+                    print('Save %s' % image_file)
+                except AttributeError:
+                    print('Fail to save. Try again.')
 
 
 except KeyboardInterrupt:
