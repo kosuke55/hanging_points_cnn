@@ -28,6 +28,7 @@ from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
+from hanging_points_cnn.utils.image import overlay_heatmap
 from hanging_points_cnn.utils.image import remove_nan
 
 
@@ -83,7 +84,7 @@ class HangingPointsNet():
         self.config = {
             'output_channels': 1,
             'feature_extractor_name': 'resnet50',
-            'confidence_thresh': 0.3,
+            'confidence_thresh': 0.25,
             'depth_range': [100, 1500],
             'use_bgr': True,
             'use_bgr2gray': True,
@@ -158,8 +159,6 @@ class HangingPointsNet():
         bgr = cv2.resize(bgr, (256, 256))
         cv_depth = cv2.resize(cv_depth, (256, 256),
                               interpolation=cv2.INTER_NEAREST)
-            
-                           
 
         # depth = frame_img(depth)
         # kernel = np.ones((10, 10), np.uint8)
@@ -193,13 +192,15 @@ class HangingPointsNet():
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
         confidence_img = cv2.resize(confidence_img, (256, 256))
+        heatmap = overlay_heatmap(bgr, confidence_img)
 
         axis_pred = bgr.copy()
         axis_pred_raw = bgr_raw.copy()
 
         dep_pred = []
         hanging_points_pose_array = PoseArray()
-        for i, (roi, roi_center) in enumerate(zip(self.model.rois_list[0], self.model.rois_center_list[0])):
+        for i, (roi, roi_center) in enumerate(
+                zip(self.model.rois_list[0], self.model.rois_center_list[0])):
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
@@ -210,7 +211,7 @@ class HangingPointsNet():
             v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
             rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
-            q = matrix2quaternion(rot)            
+            q = matrix2quaternion(rot)
             # if self.use_coords:
             #     q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
             #     q /= np.linalg.norm(q)
@@ -220,10 +221,9 @@ class HangingPointsNet():
             #     rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
             #     q = matrix2quaternion(rot)
 
-
-                # coords = coordinates.Coordinates()
-                # coordinates.geo.orient_coords_to_axis(coords, v, 'x')
-                # q = coords.quaternion
+            # coords = coordinates.Coordinates()
+            # coordinates.geo.orient_coords_to_axis(coords, v, 'x')
+            # q = coords.quaternion
 
             camera_model_crop_resize \
                 = self.camera_model.crop_resize_camera_info(
@@ -273,10 +273,13 @@ class HangingPointsNet():
                 (int(roi[2] * (xmax - xmin) / float(256) + xmin),
                  int(roi[3] * (ymax - ymin) / float(256) + ymin)),
                 (0, 255, 0), 1)
-            axis_pred_raw = draw_axis(axis_pred_raw,
-                                      quaternion2matrix(q),
-                                      hanging_point,
-                                      self.camera_model.full_K)
+            try:
+                axis_pred_raw = draw_axis(axis_pred_raw,
+                                          quaternion2matrix(q),
+                                          hanging_point,
+                                          self.camera_model.full_K)
+            except Exception:
+                print('Fail to draw axis')
 
         axis_pred = self.camera_model.crop_image(
             axis_pred_raw, copy=True).astype(np.uint8)
@@ -297,7 +300,8 @@ class HangingPointsNet():
         fg = cv2.bitwise_or(img2, img2, mask=mask_inv)
         pred_color = cv2.bitwise_or(bgr, fg)
 
-        msg_out = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
+        # msg_out = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
+        msg_out = self.bridge.cv2_to_imgmsg(heatmap, "bgr8")
         msg_out.header.stamp = depth_msg.header.stamp
 
         pred_msg = self.bridge.cv2_to_imgmsg(pred_color, "bgr8")
