@@ -55,7 +55,7 @@ class HangingPointsNet():
     def __init__(self):
         self.bridge = CvBridge()
         self.pub = rospy.Publisher("~output", Image, queue_size=10)
-        self.pub_pred = rospy.Publisher("~output/pred", Image, queue_size=10)
+        self.pub_confidence = rospy.Publisher("~output/confidence", Image, queue_size=10)
         self.pub_depth = rospy.Publisher(
             "~colorized_depth", Image, queue_size=10)
         self.pub_axis = rospy.Publisher(
@@ -284,28 +284,11 @@ class HangingPointsNet():
         axis_pred = self.camera_model.crop_image(
             axis_pred_raw, copy=True).astype(np.uint8)
 
-        # draw pred rois
-        # for roi in self.model.rois_list[0]:
-        #     if roi.tolist() == [0, 0, 0, 0]:
-        #         continue
-        #     axis_pred = cv2.rectangle(
-        #         axis_pred, (roi[0], roi[1]), (roi[2], roi[3]),
-        #         (0, 255, 0), 3)
-
-        pred_color = np.zeros_like(bgr, dtype=np.uint8)
-        pred_color[..., 2] = confidence_img[..., 0]
-        img2 = pred_color
-        img2gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-        mask_inv = cv2.bitwise_not(img2gray)
-        fg = cv2.bitwise_or(img2, img2, mask=mask_inv)
-        pred_color = cv2.bitwise_or(bgr, fg)
-
-        # msg_out = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
         msg_out = self.bridge.cv2_to_imgmsg(heatmap, "bgr8")
         msg_out.header.stamp = depth_msg.header.stamp
 
-        pred_msg = self.bridge.cv2_to_imgmsg(pred_color, "bgr8")
-        pred_msg.header.stamp = depth_msg.header.stamp
+        confidence_msg = self.bridge.cv2_to_imgmsg(confidence_img, "mono8")
+        confidence_msg.header.stamp = depth_msg.header.stamp
 
         colorized_depth_msg = self.bridge.cv2_to_imgmsg(depth_bgr, "bgr8")
         colorized_depth_msg.header.stamp = depth_msg.header.stamp
@@ -317,8 +300,8 @@ class HangingPointsNet():
         axis_pred_raw_msg.header.stamp = depth_msg.header.stamp
 
         hanging_points_pose_array.header = camera_info_msg.header
-        self.pub_pred.publish(pred_msg)
         self.pub.publish(msg_out)
+        self.pub_confidence.publish(confidence_msg)
         self.pub_depth.publish(colorized_depth_msg)
         self.pub_axis.publish(axis_pred_msg)
         self.pub_axis_raw.publish(axis_pred_raw_msg)
