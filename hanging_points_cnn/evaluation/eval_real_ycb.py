@@ -58,9 +58,9 @@ parser.add_argument(
     '--pretrained_model',
     '-p',
     type=str,
-    help='Pretrained models',
-    default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapenet  # noqa
-    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan  # noqa
+    # help='Pretrained models',
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapenet  # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan  # noqa
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -70,12 +70,12 @@ parser.add_argument(
     help='visualzie', default=0)
 
 parser.add_argument(
-    '--save-dir', '-sd', type=srt,
+    '--save-dir', '-sd', type=str,
     help='directory to save evaluation result', default='eval_gan')
-    # help='directory to save evaluation result', default='eval_shapnet')
+# help='directory to save evaluation result', default='eval_shapnet')
 
 parser.add_argument(
-    '--image-dir', '-id', type=srt,
+    '--image-dir', '-id', type=str,
     help='directory to save image', default='')
 
 args = parser.parse_args()
@@ -177,6 +177,8 @@ try:
         confidence_np[confidence_np <= 0] = 0
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
+        heatmap = overlay_heatmap(cv_bgr, confidence_img)
+        roi_heatmap = heatmap.copy()
 
         contact_point_sphere_list = []
         pos_list = []
@@ -190,8 +192,11 @@ try:
                 continue
             roi = roi.cpu().detach().numpy().copy()
             roi_image = draw_roi(roi_image, roi)
+            roi_heatmap = draw_roi(roi_heatmap, roi)
             hanging_point_x = roi_center[0]
             hanging_point_y = roi_center[1]
+            cv2.circle(roi_image, (hanging_point_x, hanging_point_y),
+                       10, (19, 208, 251), thickness=-1)
             v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
 
@@ -242,8 +247,6 @@ try:
             if gui:
                 viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
-
-        heatmap = overlay_heatmap(cv_bgr, confidence_img)
 
         gt_pos_list = []
         gt_quaternon_list = []
@@ -328,9 +331,13 @@ try:
         eval_dir = color_path.parent.parent.parent / save_dir
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
+        eval_roi_dir = eval_dir / 'roi'
+        eval_roi_heatmap_dir = eval_dir / 'roi_heatmap'
         eval_axis_dir = eval_dir / 'axis'
         os.makedirs(str(eval_dir), exist_ok=True)
         os.makedirs(str(eval_heatmap_dir), exist_ok=True)
+        os.makedirs(str(eval_roi_dir), exist_ok=True)
+        os.makedirs(str(eval_roi_heatmap_dir), exist_ok=True)
         os.makedirs(str(eval_axis_dir), exist_ok=True)
         os.makedirs(str(eval_diff_dir), exist_ok=True)
         cv2.imwrite(str(eval_heatmap_dir / Path(
@@ -341,6 +348,14 @@ try:
             category +
             '_' +
             color_path.name)), axis_image)
+        cv2.imwrite(str(eval_roi_dir / Path(
+            category +
+            '_' +
+            color_path.name)), roi_image)
+        cv2.imwrite(str(eval_roi_heatmap_dir / Path(
+            category +
+            '_' +
+            color_path.name)), roi_heatmap)
         save_json(str(eval_diff_dir / Path(
             category +
             '_' +
