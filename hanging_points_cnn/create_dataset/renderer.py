@@ -929,7 +929,7 @@ class Renderer:
             self.move_to_random_pos()
             self.look_at(self.object_coords.worldpos()
                          - self.object_center
-                         + (np.random.rand(3) - 0.5) * 0.1)
+                         + (np.random.rand(3) - 0.5) * 0.2)
             self.step(1)
             print('self.no_visible_count %d' % self.no_visible_count)
             if self.no_visible_count >= self.no_visible_skip_num:
