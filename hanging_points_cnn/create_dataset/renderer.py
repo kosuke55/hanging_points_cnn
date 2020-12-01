@@ -109,6 +109,7 @@ class Renderer:
             rot=coordinates.math.rotation_matrix_from_rpy([0, np.pi, 0]))
 
         self.save_debug_axis = False
+        self.save_debug_roi = False
         self.annotation_img = np.zeros(
             (target_width, target_height), dtype=np.uint32)
 
@@ -439,6 +440,8 @@ class Renderer:
                            padding, int(self.im_width - 1)])
 
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
+        self.roi_image = self.camera_model.draw_roi(
+            self.bgr, copy=False)  # bgr is full before crop
         return [ymin, ymax, xmin, xmax]
 
     def transform_contact_points(self, contact_points_coords,
@@ -887,6 +890,11 @@ class Renderer:
             cv2.imwrite(osp.join(
                 self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
                 self.bgr_axis)
+
+        if self.save_debug_roi:
+            cv2.imwrite(osp.join(
+                self.save_dir, 'debug_roi', '{:06}.png'.format(self.data_id)),
+                self.roi_image)
 
     def create_data(self, urdf_file, contact_points,
                     random_pose=True, random_texture=True, use_align_coords=False, use_average_coords=False):
@@ -1346,6 +1354,7 @@ def make_save_dirs(save_dir):
     os.makedirs(osp.join(save_dir, 'annotation'), exist_ok=True)
 
     # os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
+    # os.makedirs(osp.join(save_dir, 'debug_roi'), exist_ok=True)
     return save_dir
 
 
