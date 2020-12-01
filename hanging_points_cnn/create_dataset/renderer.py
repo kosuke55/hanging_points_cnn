@@ -883,10 +883,10 @@ class Renderer:
         self.camera_model.dump(osp.join(
             self.save_dir, 'camera_info', '{:06}.yaml'.format(self.data_id)))
 
-        # if self.save_debug_axis:
-        #     cv2.imwrite(osp.join(
-        #         self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
-        #         self.bgr_axis)
+        if self.save_debug_axis:
+            cv2.imwrite(osp.join(
+                self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
+                self.bgr_axis)
 
     def create_data(self, urdf_file, contact_points,
                     random_pose=True, random_texture=True, use_align_coords=False, use_average_coords=False):
