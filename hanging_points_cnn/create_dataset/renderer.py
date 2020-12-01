@@ -441,7 +441,7 @@ class Renderer:
 
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
         self.roi_image = self.camera_model.draw_roi(
-            self.bgr, copy=False)  # bgr is full before crop
+            self.bgr, copy=True)  # bgr is full before crop
         return [ymin, ymax, xmin, xmax]
 
     def transform_contact_points(self, contact_points_coords,
