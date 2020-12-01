@@ -1328,7 +1328,7 @@ def sample_contact_points(contact_points, num_samples, get_idx=False):
         return [contact_points[i] for i in idx]
 
 
-def make_save_dirs(save_dir):
+def make_save_dirs(save_dir, debug_dir=False):
     """Make each save dir
 
     Parameters
@@ -1347,14 +1347,12 @@ def make_save_dirs(save_dir):
                                      save_pip=False)
     os.makedirs(osp.join(save_dir, 'color'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'depth'), exist_ok=True)
-    # os.makedirs(osp.join(save_dir, 'hanging_points_depth'), exist_ok=True)
-    # os.makedirs(osp.join(save_dir, 'heatmap'), exist_ok=True)
-    # os.makedirs(osp.join(save_dir, 'rotations'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'camera_info'), exist_ok=True)
     os.makedirs(osp.join(save_dir, 'annotation'), exist_ok=True)
 
-    # os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
-    # os.makedirs(osp.join(save_dir, 'debug_roi'), exist_ok=True)
+    if debug_dir:
+        os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
+        os.makedirs(osp.join(save_dir, 'debug_roi'), exist_ok=True)
     return save_dir
 
 
