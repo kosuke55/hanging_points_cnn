@@ -781,7 +781,7 @@ class Renderer:
         return self.camera_id
 
     def change_texture(self, object_id):
-        """Chage textuer of object
+        """Chage textuere of object
 
         Parameters
         ----------
