@@ -61,7 +61,7 @@ class Renderer:
             near_plane=0.1, far_plane=30.0,
             target_width=256, target_height=256,
             use_change_light=True, labels=None,
-            save_dir='./', DEBUG=False):
+            save_dir='./', save_debug_image=False, DEBUG=False):
         """Create training data of CNN
 
         Parameters
@@ -94,6 +94,7 @@ class Renderer:
         self.target_width = target_width
         self.target_height = target_height
         self.save_dir = save_dir
+        self.save_debug_image = save_debug_image
 
         aspect = self.im_width / self.im_height
         self.camera_model \
@@ -108,8 +109,6 @@ class Renderer:
             pos=np.array([0, 0, 0.5]),
             rot=coordinates.math.rotation_matrix_from_rpy([0, np.pi, 0]))
 
-        self.save_debug_axis = False
-        self.save_debug_roi = False
         self.annotation_img = np.zeros(
             (target_width, target_height), dtype=np.uint32)
 
@@ -809,10 +808,10 @@ class Renderer:
         """
         for i, hp in enumerate(self.hanging_point_in_camera_coords_list):
             px, py = self.camera_model.project3d_to_pixel(hp.worldpos())
-            if self.save_debug_axis:
+            if self.save_debug_image:
                 self.bgr_axis = self.bgr.copy()
             if 0 <= px < self.target_width and 0 <= py < self.target_height:
-                if self.save_debug_axis:
+                if self.save_debug_image:
                     draw_axis(self.bgr_axis,
                               hp.worldrot(),
                               hp.worldpos(),
@@ -886,15 +885,19 @@ class Renderer:
         self.camera_model.dump(osp.join(
             self.save_dir, 'camera_info', '{:06}.yaml'.format(self.data_id)))
 
-        if self.save_debug_axis:
+        if self.save_debug_image:
             cv2.imwrite(osp.join(
                 self.save_dir, 'debug_axis', '{:06}.png'.format(self.data_id)),
                 self.bgr_axis)
-
-        if self.save_debug_roi:
             cv2.imwrite(osp.join(
                 self.save_dir, 'debug_roi', '{:06}.png'.format(self.data_id)),
                 self.roi_image)
+            _object_mask = np.zeros_like(self.roi_image)
+            _object_mask[self.object_mask] = 255  # idx -> image
+            cv2.imwrite(osp.join(
+                self.save_dir, 'debug_mask', '{:06}.png'.format(self.data_id)),
+                _object_mask)
+
 
     def create_data(self, urdf_file, contact_points,
                     random_pose=True, random_texture=True, use_align_coords=False, use_average_coords=False):
@@ -1328,7 +1331,7 @@ def sample_contact_points(contact_points, num_samples, get_idx=False):
         return [contact_points[i] for i in idx]
 
 
-def make_save_dirs(save_dir, debug_dir=False):
+def make_save_dirs(save_dir, debug_dir=True):
     """Make each save dir
 
     Parameters
@@ -1353,6 +1356,7 @@ def make_save_dirs(save_dir, debug_dir=False):
     if debug_dir:
         os.makedirs(osp.join(save_dir, 'debug_axis'), exist_ok=True)
         os.makedirs(osp.join(save_dir, 'debug_roi'), exist_ok=True)
+        os.makedirs(osp.join(save_dir, 'debug_mask'), exist_ok=True)
     return save_dir
 
 
@@ -1445,7 +1449,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save-dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/hoge')
+        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/mthesi_media')
+    parser.add_argument(
+        '--save-debug-image', '-sdd',
+        type=int, help='If true, save debug image',
+        default=0)
     parser.add_argument(
         '--data-num', '-n',
         type=int, help='num of data per object',
@@ -1484,6 +1492,7 @@ if __name__ == '__main__':
     urdf_name = args.urdf_name
     skip_list = args.skip_list
     show_image = args.show_image
+    save_debug_image = args.save_debug_image
 
     # r = Renderer(DEBUG=gui, save_dir='./hoge')
     # r.get_sim_images(
@@ -1546,7 +1555,8 @@ if __name__ == '__main__':
                 continue
 
             save_dir = osp.join(save_dir_base, category_name)
-            save_dir = make_save_dirs(save_dir)
+            save_dir = make_save_dirs(
+                save_dir, debug_dir=save_debug_image)
 
             # load multiple json
             # contact_points = get_contact_points(
@@ -1557,7 +1567,7 @@ if __name__ == '__main__':
 
             contact_points = sample_contact_points(contact_points, 30)
             while True:
-                r = Renderer(DEBUG=gui, save_dir=save_dir)
+                r = Renderer(DEBUG=gui, save_dir=save_dir, save_debug_image=save_debug_image)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points')
