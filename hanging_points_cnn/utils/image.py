@@ -319,8 +319,8 @@ def depth_edges_erase(depth, max_sample=100, copy=True):
 
     Returns
     -------
-    [type]
-        [description]
+    depth : numpy.ndarray
+        Depth with randomly erased edges
     """
     if copy:
         depth = depth.copy()
