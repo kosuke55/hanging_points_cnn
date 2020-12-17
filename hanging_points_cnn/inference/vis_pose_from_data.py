@@ -1,7 +1,6 @@
 import argparse
 import os.path as osp
 from six.moves import input
-import sys
 
 import cameramodels
 import open3d as o3d
