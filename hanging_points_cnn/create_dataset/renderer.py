@@ -1454,7 +1454,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--input-dir', '-i',
         type=str, help='input dir',
-        default='/media/kosuke/SANDISK/meshdata/hanging_object')
+        # default='/media/kosuke/SANDISK/meshdata/hanging_object')
+        # default='/media/kosuke55/SANDISK/meshdata/random_shape_shapenet_hanging_1016')
+        default='/media/kosuke55/SANDISK/meshdata/shapenet_mini_pouring_50')
     parser.add_argument(
         '--dataset-type', '-dt',
         type=str, help='dataset type',
@@ -1473,6 +1475,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--show-image', '-si',
         action='store_true', help='show image')
+    parser.add_argument(
+        '--filtered-points-name', '-fjn',
+        type=str, help='filtered points json file name',
+        # default='filtered_contact_points.json')
+        default='filtered_contact_points_pouring.json')
     args = parser.parse_args()
 
     data_num = args.data_num
@@ -1484,6 +1491,7 @@ if __name__ == '__main__':
     skip_list = args.skip_list
     show_image = args.show_image
     save_debug_image = args.save_debug_image
+    filtered_points_name = args.filtered_points_name
 
     # r = Renderer(DEBUG=gui, save_dir='./hoge')
     # r.get_sim_images(
@@ -1520,6 +1528,8 @@ if __name__ == '__main__':
     elif dataset_type == 'ObjectNet3D':
         category_name_list = ['cup', 'key', 'scissors']
 
+    # category_name_list = ['random_00363']  # mthesis media
+
     try:
         for file in files:
             dirname, filename, category_name, idx \
@@ -1533,12 +1543,12 @@ if __name__ == '__main__':
                 continue
 
             if not osp.isfile(
-                    osp.join(dirname, 'filtered_contact_points.json')):
+                    osp.join(dirname, filtered_points_name)):
                 print('Skipped %s because no ' % category_name
-                      + 'filtered_contact_points.json')
+                      + filtered_points_name)
                 continue
             contact_points = get_contact_points(
-                osp.join(dirname, 'filtered_contact_points.json'),
+                osp.join(dirname, filtered_points_name),
                 use_clustering=False, use_filter_penetration=False,
                 inf_penetration_check=False)
 
