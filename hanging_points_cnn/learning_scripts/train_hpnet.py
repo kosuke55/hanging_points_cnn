@@ -51,7 +51,8 @@ class Trainer(object):
 
     def __init__(self, gpu, data_path, test_data_path,
                  batch_size, max_epoch, pretrained_model, train_data_num,
-                 val_data_num, save_dir, lr, config=None, port=6006):
+                 val_data_num, save_dir, lr, config=None,
+                 train_depth=False, port=6006):
 
         if config is None:
             config = {
@@ -118,6 +119,7 @@ class Trainer(object):
 
         self.now = datetime.now().strftime('%Y%m%d_%H%M')
         self.use_coords = False
+        self.train_depth = train_depth
 
     def step(self, dataloader, mode):
         print('Start {}'.format(mode))
@@ -201,8 +203,10 @@ class Trainer(object):
                 #     print('************depth*******')
                 #     loss =depth_loss
                 # else:
-                # loss = confidence_loss + rotation_loss + depth_loss
-                loss = confidence_loss + rotation_loss
+                if self.train_depth:
+                    loss = confidence_loss + rotation_loss + depth_loss
+                else:
+                    loss = confidence_loss + rotation_loss
 
                 if torch.isnan(loss):
                     print('loss is nan!!')
@@ -550,7 +554,7 @@ if __name__ == "__main__":
         '-tdp',
         type=str,
         help='Test data path',
-        default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/test_images')
+        default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/test_images')  # noqa
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=32)
@@ -562,7 +566,7 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_0347.pt')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_0347.pt')  # noqa
     parser.add_argument('--train_data_num', '-tr', type=int,
                         help='How much data to use for training',
                         default=1000000)
@@ -575,16 +579,18 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int,
                         help='port',
                         default=6006)
-
     parser.add_argument(
         '--save_dir',
         '-sd',
         type=str,
         help='pt model save dir',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray')
-    # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')
-    # parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
+        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray')  # noqa
+        # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')  # noqa
+        # parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')  # noqa
     parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
+    parser.add_argument('--train-depth', '-td',
+                        action='store_true',
+                        help='if true, train depth')
 
     args = parser.parse_args()
 
@@ -603,5 +609,6 @@ if __name__ == "__main__":
         save_dir=args.data_path,
         lr=args.lr,
         config=config,
+        train_depth=args.train_depth,
         port=args.port)
     trainer.train()
