@@ -606,7 +606,8 @@ class Renderer:
         return average_coords_list
 
     def get_visible_coords(self, contact_points_coords,
-                           debug_line=False, all_visible=False):
+                           debug_line=False, all_visible=False,
+                           translate=[0, 0.01, 0]):
         """Transform and get visible coords
 
         Parameters
@@ -615,7 +616,12 @@ class Renderer:
         debug_line : bool, optional
             visualize debug line from cam to points, by default False
         all_visible : bool, optional
-            If True, just transform coords and don't filter non-visible points ,by default False
+            If True, just transform coords and don't filter non-visible points.
+            by default False
+        translate : list, optional
+            translate contact points for ray-trace,
+            by default [0, 0.01, 0]. this is for hanging.
+
         Returns
         -------
         self.hanging_point_in_camera_coords_list
@@ -624,7 +630,8 @@ class Renderer:
         """
         self.hanging_point_in_camera_coords_list = []
         contact_point_in_camera_coords_list, contact_point_worldcoords_list \
-            = self.transform_contact_points(contact_points_coords)
+            = self.transform_contact_points(
+                contact_points_coords, translate=translate)
         ray_info_list = pybullet.rayTestBatch(
             [c.worldpos() for c in contact_point_worldcoords_list],
             [self.camera_coords.worldpos()] * len(
@@ -892,15 +899,19 @@ class Renderer:
                 self.save_dir, 'debug_mask', '{:06}.png'.format(self.data_id)),
                 _object_mask)
 
-
     def create_data(self, urdf_file, contact_points,
-                    random_pose=True, random_texture=True, use_align_coords=False, use_average_coords=False):
+                    random_pose=True, random_texture=True,
+                    use_align_coords=False, use_average_coords=False,
+                    translate=[0, 0.01, 0]):
         """Create training data
 
         Parameters
         ----------
         urdf_file : str
         contact_points : list[list[list[float], list[float]]]
+        translate : list, optional
+            translate contact points for ray-trace,
+            by default [0, 0.01, 0]. this is for hanging.
 
         Returns
         -------
@@ -1005,7 +1016,9 @@ class Renderer:
         if self.no_visible_count >= self.no_visible_skip_num:
             self.finish()
             return False
-        if not self.get_visible_coords(contact_points_coords, all_visible=True):
+        if not self.get_visible_coords(
+                contact_points_coords,
+                all_visible=True):
             self.no_visible_count += 1
             self.finish()
             return False
