@@ -63,7 +63,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--input-dir', '-i', type=str,
     help='input urdf',
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-481902-45682')
+    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-481902-45682')  # noqa
 
 parser.add_argument(
     '--idx', type=int,
@@ -80,8 +80,8 @@ viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 for idx in range(start_idx, 100000):
     print(idx)
     if idx != start_idx:
-        viewer.delete(pc)
-        for c in contact_point_sphere_list:
+        viewer.delete(pc)  # noqa
+        for c in contact_point_sphere_list:  # noqa
             viewer.delete(c)
 
     annotation_path = osp.join(
