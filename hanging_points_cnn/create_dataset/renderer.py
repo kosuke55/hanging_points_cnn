@@ -1586,9 +1586,12 @@ if __name__ == '__main__':
         for file in files:
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
-            print(category_name)
+            print('dirname ', dirname)
+            print('filename ', filename)
+            print('category_name ', category_name)
+
             if category_name_list is not None:
-                if category_name not in category_name_list:
+                if not any(c in category_name for c in category_name_list):
                     continue
             if category_name in bad_list:
                 print('Skipped %s because it is in bad_list' % category_name)
