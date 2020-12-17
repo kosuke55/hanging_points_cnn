@@ -56,7 +56,7 @@ class Renderer:
             target_width=256, target_height=256,
             use_change_light=True, labels=None,
             save_dir='./', save_debug_image=False,
-            DEBUG=False, task_type='hanging'):
+            gui=False, task_type='hanging', stop_per_data=False):
         """Create training data of CNN
 
         Parameters
@@ -77,7 +77,7 @@ class Renderer:
              created data height, by default 256
         save_dir : str, optional
             [description], by default './'
-        DEBUG : bool, optional
+        gui : bool, optional
             enable gui , by default False
         task_type : str, optional
             hanging or pouring.
@@ -95,13 +95,14 @@ class Renderer:
         self.save_dir = save_dir
         self.save_debug_image = save_debug_image
         self.task_type = task_type
+        self.stop_per_data = stop_per_data
 
         if self.task_type == 'hanging':
             # direction of grabity
-            self.translate_value = np.array([0, 0.01, 0])
+            self.translate_value = np.array([0, 0.005, 0])
         elif self.task_type == 'pouring':
             # direction opposite to gravity
-            self.translate_value = np.array([-0.01, 0, 0])
+            self.translate_value = np.array([-0.005, 0, 0])
 
         aspect = self.im_width / self.im_height
         self.camera_model \
@@ -131,7 +132,7 @@ class Renderer:
         self.labels = labels
         self.visible_labels = []
 
-        if DEBUG:
+        if gui:
             self.cid = pybullet.connect(pybullet.GUI)
             pybullet.resetDebugVisualizerCamera(
                 cameraDistance=1,
@@ -140,7 +141,7 @@ class Renderer:
                 cameraTargetPosition=[0, 0, 0.1])
         else:
             self.cid = pybullet.connect(pybullet.DIRECT)
-        self.debug_visible_line = DEBUG
+        self.gui = gui
         self.no_visible_count = 0
         self.no_visible_skip_num = 30
 
@@ -473,7 +474,7 @@ class Renderer:
         for contact_point_coords in contact_points_coords:
             contact_point_worldcoords \
                 = self.object_coords.copy().transform(
-                    contact_point_coords)
+                    contact_point_coords.translate(translate))
             contact_point_worldcoords_list.append(contact_point_worldcoords)
             contact_point_in_camera_coords \
                 = self.camera_coords.inverse_transformation(
@@ -502,7 +503,7 @@ class Renderer:
             contact_points_coords.append(contact_point_coords)
         return contact_points_coords
 
-    def coords_to_dict(self, coords_list, traslate=True):
+    def coords_to_dict(self, coords_list, translate=True):
         """Cover coords list to dict for json
 
         Parameters
@@ -518,7 +519,7 @@ class Renderer:
             'urdf_file': self.urdf_file,
             'contact_points': []}
         for coords in coords_list:
-            if traslate:
+            if translate:
                 coords = coords.copy_worldcoords().translate(
                     self.object_center, 'world')
             pose = np.concatenate(
@@ -657,12 +658,12 @@ class Renderer:
                 self.hanging_point_in_camera_coords_list.append(coords_c)
                 if self.labels is not None:
                     self.visible_labels.append(self.labels[i])
-                if self.debug_visible_line:
+                if self.gui:
                     pybullet.addUserDebugLine(
                         coords_w.worldpos(),
                         self.camera_coords.worldpos(), [1, 1, 1], 3)
             else:
-                if self.debug_visible_line:
+                if self.gui:
                     pybullet.addUserDebugLine(
                         coords_w.worldpos(),
                         self.camera_coords.worldpos(), [1, 0, 0], 3)
@@ -965,7 +966,7 @@ class Renderer:
                 return False
             if not self.get_visible_coords(
                     contact_points_coords,
-                    translate_value=self.translate_value):
+                    translate=self.translate_value):
                 self.reset_object_pose()
                 self.no_visible_count += 1
                 continue
@@ -989,6 +990,10 @@ class Renderer:
             self.remove_all_objects()
             return False
         self.save_data()
+
+        if self.stop_per_data:
+            input('Next data?: [ENTER]')
+
         self.finish()
         self.remove_all_objects()
         return True
@@ -1033,7 +1038,7 @@ class Renderer:
             return False
         if not self.get_visible_coords(
                 contact_points_coords,
-                translate_value=self.translate_value,
+                translate=self.translate_value,
                 all_visible=True):
             self.no_visible_count += 1
             self.finish()
@@ -1513,6 +1518,10 @@ if __name__ == '__main__':
         '--task-type', '-t', type=str,
         default=None,
         help='if None, set it automaticaly from outfile')
+    parser.add_argument(
+        '--stop-per-data', '-spd',
+        action='store_true',
+        help='stop the window per data for checking')
     args = parser.parse_args()
 
     data_num = args.data_num
@@ -1525,6 +1534,7 @@ if __name__ == '__main__':
     show_image = args.show_image
     save_debug_image = args.save_debug_image
     filtered_points_name = args.filtered_points_name
+    stop_per_data = args.stop_per_data
 
     if args.task_type is not None:
         task_type = args.task_type
@@ -1611,10 +1621,11 @@ if __name__ == '__main__':
             contact_points = sample_contact_points(contact_points, 30)
             while True:
                 r = Renderer(
-                    DEBUG=gui,
+                    gui=gui,
                     save_dir=save_dir,
                     save_debug_image=save_debug_image,
-                    task_type=task_type)
+                    task_type=task_type,
+                    stop_per_data=stop_per_data)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points')
