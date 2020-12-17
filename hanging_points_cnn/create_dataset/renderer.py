@@ -24,8 +24,8 @@ from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
 from hanging_points_generator.create_mesh import load_camera_pose
-from hanging_points_generator.hp_generator import cluster_contact_points
-from hanging_points_generator.hp_generator import filter_penetration
+from hanging_points_generator.generator_utils import cluster_contact_points
+from hanging_points_generator.generator_utils import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
 from hanging_points_generator.generator_utils import load_list
 from hanging_points_generator.generator_utils import save_json
