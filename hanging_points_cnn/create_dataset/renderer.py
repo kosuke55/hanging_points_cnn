@@ -55,7 +55,8 @@ class Renderer:
             near_plane=0.1, far_plane=30.0,
             target_width=256, target_height=256,
             use_change_light=True, labels=None,
-            save_dir='./', save_debug_image=False, DEBUG=False):
+            save_dir='./', save_debug_image=False,
+            DEBUG=False, task_type='hanging'):
         """Create training data of CNN
 
         Parameters
@@ -78,6 +79,10 @@ class Renderer:
             [description], by default './'
         DEBUG : bool, optional
             enable gui , by default False
+        task_type : str, optional
+            hanging or pouring.
+            the value of translate depends on task_type.
+            if task_type is hanging, tranlate value is [0, 0.01, 0]
         """
         self.objects = []
         self.im_width = im_width
@@ -89,6 +94,14 @@ class Renderer:
         self.target_height = target_height
         self.save_dir = save_dir
         self.save_debug_image = save_debug_image
+        self.task_type = task_type
+
+        if self.task_type == 'hanging':
+            # direction of grabity
+            self.translate_value = np.array([0, 0.01, 0])
+        elif self.task_type == 'pouring':
+            # direction opposite to gravity
+            self.translate_value = np.array([-0.01, 0, 0])
 
         aspect = self.im_width / self.im_height
         self.camera_model \
@@ -950,7 +963,9 @@ class Renderer:
             print('self.no_visible_count %d' % self.no_visible_count)
             if self.no_visible_count >= self.no_visible_skip_num:
                 return False
-            if not self.get_visible_coords(contact_points_coords):
+            if not self.get_visible_coords(
+                    contact_points_coords,
+                    translate_value=self.translate_value):
                 self.reset_object_pose()
                 self.no_visible_count += 1
                 continue
@@ -1018,6 +1033,7 @@ class Renderer:
             return False
         if not self.get_visible_coords(
                 contact_points_coords,
+                translate_value=self.translate_value,
                 all_visible=True):
             self.no_visible_count += 1
             self.finish()
@@ -1493,6 +1509,10 @@ if __name__ == '__main__':
         type=str, help='filtered points json file name',
         # default='filtered_contact_points.json')
         default='filtered_contact_points_pouring.json')
+    parser.add_argument(
+        '--task-type', '-t', type=str,
+        default=None,
+        help='if None, set it automaticaly from outfile')
     args = parser.parse_args()
 
     data_num = args.data_num
@@ -1505,6 +1525,15 @@ if __name__ == '__main__':
     show_image = args.show_image
     save_debug_image = args.save_debug_image
     filtered_points_name = args.filtered_points_name
+
+    if args.task_type is not None:
+        task_type = args.task_type
+    else:
+        if 'hanging' in input_dir:
+            task_type = 'hanging'
+        elif 'pouring' in input_dir:
+            task_type = 'pouring'
+    print('task_type ', task_type)
 
     # r = Renderer(DEBUG=gui, save_dir='./hoge')
     # r.get_sim_images(
@@ -1581,7 +1610,11 @@ if __name__ == '__main__':
 
             contact_points = sample_contact_points(contact_points, 30)
             while True:
-                r = Renderer(DEBUG=gui, save_dir=save_dir, save_debug_image=save_debug_image)
+                r = Renderer(
+                    DEBUG=gui,
+                    save_dir=save_dir,
+                    save_debug_image=save_debug_image,
+                    task_type=task_type)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points')
