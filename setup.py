@@ -60,6 +60,9 @@ setup(
         "Programming Language :: Python",
     ],
     packages=find_packages(),
+    entry_points={
+        'console_scripts':
+        ['visualize-function-points=hanging_points_cnn.inference.vis_pose_from_data:main']},
     zip_safe=False,
     setup_requires=setup_requires,
     install_requires=install_requires,
