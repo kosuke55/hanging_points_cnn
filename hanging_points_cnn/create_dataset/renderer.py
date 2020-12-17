@@ -1446,8 +1446,7 @@ if __name__ == '__main__':
         default='/media/kosuke/SANDISK-2/meshdata/hanging_object/mthesi_media')
     parser.add_argument(
         '--save-debug-image', '-sdd',
-        type=int, help='If true, save debug image',
-        default=0)
+        action='store_true', help='If true, save debug image')
     parser.add_argument(
         '--data-num', '-n',
         type=int, help='num of data per object',
@@ -1470,12 +1469,10 @@ if __name__ == '__main__':
         default='filter_skip_list.txt')
     parser.add_argument(
         '--gui', '-g',
-        type=int, help='debug gui',
-        default=0)
+        action='store_true', help='debug gui')
     parser.add_argument(
         '--show-image', '-si',
-        type=int, help='show image',
-        default=0)
+        action='store_true', help='show image')
     args = parser.parse_args()
 
     data_num = args.data_num
