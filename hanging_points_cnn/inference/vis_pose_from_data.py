@@ -47,16 +47,6 @@ def label_colormap(n_label=256):
     return cmap
 
 
-try:
-    import cv2
-except ImportError:
-    for path in sys.path:
-        if '/opt/ros/' in path:
-            print('sys.path.remove({})'.format(path))
-            sys.path.remove(path)
-            import cv2
-            sys.path.append(path)
-
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
