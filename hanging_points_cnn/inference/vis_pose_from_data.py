@@ -14,7 +14,8 @@ from hanging_points_generator.generator_utils import load_json
 def label_colormap(n_label=256):
     """Label colormap.
 
-    original code is https://github.com/wkentaro/imgviz/blob/master/imgviz/label.py
+    original code is
+    https://github.com/wkentaro/imgviz/blob/master/imgviz/label.py
 
     Parameters
     ----------
