@@ -137,7 +137,7 @@ for idx in range(start_idx, 100000):
         length = dep * 0.001 / pos[2]
         pos = pos * length
 
-        contact_point_sphere = skrobot.models.Sphere(0.003, color=color)
+        contact_point_sphere = skrobot.model.Sphere(0.003, color=color)
         contact_point_sphere.newcoords(
             skrobot.coordinates.Coordinates(pos=pos, rot=q))
         viewer.add(contact_point_sphere)
@@ -147,7 +147,7 @@ for idx in range(start_idx, 100000):
         np.asarray(
             pcd.points), np.asarray(
             pcd.colors))
-    pc = skrobot.models.PointCloudLink(trimesh_pc)
+    pc = skrobot.model.PointCloudLink(trimesh_pc)
 
     viewer.add(pc)
 
