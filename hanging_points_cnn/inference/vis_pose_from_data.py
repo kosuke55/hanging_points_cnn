@@ -2,7 +2,6 @@ import argparse
 import os.path as osp
 from six.moves import input
 import sys
-import time
 
 import cameramodels
 import open3d as o3d
@@ -11,10 +10,8 @@ import skrobot
 import trimesh
 from hanging_points_generator.generator_utils import load_json
 
-from hanging_points_cnn.utils.rois_tools import find_rois
 
-
-def label_colormap(n_label=256, value=None):
+def label_colormap(n_label=256):
     """Label colormap.
 
     original code is https://github.com/wkentaro/imgviz/blob/master/imgviz/label.py
@@ -23,8 +20,6 @@ def label_colormap(n_label=256, value=None):
     ----------
     n_labels: int
         Number of labels (default: 256).
-    value: float or int
-        Value scale or value of label color in HSV space.
 
     Returns
     -------
@@ -49,14 +44,6 @@ def label_colormap(n_label=256, value=None):
         cmap[i, 1] = g
         cmap[i, 2] = b
 
-    if value is not None:
-        hsv = color_module.rgb2hsv(cmap.reshape(1, -1, 3))
-        if isinstance(value, float):
-            hsv[:, 1:, 2] = hsv[:, 1:, 2].astype(float) * value
-        else:
-            assert isinstance(value, int)
-            hsv[:, 1:, 2] = value
-        cmap = color_module.hsv2rgb(hsv).reshape(-1, 3)
     return cmap
 
 
@@ -119,6 +106,7 @@ for idx in range(start_idx, 100000):
         rgbd, intrinsics)
 
     contact_point_sphere_list = []
+    # for manual annotaion which have labels
     if 'label' in annotation_data[0]:
         labels = [a['label'] for a in annotation_data]
         color_map = label_colormap(max(labels) + 1)
@@ -154,4 +142,4 @@ for idx in range(start_idx, 100000):
     if idx == start_idx:
         viewer.show()
 
-    input('')
+    input('Next data?: [ENTER]')
