@@ -62,7 +62,8 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts':
-        ['visualize-function-points=hanging_points_cnn.inference.vis_pose_from_data:main']},
+        ['visualize-function-points=hanging_points_cnn.apps.visualize_function_points:main',
+         'infer-function-points=hanging_points_cnn.apps.infer_function_points:main']},
     zip_safe=False,
     setup_requires=setup_requires,
     install_requires=install_requires,
