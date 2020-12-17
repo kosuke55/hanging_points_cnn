@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-# from __future__ import absolute_import
-# from __future__ import division
+from __future__ import absolute_import
+from __future__ import division
 
 import sys
-import os.path as osp
 
 import torch
 import torch.nn as nn
@@ -54,7 +53,8 @@ class Decoder(nn.Module):
             self.feature_extractor_out_channels = 512
 
         self.conv1 = Conv2DBatchNormRelu(
-            self.feature_extractor_out_channels, 128, kernel_size=3, stride=1, padding=1)
+            self.feature_extractor_out_channels, 128,
+            kernel_size=3, stride=1, padding=1)
 
         self.deconv2 = nn.ConvTranspose2d(
             128, 128, kernel_size=4, stride=2, padding=1)
@@ -63,16 +63,18 @@ class Decoder(nn.Module):
 
         if feature_extractor_name == 'resnet50':
             self.deconv3 = nn.ConvTranspose2d(
-                128, self.output_channels, kernel_size=32, stride=16, padding=8)  # *16
+                128, self.output_channels,
+                kernel_size=32, stride=16, padding=8)  # *16
         elif feature_extractor_name == 'resnet18':
             self.deconv3 = nn.ConvTranspose2d(
-                128, self.output_channels, kernel_size=16, stride=8, padding=4)  # *8
+                128, self.output_channels,
+                kernel_size=16, stride=8, padding=4)  # *8
         self.conv3 = Conv2DBatchNormRelu(
-            self.output_channels, self.output_channels, kernel_size=3, stride=1, padding=1)
-        
+            self.output_channels, self.output_channels,
+            kernel_size=3, stride=1, padding=1)
+
     def forward(self, x):
         h = x
-        # h = self.conv0(h)
         h = self.conv1(h)
         h = self.conv2(self.deconv2(h))
         h = self.conv3(self.deconv3(h))
@@ -140,7 +142,6 @@ class HPNET(nn.Module):
             nn.Flatten(),
             nn.Linear(128 * 8 * 8, 128 * 8 * 8),
             nn.Linear(128 * 8 * 8, 3)
-            # nn.Tanh()
         )
 
         self.conv_to_depth = nn.Sequential(
@@ -152,24 +153,10 @@ class HPNET(nn.Module):
             nn.ReLU(),
             nn.Linear(128 * 8 * 8, 1),
             nn.Sigmoid()
-            # nn.Linear(1, 1)
-            # nn.ReLU()
-
-        )
-
-        hoge = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128 * 8 * 8, 128 * 8 * 8),
-            nn.Linear(128 * 8 * 8, 1),
-            nn.Sigmoid()
-            # nn.ReLU()
         )
 
         self.roi_align = RoIAlign(
             self.feature_extractor_out_size, self.roi_align_spatial_scale, -1)
-
-        self.sigmoid = nn.Sigmoid()
-        self.li = nn.Linear(1, 1)
 
     def forward(self, x):
         h = x
@@ -187,13 +174,5 @@ class HPNET(nn.Module):
         rois = self.roi_align(feature, self.rois_list)
         rotation = self.conv_to_rotation(rois)
         depth = self.conv_to_depth(rois)
-        # depth = self.sigmoid(self.conv_to_depth(rois))
-        
-        # print(depth.shape)
-        # print('sig' ,depth)
-        # depth = self.li(depth)
-        # print(depth.shape)
-        # print('li', depth)
-        
 
         return confidence, depth, rotation
