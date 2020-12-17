@@ -19,8 +19,6 @@ import numpy as np
 import numpy.matlib as npm
 import pybullet
 import pybullet_data
-# import skrobot
-import xml.etree.ElementTree as ET
 from eos import make_fancy_output_dir
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
@@ -30,11 +28,8 @@ from hanging_points_generator.hp_generator import cluster_contact_points
 from hanging_points_generator.hp_generator import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
 from hanging_points_generator.generator_utils import load_list
-from hanging_points_generator.generator_utils import load_multiple_contact_points
 from hanging_points_generator.generator_utils import save_json
-from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import create_circular_mask
-from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import draw_axis
 
