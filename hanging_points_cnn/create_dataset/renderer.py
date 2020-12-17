@@ -33,7 +33,6 @@ from hanging_points_cnn.utils.image import create_circular_mask
 from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import draw_axis
 
-from hanging_points_generator.generator_utils import save_contact_points
 from skrobot.coordinates.math import rotation_matrix_from_axis
 
 try:
