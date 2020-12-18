@@ -5,10 +5,10 @@ import argparse
 import copy
 import os
 import os.path as osp
+
 import sys
 import yaml
 from datetime import datetime
-from pathlib import Path
 
 import cameramodels
 import numpy as np
@@ -21,16 +21,14 @@ from skrobot.coordinates.math import quaternion2matrix
 
 from hanging_points_cnn.learning_scripts.hpnet import HPNET
 from hanging_points_cnn.learning_scripts.hpnet_loss import HPNETLoss
-from hanging_points_cnn.learning_scripts.hanging_points_data import load_dataset
-from hanging_points_cnn.learning_scripts.hanging_points_data import load_test_dataset
+from hanging_points_cnn.learning_scripts.hanging_points_data \
+    import load_dataset
+from hanging_points_cnn.learning_scripts.hanging_points_data \
+    import load_test_dataset
 from hanging_points_cnn.utils.image import colorize_depth
-from hanging_points_cnn.utils.image import create_depth_circle
 from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import draw_roi
-from hanging_points_cnn.utils.image import draw_vec
-from hanging_points_cnn.utils.image import get_depth_in_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
-from hanging_points_cnn.utils.image import remove_nan
 from hanging_points_cnn.utils.image import trim_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
 from hanging_points_cnn.utils.rois_tools import get_value_gt
@@ -49,7 +47,7 @@ except ImportError:
 
 class Trainer(object):
 
-    def __init__(self, gpu, data_path, test_data_path,
+    def __init__(self, data_path, test_data_path,
                  batch_size, max_epoch, pretrained_model, train_data_num,
                  val_data_num, save_dir, lr, config=None,
                  train_depth=False, port=6006):
@@ -91,7 +89,6 @@ class Trainer(object):
 
         self.vis = visdom.Visdom(port=port)
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
         print('device is:{}'.format(self.device))
@@ -110,7 +107,7 @@ class Trainer(object):
         # self.optimizer = optim.SGD(
         # self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=args.lr, betas=(0.9, 0.999),
+            self.model.parameters(), lr=lr, betas=(0.9, 0.999),
             eps=1e-10, weight_decay=0, amsgrad=False)
         self.prev_optimizer = copy.deepcopy(self.optimizer)
 
@@ -212,7 +209,7 @@ class Trainer(object):
                     print('loss is nan!!')
                     self.model = self.prev_model
                     self.optimizer = torch.optim.Adam(
-                        self.model.parameters(), lr=args.lr,
+                        self.model.parameters(), lr=lr,
                         betas=(0.9, 0.999), eps=1e-10, weight_decay=0,
                         amsgrad=False)
                     self.optimizer.load_state_dict(
@@ -542,7 +539,12 @@ class Trainer(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-g', '--gpu', type=int, required=True, help='gpu id')
+    parser.add_argument(
+        '-g', '--gpu', type=int,
+        help='gpu id. '
+        'if this option do not work, '
+        'run `CUDA_VISIBLE_DEVICES={gpu id} python train_hpnet.py`',
+        default=0)
     parser.add_argument(
         '--data-path',
         '-dp',
@@ -557,7 +559,7 @@ if __name__ == "__main__":
         default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/test_images')  # noqa
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
-                        default=32)
+                        default=4)
     parser.add_argument('--max_epoch', '-me', type=int,
                         help='max epoch',
                         default=1000000)
@@ -594,11 +596,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
+
     with open(args.confing) as f:
         config = yaml.safe_load(f)
 
     trainer = Trainer(
-        gpu=args.gpu,
         data_path=args.data_path,
         test_data_path=args.test_data_path,
         batch_size=args.batch_size,
