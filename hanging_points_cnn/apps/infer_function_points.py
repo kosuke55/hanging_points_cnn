@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import argparse
 import os.path as osp
 import sys
@@ -81,6 +84,7 @@ def main():
         'use_bgr2gray': True,
         'roi_padding': 50
     }
+    target_size = (256, 256)
     depth_range = config['depth_range']
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -112,20 +116,21 @@ def main():
 
             camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
                 camera_info_path)
-            camera_model.target_size = (256, 256)
+            camera_model.target_size = target_size
             intrinsics = camera_model.open3d_intrinsic
 
             cv_bgr = cv2.imread(color_path)
             # cv_bgr = cv2.flip(cv_bgr, 0)
-            cv_bgr = cv2.resize(cv_bgr, (256, 256))
+            cv_bgr = cv2.resize(cv_bgr, target_size)
             cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
             color = o3d.geometry.Image(cv_rgb)
             # color = o3d.io.read_image(color_path)
 
             cv_depth = np.load(depth_path)
             # cv_depth = cv2.flip(cv_depth, 0)
-            # cv_depth = cv2.imread(depth_path, cv2.IMREAD_ANYDEPTH).astype(np.float32)
-            cv_depth = cv2.resize(cv_depth, (256, 256),
+            # cv_depth = cv2.imread(
+            #     depth_path, cv2.IMREAD_ANYDEPTH).astype(np.float32)
+            cv_depth = cv2.resize(cv_depth, target_size,
                                   interpolation=cv2.INTER_NEAREST)
             depth = o3d.geometry.Image(cv_depth)
             # depth = o3d.geometry.Image(np.load(depth_path))
@@ -145,7 +150,7 @@ def main():
 
             if config['use_bgr2gray']:
                 gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY)
-                gray = cv2.resize(gray, (256, 256))[..., None] / 255.
+                gray = cv2.resize(gray, target_size)[..., None] / 255.
                 normalized_depth = normalize_depth(
                     cv_depth, depth_range[0], depth_range[1])[..., None]
                 in_feature = np.concatenate(
@@ -186,7 +191,8 @@ def main():
                 q = matrix2quaternion(rot)
 
                 camera_model_crop_resize \
-                    = camera_model.crop_resize_camera_info(target_size=[256, 256])
+                    = camera_model.crop_resize_camera_info(
+                        target_size=[256, 256])
 
                 hanging_point = np.array(
                     camera_model_crop_resize.project_pixel_to_3d_ray(
@@ -202,8 +208,9 @@ def main():
                         roi_center[1] - 10:roi_center[1] + 10,
                         roi_center[0] - 10:roi_center[0] + 10]
                     dep_roi_clip = depth_roi_clip[np.where(
-                        np.logical_and(config['depth_range'][0] < depth_roi_clip,
-                                       depth_roi_clip < config['depth_range'][1]))]
+                        np.logical_and(
+                            config['depth_range'][0] < depth_roi_clip,
+                            depth_roi_clip < config['depth_range'][1]))]
                     dep_roi_clip = np.median(dep_roi_clip) * 0.001
                     if dep_roi_clip == np.nan:
                         continue
@@ -224,8 +231,12 @@ def main():
             heatmap = overlay_heatmap(cv_bgr, confidence_img)
             cv2.imshow('heatmap', heatmap)
             cv2.imshow('roi', roi_image)
-            cv2.waitKey(0)
+            print('Next data: [ENTER] on image window.\n'
+                  'Quit: [q] on image window.')
+            key = cv2.waitKey(0)
             cv2.destroyAllWindows()
+            if key == ord('q'):
+                break
     except KeyboardInterrupt:
         pass
 
