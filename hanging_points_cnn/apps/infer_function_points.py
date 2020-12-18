@@ -20,7 +20,6 @@ from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
-from hanging_points_cnn.utils.rois_tools import find_rois
 from hanging_points_cnn.utils.rois_tools import make_box
 
 
@@ -64,12 +63,16 @@ def main():
         '-p',
         type=str,
         help='Pretrained models',
-        # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt')
-        # # shapenet
-        default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
+        # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt') # shapenet
+        # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
+        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201218_1032.pt')  # noqa
     parser.add_argument(
         '--predict-depth', '-pd', type=int,
         help='predict-depth', default=0)
+    parser.add_argument(
+        '--task', '-t', type=str,
+        help='h(hanging) or p(pouring)',
+        default='h')
 
     args = parser.parse_args()
     base_dir = args.input_dir
@@ -86,8 +89,17 @@ def main():
         'roi_padding': 50
     }
     target_size = (256, 256)
-    depth_roi_size = (100, 100)
+
     depth_range = config['depth_range']
+
+    task_type = args.task
+    if task_type == 'p':
+        task_type = 'pouring'
+        depth_roi_size = (100, 100)
+    else:
+        task_type = 'hanging'
+        depth_roi_size = (20, 20)
+    print('task type: {}'.format(task_type))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = HPNET(config).to(device)
@@ -220,9 +232,9 @@ def main():
                         np.logical_and(
                             config['depth_range'][0] < depth_roi_clip,
                             depth_roi_clip < config['depth_range'][1]))]
-                    dep_roi_clip = (np.max(dep_roi_clip) + np.min(dep_roi_clip)) * 0.001 / 2.
-                    # dep_roi_clip = np.median(dep_roi_clip) * 0.001
-                    # dep_roi_clip = np.mean(dep_roi_clip) * 0.001
+
+                    dep_roi_clip = np.median(dep_roi_clip) * 0.001
+
                     if dep_roi_clip == np.nan:
                         continue
                     length = float(dep_roi_clip) / hanging_point[2]
