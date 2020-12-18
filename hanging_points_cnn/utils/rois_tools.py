@@ -136,6 +136,43 @@ def reshape_rois_list(rois_list):
     return reshaped_rois_list
 
 
+def make_box(center, width, height, img_shape, xywh=True):
+    """Make a box within an image range
+
+    Parameters
+    ----------
+    center : list[int] ot tuple(int)
+        the center of the box. (y, x) order.
+    width : int
+        box width
+    height : int
+        box height
+    img_shape : list[int] ot tuple(int)
+        image shapes. (width, height) order.
+    xywh : bool, optional
+        if ture, return [left_x, top_y, width, height],
+        if false, return [left, top, right, bottom],
+        by default True
+
+    Returns
+    -------
+    box : list[int]
+        [left_x, top_y, width, height] or [left, top, right, bottom],
+    """
+    x1 = int(max(center[1] - width / 2., 0))
+    y1 = int(max(center[0] - height / 2., 0))
+    x2 = int(min(center[1] + width / 2., img_shape[1] - 1))
+    y2 = int(max(center[0] + height / 2., img_shape[1] - 1))
+
+    w = x2 - x1
+    h = y2 - y1
+
+    if xywh:
+        return [x1, y1, w, h]
+    else:
+        return [x1, y1, x2, y2]
+
+
 def expand_box(box, img_shape, scale=None, padding=None):
     """Expand roi box
 

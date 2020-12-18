@@ -21,6 +21,7 @@ from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
 from hanging_points_cnn.utils.rois_tools import find_rois
+from hanging_points_cnn.utils.rois_tools import make_box
 
 
 try:
@@ -85,6 +86,7 @@ def main():
         'roi_padding': 50
     }
     target_size = (256, 256)
+    depth_roi_size = (100, 100)
     depth_range = config['depth_range']
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -204,14 +206,23 @@ def main():
                         dep, depth_range[0], depth_range[1]) * 0.001
                     length = float(dep) / hanging_point[2]
                 else:
+                    depth_roi = make_box(
+                        roi_center,
+                        width=depth_roi_size[1],
+                        height=depth_roi_size[0],
+                        img_shape=target_size,
+                        xywh=False)
                     depth_roi_clip = cv_depth[
-                        roi_center[1] - 10:roi_center[1] + 10,
-                        roi_center[0] - 10:roi_center[0] + 10]
+                        depth_roi[0]:depth_roi[2],
+                        depth_roi[1]:depth_roi[3]]
+
                     dep_roi_clip = depth_roi_clip[np.where(
                         np.logical_and(
                             config['depth_range'][0] < depth_roi_clip,
                             depth_roi_clip < config['depth_range'][1]))]
-                    dep_roi_clip = np.median(dep_roi_clip) * 0.001
+                    dep_roi_clip = (np.max(dep_roi_clip) + np.min(dep_roi_clip)) * 0.001 / 2.
+                    # dep_roi_clip = np.median(dep_roi_clip) * 0.001
+                    # dep_roi_clip = np.mean(dep_roi_clip) * 0.001
                     if dep_roi_clip == np.nan:
                         continue
                     length = float(dep_roi_clip) / hanging_point[2]
