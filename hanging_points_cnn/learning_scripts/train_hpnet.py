@@ -29,7 +29,6 @@ from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import draw_axis
 from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import unnormalize_depth
-from hanging_points_cnn.utils.image import trim_depth
 from hanging_points_cnn.utils.rois_tools import annotate_rois
 from hanging_points_cnn.utils.rois_tools import get_value_gt
 from hanging_points_cnn.utils.rois_tools import find_rois
@@ -80,6 +79,7 @@ class Trainer(object):
         self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
 
+        self.lr = lr
         self.max_epoch = max_epoch
         self.time_now = datetime.now().strftime('%Y%m%d_%H%M')
         self.best_loss = 1e10
@@ -104,10 +104,8 @@ class Trainer(object):
         self.prev_model = copy.deepcopy(self.model)
 
         self.best_loss = 1e10
-        # self.optimizer = optim.SGD(
-        # self.model.parameters(), lr=args.lr, momentum=0.5, weight_decay=1e-6)
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=lr, betas=(0.9, 0.999),
+            self.model.parameters(), lr=self.lr, betas=(0.9, 0.999),
             eps=1e-10, weight_decay=0, amsgrad=False)
         self.prev_optimizer = copy.deepcopy(self.optimizer)
 
@@ -176,18 +174,14 @@ class Trainer(object):
                 pos_weight = pos_weight.to(self.device)
 
                 hp_data_gt = hp_data_gt.to(self.device)
-                ground_truth = hp_data_gt.cpu().detach().numpy().copy()
                 confidence_gt = hp_data_gt[:, 0:1, ...]
                 rois_list_gt, rois_center_list_gt = find_rois(confidence_gt)
-
-                # depth_and_rotation_gt = hp_data_gt[:, 1:, ...]
 
                 criterion = HPNETLoss(self.use_coords).to(self.device)
 
                 if self.model.rois_list is None or rois_list_gt is None:
                     return None, None
-                # annotated_rois = annotate_rois(
-                #     self.model.rois_list, rois_list_gt, depth_and_rotation_gt)
+
                 annotated_rois = annotate_rois(
                     self.model.rois_list, rois_list_gt, annotation_data)
 
@@ -195,11 +189,6 @@ class Trainer(object):
                     confidence, hp_data_gt, pos_weight,
                     depth, rotation, annotated_rois)
 
-                # loss =depth_loss
-                # if confidence_loss < 0.1 and rotation_loss < 0.1 and depth_loss != 0:
-                #     print('************depth*******')
-                #     loss =depth_loss
-                # else:
                 if self.train_depth:
                     loss = confidence_loss + rotation_loss + depth_loss
                 else:
@@ -209,7 +198,7 @@ class Trainer(object):
                     print('loss is nan!!')
                     self.model = self.prev_model
                     self.optimizer = torch.optim.Adam(
-                        self.model.parameters(), lr=lr,
+                        self.model.parameters(), lr=self.lr,
                         betas=(0.9, 0.999), eps=1e-10, weight_decay=0,
                         amsgrad=False)
                     self.optimizer.load_state_dict(
@@ -226,55 +215,30 @@ class Trainer(object):
                         self.model.parameters(), 5)
                     self.optimizer.step()
 
-                # hanging_point_depth_gt \
-                #     = unnormalize_depth(
-                #         ground_truth[0, 1, ...].astype(np.float32),
-                #         self.depth_range[0], self.depth_range[1])
-
-                # depth_gt = ground_truth[0, 1, ...]
-                # unnormalized_depth_gt = unnormalize_depth(
-                #     depth_gt, self.depth_range[0], self.depth_range[1])
-
-                # rotations_gt = ground_truth[0, 2:, ...]
-                # rotations_gt = rotations_gt.transpose(1, 2, 0)
-
-                # hanging_point_depth_gt_bgr \
-                #     = colorize_depth(
-                #         hanging_point_depth_gt,
-                #         ignore_value=self.depth_range[0])
-
-                # hanging_point_depth_gt_rgb = cv2.cvtColor(
-                #     hanging_point_depth_gt_bgr,
-                #     cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
-
                 axis_gt = depth_image_bgr.copy()
 
                 confidence_gt_vis = cv2.cvtColor(confidence_gt[0, 0, ...].cpu(
                 ).detach().numpy().copy() * 255, cv2.COLOR_GRAY2BGR)
 
                 # Visualize gt axis and roi
-                rois_gt_filtered = []
                 for roi, roi_c in zip(rois_list_gt[0], rois_center_list_gt[0]):
                     if roi.tolist() == [0, 0, 0, 0]:
                         continue
                     roi = roi.cpu().detach().numpy().copy()
                     cx = roi_c[0]
                     cy = roi_c[1]
-                    # dep = get_depth_in_roi(depth, roi, self.depth_range)
-                    # dep_gt = float(dep)
 
-                    # rotation = rotations_gt[cy, cx, :]
-                    # depth_gt_val = depth_gt[cy, cx]
-                    # unnormalized_depth_gt_val = unnormalized_depth_gt[cy, cx]
-                    depth_and_rotation_gt = get_value_gt([cx, cy], annotation_data[0])
-                    rotation_gt= depth_and_rotation_gt[1:]
+                    depth_and_rotation_gt = get_value_gt(
+                        [cx, cy], annotation_data[0])
+                    rotation_gt = depth_and_rotation_gt[1:]
                     depth_gt_val = depth_and_rotation_gt[0]
                     unnormalized_depth_gt_val = unnormalize_depth(
                         depth_gt_val, self.depth_range[0], self.depth_range[1])
 
                     hanging_point_pose = np.array(
                         self.cameramodel.project_pixel_to_3d_ray(
-                            [int(cx), int(cy)])) * unnormalized_depth_gt_val * 0.001
+                            [int(cx), int(cy)])) \
+                        * unnormalized_depth_gt_val * 0.001
 
                     if self.use_coords:
                         rot = quaternion2matrix(rotation_gt),
@@ -291,14 +255,12 @@ class Trainer(object):
                     except Exception:
                         print('Fail to draw axis')
 
-                    # rois_gt_filtered.append(roi)
                     confidence_gt_vis = draw_roi(
                         confidence_gt_vis, roi, val=depth_gt_val, gt=True)
                     axis_gt = draw_roi(axis_gt, roi, val=depth_gt_val, gt=True)
 
             # Visualize pred axis and roi
             axis_pred = depth_image_bgr.copy()
-            hanging_point_depth_image_pred = depth_image.copy()
 
             for i, (roi, roi_c) in enumerate(
                     zip(self.model.rois_list[0],
@@ -314,7 +276,6 @@ class Trainer(object):
                 normalized_dep_pred = float(dep)
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1])
-                dep_pred = trim_depth(dep, depth_image)
 
                 confidence_vis = draw_roi(
                     confidence_vis, roi, val=normalized_dep_pred)
@@ -329,21 +290,17 @@ class Trainer(object):
                             axis_pred, annotated_rois[i][0],
                             val=annotated_rois[i][1][0], gt=True)
 
-                # hanging_point_depth_pred = create_depth_circle(
-                #     hanging_point_depth_pred, cy, cx, dep_pred)
-
                 hanging_point_pose = np.array(
                     self.cameramodel.project_pixel_to_3d_ray(
                         [int(cx), int(cy)])) * float(dep * 0.001)
 
                 if self.use_coords:
-                    q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
+                    # have not check this yet
+                    q = rotation[i].cpu().detach().numpy().copy()
                     q /= np.linalg.norm(q)
                     rot = quaternion2matrix(q)
 
                 else:
-                    # import ipdb
-                    # ipdb.set_trace()
                     v = rotation[i].cpu().detach().numpy()
                     v /= np.linalg.norm(v)
                     rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
@@ -355,15 +312,6 @@ class Trainer(object):
                               self.cameramodel.K)
                 except Exception:
                     print('Fail to draw axis')
-
-            # hanging_point_depth_pred_bgr \
-            #     = colorize_depth(
-            #         hanging_point_depth_pred,
-            #         ignore_value=self.depth_range[0])
-
-            # hanging_point_depth_pred_rgb = cv2.cvtColor(
-            #     hanging_point_depth_pred_bgr,
-            #     cv2.COLOR_BGR2RGB).transpose(2, 0, 1)
 
             axis_pred = cv2.cvtColor(
                 axis_pred, cv2.COLOR_BGR2RGB)
@@ -396,14 +344,14 @@ class Trainer(object):
                 if rotation_loss.item() > 0:
                     depth_loss_sum += depth_loss.item()
                     rotation_loss_sum += rotation_loss.item()
-                    # loss_sum = loss_sum + confidence_loss.item() + \
-                    #     rotation_loss.item() + depth_loss.item()
-                    loss_sum = loss_sum + confidence_loss.item() + rotation_loss.item()
+                    loss_sum = loss_sum \
+                        + confidence_loss.item() \
+                        + rotation_loss.item()
                     rotation_loss_count += 1
 
                 if np.mod(index, 1) == 0:
                     print(
-                        'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(
+                        'epoch {}, {}/{},{} loss is confidence:{} rotation:{} depth:{}'.format(   # noqa
                             self.epo,
                             index,
                             len(dataloader),
@@ -412,12 +360,6 @@ class Trainer(object):
                             rotation_loss.item(),
                             depth_loss.item()))
 
-                # self.vis.images([hanging_point_depth_gt_rgb,
-                #                  hanging_point_depth_pred_rgb],
-                #                 win='{} hanging_point_depth_gt_rgb'.format(
-                #                     mode),
-                #                 opts=dict(
-                #     title='{} hanging_point_depth (GT, pred)'.format(mode)))
                 self.vis.images([axis_gt.transpose(2, 0, 1),
                                  axis_pred.transpose(2, 0, 1)],
                                 win='{} axis'.format(mode),
