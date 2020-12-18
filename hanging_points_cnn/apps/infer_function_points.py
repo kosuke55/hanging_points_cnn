@@ -138,7 +138,7 @@ def main():
                 np.asarray(
                     pcd.points), np.asarray(
                     pcd.colors))
-            pc = skrobot.models.PointCloudLink(trimesh_pc)
+            pc = skrobot.model.PointCloudLink(trimesh_pc)
 
             viewer.add(pc)
             # o3d.visualization.draw_geometries([pcd])
@@ -211,7 +211,7 @@ def main():
 
                 hanging_point *= length
 
-                contact_point_sphere = skrobot.models.Sphere(
+                contact_point_sphere = skrobot.model.Sphere(
                     0.001, color=[255, 0, 0])
                 contact_point_sphere.newcoords(
                     skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
