@@ -542,7 +542,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-g', '--gpu', type=int,
         help='gpu id. '
-        'if this option do not work, '
+        'if this option does not work, '
         'run `CUDA_VISIBLE_DEVICES={gpu id} python train_hpnet.py`',
         default=0)
     parser.add_argument(
