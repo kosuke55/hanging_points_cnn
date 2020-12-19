@@ -94,7 +94,8 @@ class HangingPointsNet():
         self.model = HPNET(self.config).to(device)
         if osp.exists(pretrained_model):
             print('use pretrained model')
-            self.model.load_state_dict(torch.load(pretrained_model))
+            self.model.load_state_dict(
+                torch.load(pretrained_model), strict=False)
         self.model.eval()
         self.camera_model = None
         self.load_camera_info()
