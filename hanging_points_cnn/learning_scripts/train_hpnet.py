@@ -467,8 +467,10 @@ class Trainer(object):
                         self.save_dir,
                         'hpnet_bestmodel_' + self.time_now + '.pt')
                     print('save {}'.format(save_file))
+                    # For ros(python 2, torch 1.4)
                     torch.save(
-                        self.model.state_dict(), save_file)
+                        self.model.state_dict(), save_file,
+                        _use_new_zipfile_serialization=False)
 
     def train(self):
         for self.epo in range(self.max_epoch):
