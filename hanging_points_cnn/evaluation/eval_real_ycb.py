@@ -372,8 +372,13 @@ try:
             cv2.imshow('axis', axis_image)
             if image_dir != '':
                 viewer._init_and_start_app()
-            cv2.waitKey(0)
+
+            print('Next data: [ENTER] on image window.\n'
+                  'Quit: [q] on image window.')
+            key = cv2.waitKey(0)
             cv2.destroyAllWindows()
+            if key == ord('q'):
+                break
 
         if image_dir != '':
             image_file = osp.join(

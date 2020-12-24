@@ -345,9 +345,13 @@ try:
         cv2.imshow('heatmap', heatmap)
         cv2.imshow('roi', roi_image)
         cv2.imshow('axis', axis_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
 
+        print('Next data: [ENTER] on image window.\n'
+              'Quit: [q] on image window.')
+        key = cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        if key == ord('q'):
+            break
 
 except KeyboardInterrupt:
     pass
