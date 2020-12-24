@@ -95,7 +95,7 @@ depth_range = config['depth_range']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = HPNET(config).to(device)
-model.load_state_dict(torch.load(pretrained_model))
+model.load_state_dict(torch.load(pretrained_model), strict=False)
 model.eval()
 
 viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
