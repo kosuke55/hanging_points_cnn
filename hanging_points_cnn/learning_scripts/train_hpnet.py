@@ -402,7 +402,8 @@ class Trainer(object):
                     'hpnet_latestmodel_' + self.time_now + '.pt')
                 print('save {}'.format(save_file))
                 torch.save(
-                    self.model.state_dict(), save_file)
+                    self.model.state_dict(), save_file,
+                    _use_new_zipfile_serialization=False)
 
         if mode != 'test':
             if len(dataloader) > 0:
@@ -457,7 +458,8 @@ class Trainer(object):
                         'hpnet_latestmodel_' + self.time_now + '.pt')
                     print('save {}'.format(save_file))
                     torch.save(
-                        self.model.state_dict(), save_file)
+                        self.model.state_dict(), save_file,
+                        _use_new_zipfile_serialization=False)
 
                 if self.best_loss > avg_loss:
                     print('update best model {} -> {}'.format(
