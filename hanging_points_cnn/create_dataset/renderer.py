@@ -9,6 +9,7 @@ import json
 import os
 import os.path as osp
 import random
+import shutil
 import sys
 from operator import itemgetter
 from pathlib import Path
@@ -1652,8 +1653,10 @@ if __name__ == '__main__':
                     stop_per_data=stop_per_data)
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
                 if r.no_visible_count >= r.no_visible_skip_num:
-                    print('Skip because this object has no visible points')
+                    print('Skip because this object has no visible points ')
+                    shutil.rmtree(save_dir)
                     break
+
                 r.get_data_id()
                 print(r.data_id)
                 if r.data_id == data_num:
