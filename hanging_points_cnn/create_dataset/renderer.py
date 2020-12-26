@@ -1508,6 +1508,10 @@ if __name__ == '__main__':
         type=str, help='skip list file name',
         default='filter_skip_list.txt')
     parser.add_argument(
+        '--remain-list', '-rl',
+        type=str, help='remain list file name',
+        default=None)
+    parser.add_argument(
         '--gui', '-g',
         action='store_true', help='debug gui')
     parser.add_argument(
@@ -1582,24 +1586,42 @@ if __name__ == '__main__':
         if osp.isfile(skip_list_file):
             skip_list = load_list(skip_list_file)
 
-    remained_files = []
-    for file in files:
-        dirname, filename, category_name, idx \
-            = split_file_name(file, dataset_type)
-        if category_name in skip_list:
-            print('skip {} (in skip_list)'.format(file))
-            continue
-        if not any(c in category_name for c in category_name_list):
-            print('skip {} (not in category list)'.format(file))
-            continue
-        remained_files.append(file)
-    files = remained_files
+    if args.remain_list is not None:
+        remain_list = args.remain_list
+        remain_list_file = str(Path(input_dir) / remain_list)
+        if osp.isfile(remain_list_file):
+            print('Load file from ' + remain_list_file)
+            remained_objects = load_list(remain_list_file)
+            remained_files = []
+            for file in files:
+                dirname, filename, category_name, idx \
+                    = split_file_name(file, dataset_type)
+                if category_name in remained_objects:
+                    remained_files.append(file)
+            files = remained_files
+        else:
+            raise ValueError('No such file: ' + remain_list_file)
+    else:
+        remained_files = []
+        for file in files:
+            dirname, filename, category_name, idx \
+                = split_file_name(file, dataset_type)
+            if category_name in skip_list:
+                print('skip {} (in skip_list)'.format(file))
+                continue
+            if not any(c in category_name for c in category_name_list):
+                print('skip {} (not in category list)'.format(file))
+                continue
+            remained_files.append(file)
+        files = remained_files
 
     if args.num_samples is not None:
         num_samples = args.num_samples
         indices = random.sample(range(0, len(files)), num_samples)
         files = [files[i] for i in indices]
         print('samping {} files'.format(len(files)))
+
+    print('number of files {}'.format(len(files)))
 
     try:
         for file in files:
