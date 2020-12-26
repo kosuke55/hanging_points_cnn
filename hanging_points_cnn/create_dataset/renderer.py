@@ -21,6 +21,8 @@ import numpy.matlib as npm
 import pybullet
 import pybullet_data
 from eos import make_fancy_output_dir
+from shapenet_utils import hanging_label
+from shapenet_utils import pouring_label
 from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
