@@ -146,7 +146,7 @@ class Renderer:
             self.cid = pybullet.connect(pybullet.DIRECT)
         self.gui = gui
         self.no_visible_count = 0
-        self.no_visible_skip_num = 30
+        self.no_visible_skip_num = 50
 
         self.texture_paths = list(
             map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
@@ -672,10 +672,10 @@ class Renderer:
                         self.camera_coords.worldpos(), [1, 0, 0], 3)
 
         if len(self.hanging_point_in_camera_coords_list) == 0:
-            print('-- No visible hanging point --')
+            # print('-- No visible hanging point --')
             return False
-        else:
-            print('-- Find visible hanging point --')
+        # else:
+        #     print('-- Find visible hanging point --')
         return self.hanging_point_in_camera_coords_list
 
     def move_to_coords(self, coords):
@@ -883,7 +883,7 @@ class Renderer:
 
     def save_data(self):
         """Save training data"""
-        print('Save {}'.format(self.data_id))
+        print('Save {} data'.format(self.data_id))
         cv2.imwrite(osp.join(self.save_dir, 'color', '{:06}.png'.format(
             self.data_id)), self.bgr)
         np.save(osp.join(
@@ -964,7 +964,7 @@ class Renderer:
                          - self.object_center
                          + (np.random.rand(3) - 0.5) * 0.2)
             self.step(1)
-            print('self.no_visible_count %d' % self.no_visible_count)
+            print('no_visible_count: %d' % self.no_visible_count)
             if self.no_visible_count >= self.no_visible_skip_num:
                 return False
             if not self.get_visible_coords(
@@ -1660,7 +1660,6 @@ if __name__ == '__main__':
                     break
 
                 r.get_data_id()
-                print(r.data_id)
                 if r.data_id == data_num:
                     break
 
