@@ -1589,18 +1589,15 @@ if __name__ == '__main__':
     if args.remain_list is not None:
         remain_list = args.remain_list
         remain_list_file = str(Path(input_dir) / remain_list)
-        if osp.isfile(remain_list_file):
-            print('Load file from ' + remain_list_file)
-            remained_objects = load_list(remain_list_file)
-            remained_files = []
-            for file in files:
-                dirname, filename, category_name, idx \
-                    = split_file_name(file, dataset_type)
-                if category_name in remained_objects:
-                    remained_files.append(file)
-            files = remained_files
-        else:
-            raise ValueError('No such file: ' + remain_list_file)
+        remained_objects = load_list(remain_list_file)
+        remained_files = []
+        for file in files:
+            dirname, filename, category_name, idx \
+                = split_file_name(file, dataset_type)
+            if category_name in remained_objects:
+                remained_files.append(file)
+        files = remained_files
+        print('Load file from ' + remain_list_file)
     else:
         remained_files = []
         for file in files:
