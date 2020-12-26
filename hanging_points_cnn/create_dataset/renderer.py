@@ -1486,6 +1486,10 @@ if __name__ == '__main__':
         type=int, help='num of data per object',
         default=1000)
     parser.add_argument(
+        '--num-samples', '-ns',
+        type=int, help='number of sampled data for rendering',
+        default=None)
+    parser.add_argument(
         '--input-dir', '-i',
         type=str, help='input dir',
         # default='/media/kosuke/SANDISK/meshdata/hanging_object')
@@ -1494,10 +1498,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dataset-type', '-dt',
         type=str, help='dataset type',
-        default='')
+        default='shapenet')
     parser.add_argument(
         '--urdf-name', '-u',
-        type=str, help='save dir',
+        type=str, help='urdf file name',
         default='base.urdf')
     parser.add_argument(
         '--skip-list', '-sl',
@@ -1512,8 +1516,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--filtered-points-name', '-fjn',
         type=str, help='filtered points json file name',
-        # default='filtered_contact_points.json')
-        default='filtered_contact_points_pouring.json')
+        default='filtered_contact_points.json')
+        # default='filtered_contact_points_pouring.json')
     parser.add_argument(
         '--task-type', '-t', type=str,
         default=None,
@@ -1530,7 +1534,6 @@ if __name__ == '__main__':
     input_dir = args.input_dir
     save_dir_base = args.save_dir
     urdf_name = args.urdf_name
-    skip_list = args.skip_list
     show_image = args.show_image
     save_debug_image = args.save_debug_image
     filtered_points_name = args.filtered_points_name
@@ -1545,25 +1548,17 @@ if __name__ == '__main__':
             task_type = 'pouring'
     print('task_type ', task_type)
 
-    # r = Renderer(DEBUG=gui, save_dir='./hoge')
-    # r.get_sim_images(
-    #     # '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/mesh_voxelize_marching_cubes_urdf/base.urdf',
-    #     '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/tsdf_urdf/base.urdf',
-    #     # '/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/urdf2/025_mug/base.urdf',
-    #     '/home/kosuke55/catkin_ws/src/hanging_points_generator/save_dir_handeye/camera_pose/camera_pose_icp004.txt')
-    # sys.exit()
-
     file_paths = list(sorted(Path(
         input_dir).glob(osp.join('*', urdf_name))))
     files = list(map(str, file_paths))
 
-    bad_list_file = str(Path(input_dir) / skip_list)
-    bad_list = []
-    if osp.isfile(bad_list_file):
-        bad_list = load_list(osp.join(input_dir, skip_list))
+    if dataset_type == 'shapenet':
+        if task_type == 'hanging':
+            category_name_list = hanging_label()
+        elif task_type == 'pouring':
+            category_name_list = pouring_label()
 
-    category_name_list = None
-    if dataset_type == 'ycb':
+    elif dataset_type == 'ycb':
         category_name_list = [
             "019_pitcher_base",
             "022_windex_bottle",
@@ -1580,22 +1575,36 @@ if __name__ == '__main__':
     elif dataset_type == 'ObjectNet3D':
         category_name_list = ['cup', 'key', 'scissors']
 
-    # category_name_list = ['random_00363']  # mthesis media
+    skip_list = []
+    if args.skip_list is not None:
+        skip_list = args.skip_list
+        skip_list_file = str(Path(input_dir) / skip_list)
+        if osp.isfile(skip_list_file):
+            skip_list = load_list(skip_list_file)
+
+    remained_files = []
+    for file in files:
+        dirname, filename, category_name, idx \
+            = split_file_name(file, dataset_type)
+        if category_name in skip_list:
+            print('skip {} (in skip_list)'.format(file))
+            continue
+        if not any(c in category_name for c in category_name_list):
+            print('skip {} (not in category list)'.format(file))
+            continue
+        remained_files.append(file)
+    files = remained_files
+
+    if args.num_samples is not None:
+        num_samples = args.num_samples
+        indices = random.sample(range(0, len(files)), num_samples)
+        files = [files[i] for i in indices]
+        print('samping {} files'.format(len(files)))
 
     try:
         for file in files:
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
-            print('dirname ', dirname)
-            print('filename ', filename)
-            print('category_name ', category_name)
-
-            if category_name_list is not None:
-                if not any(c in category_name for c in category_name_list):
-                    continue
-            if category_name in bad_list:
-                print('Skipped %s because it is in bad_list' % category_name)
-                continue
 
             if not osp.isfile(
                     osp.join(dirname, filtered_points_name)):
@@ -1613,13 +1622,6 @@ if __name__ == '__main__':
             save_dir = osp.join(save_dir_base, category_name)
             save_dir = make_save_dirs(
                 save_dir, debug_dir=save_debug_image)
-
-            # load multiple json
-            # contact_points = get_contact_points(
-            #     osp.join(dirname, 'contact_points'))
-
-            # load filtered points
-            print(dirname)
 
             contact_points = sample_contact_points(contact_points, 30)
             while True:
