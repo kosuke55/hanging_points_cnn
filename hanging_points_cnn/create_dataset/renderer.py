@@ -146,7 +146,7 @@ class Renderer:
             self.cid = pybullet.connect(pybullet.DIRECT)
         self.gui = gui
         self.no_visible_count = 0
-        self.no_visible_skip_num = 50
+        self.no_visible_skip_num = 300
 
         self.texture_paths = list(
             map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
