@@ -1003,7 +1003,8 @@ class Renderer:
 
     def create_eval_data(
             self, urdf_file, contact_points, camera_pos, obj_pos, obj_rot,
-            random_pose=False, random_texture=False):
+            random_pose=False, random_texture=False,
+            gui=True, interactive=True):
         """Create ycb eval data
 
         Parameters
@@ -1050,12 +1051,15 @@ class Renderer:
         self.no_visible_count = 0
 
         bgr = self.get_bgr()
-        cv2.imshow('bgr', bgr)
-        if cv2.waitKey(0) != ord('y'):
-            print('skip image')
-            cv2.destroyAllWindows()
-            self.finish()
-            return False
+        if gui:
+            cv2.imshow('bgr', bgr)
+        if interactive:
+            print('Press [y] to save images\n or other keys to skip.')
+            if cv2.waitKey(0) != ord('y'):
+                print('skip image')
+                cv2.destroyAllWindows()
+                self.finish()
+                return False
         print('save image')
         cv2.destroyAllWindows()
 
