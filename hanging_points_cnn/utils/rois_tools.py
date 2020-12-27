@@ -162,7 +162,7 @@ def make_box(center, width, height, img_shape, xywh=True):
     x1 = int(max(center[1] - width / 2., 0))
     y1 = int(max(center[0] - height / 2., 0))
     x2 = int(min(center[1] + width / 2., img_shape[1] - 1))
-    y2 = int(max(center[0] + height / 2., img_shape[1] - 1))
+    y2 = int(min(center[0] + height / 2., img_shape[1] - 1))
 
     w = x2 - x1
     h = y2 - y1
