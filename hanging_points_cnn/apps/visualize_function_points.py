@@ -55,11 +55,13 @@ def main():
         '--input-dir', '-i', type=str,
         help='input urdf',
         default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-481902-45682')  # noqa
-
     parser.add_argument(
         '--idx', type=int,
         help='data idx',
         default=0)
+    parser.add_argument(
+        '--large-axis', '-la', action='store_true',
+        help='use large axis as visulaizing marker')
 
     args = parser.parse_args()
     base_dir = args.input_dir
@@ -71,7 +73,7 @@ def main():
         print(idx)
         if idx != start_idx:
             viewer.delete(pc)  # noqa
-            for c in contact_point_sphere_list:  # noqa
+            for c in contact_point_marker_list:  # noqa
                 viewer.delete(c)
 
         annotation_path = osp.join(
@@ -95,7 +97,7 @@ def main():
         pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
             rgbd, intrinsics)
 
-        contact_point_sphere_list = []
+        contact_point_marker_list = []
         # for manual annotaion which have labels
         if 'label' in annotation_data[0]:
             labels = [a['label'] for a in annotation_data]
@@ -114,12 +116,14 @@ def main():
                 cameramodel.project_pixel_to_3d_ray([cx, cy]))
             length = dep * 0.001 / pos[2]
             pos = pos * length
-
-            contact_point_sphere = skrobot.model.Sphere(0.003, color=color)
-            contact_point_sphere.newcoords(
+            if args.large_axis:
+                contact_point_marker = skrobot.model.Axis(0.003, 0.05)
+            else:
+                contact_point_marker = skrobot.model.Sphere(0.003, color=color)
+            contact_point_marker.newcoords(
                 skrobot.coordinates.Coordinates(pos=pos, rot=q))
-            viewer.add(contact_point_sphere)
-            contact_point_sphere_list.append(contact_point_sphere)
+            viewer.add(contact_point_marker)
+            contact_point_marker_list.append(contact_point_marker)
 
         trimesh_pc = trimesh.PointCloud(
             np.asarray(
