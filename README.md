@@ -7,6 +7,7 @@ pip install -e .
 ```
 
 ## Create training dataset
+### Rendering
 Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator)
 If you use ycb to generate hanging points
 `python run_many.py 'python generate_hanging_points.py'`
@@ -21,6 +22,30 @@ python run_many.py 'python renderer.py -n 1000 -i <path to ycb urdf> -s <save di
 ```
 For example,
 Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'`
+
+### Check annotated data
+Use `visualize-function-points` app.
+```
+visualize-function-points -h
+INFO - 2020-12-28 01:56:36,367 - topics - topicmanager initialized
+pybullet build time: Sep 14 2020 02:23:24
+usage: visualize-function-points [-h] [--input-dir INPUT_DIR] [--idx IDX]
+                                 [--large-axis]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input-dir INPUT_DIR, -i INPUT_DIR
+                        input urdf (default: /media/kosuke55/SANDISK-2/meshdat
+                        a/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-
+                        481902-45682)
+  --idx IDX             data idx (default: 0)
+  --large-axis, -la     use large axis as visulaizing marker (default: False)
+INFO - 2020-12-28 01:56:39,356 - core - signal_shutdown [atexit]
+```
+
+| <img src="https://user-images.githubusercontent.com/39142679/103175749-a767b380-48af-11eb-9feb-e39cb1aeea9d.png" width="300" height="300"> <img src="https://user-images.githubusercontent.com/39142679/103175745-a33b9600-48af-11eb-96fc-0d85e8f77e8c.png" width="300" height="300">
+|:--:|
+| left: hanging points &ensp; right: pouring points|
 
 
 ## Training
