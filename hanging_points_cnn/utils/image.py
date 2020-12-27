@@ -328,6 +328,9 @@ def depth_edges_erase(depth, max_sample=100, copy=True):
     edges = mask_to_edges(mask)
     edges_idx = np.where(edges == 255)
     length = len(edges_idx[0])
+    if length == 0:
+        return depth
+
     num_samples = np.random.randint(0, min(max_sample, length))
     samples_idx = np.unique(np.random.randint(0, length, num_samples))
     py_list = edges_idx[0][samples_idx]
