@@ -1478,6 +1478,23 @@ def average_coords(coords_list):
     return coords_average
 
 
+def count_exsiting_data(target_dir):
+    """Count the number of already generated data for an object
+
+    Parameters
+    ----------
+    target_dir : str
+        target_dir/<fancy_dir>/<generated_data_dir>/<generated_data>
+
+    Returns
+    -------
+    num_data : int
+        number of already generated data for an object of target_dir
+    """
+    num_data = len(glob.glob(osp.join(target_dir, '*', 'depth', '*npy')))
+    return num_data
+
+
 if __name__ == '__main__':
     print('Start')
     parser = argparse.ArgumentParser(
@@ -1520,6 +1537,15 @@ if __name__ == '__main__':
         type=str, help='remain list file name',
         default=None)
     parser.add_argument(
+        '--use-finish-list', '-ufl',
+        action='store_true',
+        help='unable multiple processes on the same objects. '
+        'remove finish_list.txt before running when using this option')
+    parser.add_argument(
+        '--add-mode', '-am',
+        action='store_true',
+        help='Add data until the total number of data reaches data_num.')
+    parser.add_argument(
         '--gui', '-g',
         action='store_true', help='debug gui')
     parser.add_argument(
@@ -1550,6 +1576,8 @@ if __name__ == '__main__':
     save_debug_image = args.save_debug_image
     filtered_points_name = args.filtered_points_name
     stop_per_data = args.stop_per_data
+    use_finish_list = args.use_finish_list
+    add_mode = args.add_mode
 
     if args.task_type is not None:
         task_type = args.task_type
@@ -1630,8 +1658,19 @@ if __name__ == '__main__':
 
     no_visible_skip_file_name = str(
         Path(save_dir_base) / 'no_visible_objcts_list.txt')
+
     try:
         for file in files:
+            if use_finish_list:
+                finish_file = osp.join(
+                    save_dir_base, 'finish_list.txt')
+                if osp.isfile(finish_file):
+                    finish_list = load_list(finish_file)
+                if file in finish_list:
+                    print('skip {} because it is in finish list'.format(file))
+                    continue
+                add_list(finish_file, file)
+
             dirname, filename, category_name, idx \
                 = split_file_name(file, dataset_type)
 
@@ -1649,26 +1688,33 @@ if __name__ == '__main__':
                 continue
 
             save_dir = osp.join(save_dir_base, category_name)
-            save_dir = make_save_dirs(
+            fancy_save_dir = make_save_dirs(
                 save_dir, debug_dir=save_debug_image)
 
             contact_points = sample_contact_points(contact_points, 30)
             while True:
                 r = Renderer(
                     gui=gui,
-                    save_dir=save_dir,
+                    save_dir=fancy_save_dir,
                     save_debug_image=save_debug_image,
                     task_type=task_type,
                     stop_per_data=stop_per_data)
+
+                if add_mode:
+                    num_exsiting_data = count_exsiting_data(save_dir)
+                    print('num_exsiting_data ', num_exsiting_data)
+                    if num_exsiting_data == data_num:
+                        break
+                else:
+                    r.get_data_id()
+                    if r.data_id == data_num:
+                        break
+
                 r.create_data(osp.join(dirname, urdf_name), contact_points)
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points ')
-                    shutil.rmtree(save_dir)
+                    shutil.rmtree(fancy_save_dir)
                     add_list(no_visible_skip_file_name, file)
-                    break
-
-                r.get_data_id()
-                if r.data_id == data_num:
                     break
 
     except KeyboardInterrupt:
