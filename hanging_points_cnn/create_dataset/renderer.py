@@ -27,6 +27,7 @@ from sklearn.cluster import DBSCAN
 from skrobot import coordinates
 
 from hanging_points_generator.create_mesh import load_camera_pose
+from hanging_points_generator.generator_utils import add_list
 from hanging_points_generator.generator_utils import cluster_contact_points
 from hanging_points_generator.generator_utils import filter_penetration
 from hanging_points_generator.generator_utils import get_urdf_center
@@ -1627,6 +1628,8 @@ if __name__ == '__main__':
 
     print('number of files {}'.format(len(files)))
 
+    no_visible_skip_file_name = str(
+        Path(save_dir_base) / 'no_visible_objcts_list.txt')
     try:
         for file in files:
             dirname, filename, category_name, idx \
@@ -1661,6 +1664,7 @@ if __name__ == '__main__':
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points ')
                     shutil.rmtree(save_dir)
+                    add_list(no_visible_skip_file_name, file)
                     break
 
                 r.get_data_id()
