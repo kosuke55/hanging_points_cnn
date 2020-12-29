@@ -884,7 +884,7 @@ class Renderer:
 
     def save_data(self):
         """Save training data"""
-        print('Save {} data'.format(self.data_id))
+        print('Save {}: {} data'.format(self.save_dir, self.data_id))
         cv2.imwrite(osp.join(self.save_dir, 'color', '{:06}.png'.format(
             self.data_id)), self.bgr)
         np.save(osp.join(
@@ -1490,8 +1490,14 @@ def count_exsiting_data(target_dir):
     num_data : int
         number of already generated data for an object of target_dir
     """
-    num_data = len(glob.glob(osp.join(target_dir, '*', 'depth', '*npy')))
-    return num_data
+    num_color = len(glob.glob(osp.join(target_dir, '*', 'color', '*png')))
+    num_depth = len(glob.glob(osp.join(target_dir, '*', 'depth', '*npy')))
+    num_camera_info = len(glob.glob(osp.join(
+        target_dir, '*', 'camera_info', '*yaml')))
+
+    assert num_color == num_depth == num_camera_info
+
+    return num_color
 
 
 if __name__ == '__main__':
