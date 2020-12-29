@@ -49,7 +49,7 @@ class Trainer(object):
     def __init__(self, data_path, test_data_path,
                  batch_size, max_epoch, pretrained_model, train_data_num,
                  val_data_num, save_dir, lr, config=None,
-                 train_depth=False, port=6006):
+                 train_depth=False, port=6006, object_list=None):
 
         if config is None:
             config = {
@@ -67,7 +67,8 @@ class Trainer(object):
             = load_dataset(data_path, batch_size,
                            use_bgr=self.config['use_bgr'],
                            use_bgr2gray=self.config['use_bgr2gray'],
-                           depth_range=self.depth_range)
+                           depth_range=self.depth_range,
+                           object_list=object_list)
         self.test_dataloader \
             = load_test_dataset(test_data_path,
                                 use_bgr=self.config['use_bgr'],
@@ -539,6 +540,12 @@ if __name__ == "__main__":
     parser.add_argument('--train-depth', '-td',
                         action='store_true',
                         help='if true, train depth')
+    parser.add_argument(
+        '--object_list',
+        '-ol',
+        type=str,
+        help='list of objects used for traing',
+        default=None)
 
     args = parser.parse_args()
 
@@ -546,6 +553,14 @@ if __name__ == "__main__":
 
     with open(args.confing) as f:
         config = yaml.safe_load(f)
+
+    object_list_file = args.object_list
+    if object_list_file is None:
+        object_list = None
+    else:
+        if osp.isfile(object_list_file):
+            with open(object_list_file) as f:
+                object_list = [s.strip() for s in f.readlines()]
 
     trainer = Trainer(
         data_path=args.data_path,
@@ -559,5 +574,6 @@ if __name__ == "__main__":
         lr=args.lr,
         config=config,
         train_depth=args.train_depth,
-        port=args.port)
+        port=args.port,
+        object_list=object_list)
     trainer.train()

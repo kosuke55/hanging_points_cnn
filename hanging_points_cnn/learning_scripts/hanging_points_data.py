@@ -54,12 +54,15 @@ def collate_fn(batch):
     return in_features, depths, camera_info_paths, ground_truths, annotations
 
 
-def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray, depth_range):
+def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray,
+                 depth_range, object_list=None):
     transform = transforms.Compose([
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(
-        data_path, transform, use_bgr, use_bgr2gray, depth_range)
+        data_path, transform, use_bgr, use_bgr2gray,
+        depth_range, object_list=object_list)
 
+    print('Load {} data'.format(len(hp_data)))
     train_size = int(0.9 * len(hp_data))
     val_size = len(hp_data) - train_size
 
@@ -89,7 +92,8 @@ def load_test_dataset(data_path, use_bgr, use_bgr2gray, depth_range):
 class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None,
                  use_bgr=True, use_bgr2gray=True,
-                 depth_range=[0.2, 0.7], test=False):
+                 depth_range=[0.2, 0.7], test=False,
+                 object_list=None):
         self.test = test
         self.data_path = data_path
         self.transform = transform
@@ -100,6 +104,15 @@ class HangingPointsDataset(Dataset):
             # data_path/class/fancy/depth/*.npy
             self.file_paths = list(
                 sorted(Path(self.data_path).glob("*/*/depth/*.npy")))
+            if object_list is not None:
+                print('len(object_list)', len(object_list))
+                self.file_paths = list(filter(
+                    lambda path: any(target_object in str(path)
+                                     for target_object in object_list),
+                    self.file_paths))
+                print('Select {} data in object_list'.format(
+                    len(self.file_paths)))
+
         self.use_bgr = use_bgr
         if use_bgr2gray:
             self.use_bgr = True
