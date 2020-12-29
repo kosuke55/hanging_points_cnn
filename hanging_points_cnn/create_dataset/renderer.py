@@ -1477,13 +1477,17 @@ def average_coords(coords_list):
     return coords_average
 
 
-def count_exsiting_data(target_dir):
+def count_exsiting_data(target_dir, check_all_number=True):
     """Count the number of already generated data for an object
 
     Parameters
     ----------
     target_dir : str
         target_dir/<fancy_dir>/<generated_data_dir>/<generated_data>
+    check_all_number : bool
+        if True, check if the number of data of color,
+        depth and camera_info are equal.
+        by default True
 
     Returns
     -------
@@ -1491,11 +1495,17 @@ def count_exsiting_data(target_dir):
         number of already generated data for an object of target_dir
     """
     num_color = len(glob.glob(osp.join(target_dir, '*', 'color', '*png')))
+
+    if not check_all_number:
+        num_color
+
     num_depth = len(glob.glob(osp.join(target_dir, '*', 'depth', '*npy')))
     num_camera_info = len(glob.glob(osp.join(
         target_dir, '*', 'camera_info', '*yaml')))
 
-    assert num_color == num_depth == num_camera_info
+    assert num_color == num_depth == num_camera_info,\
+        '{} num_color:{} num_depth:{}, num_camera_info:{}'.format(
+            target_dir, num_color, num_depth, num_camera_info)
 
     return num_color
 
