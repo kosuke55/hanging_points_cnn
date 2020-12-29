@@ -58,7 +58,41 @@ python train_hpnet.py -g 2 -c config/gray_model.yaml  -bs 16 -dp <save dir>
 
 
 ## Inference
+Use `infer-function-points` app.
 ```
-ipython -i -- infer_pose_from_data.py -i <save dir>/<fancy dir> --idx 10 -p <your trained model path>
+infer-function-points -h
+INFO - 2020-12-29 22:41:01,673 - topics - topicmanager initialized
+usage: infer-function-points [-h] [--input-dir INPUT_DIR] [--color COLOR]
+                             [--depth DEPTH] [--camera-info CAMERA_INFO]
+                             [--pretrained_model PRETRAINED_MODEL]
+                             [--predict-depth PREDICT_DEPTH] [--task TASK]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input-dir INPUT_DIR, -i INPUT_DIR
+                        input directory (default: None)
+  --color COLOR, -c COLOR
+                        color image (.png) (default: None)
+  --depth DEPTH, -d DEPTH
+                        depth image (.npy) (default: None)
+  --camera-info CAMERA_INFO, -ci CAMERA_INFO
+                        camera info file (.yaml) (default: None)
+  --pretrained_model PRETRAINED_MODEL, -p PRETRAINED_MODEL
+                        Pretrained models (default: /media/kosuke55/SANDISK-2/
+                        meshdata/shapenet_pouring_render/1218_mug_cap_helmet_b
+                        owl/hpnet_latestmodel_20201219_0213.pt)
+  --predict-depth PREDICT_DEPTH, -pd PREDICT_DEPTH
+                        predict-depth (default: 0)
+  --task TASK, -t TASK  h(hanging) or p(pouring) (default: h)
+INFO - 2020-12-29 22:41:03,442 - core - signal_shutdown [atexit]
 ```
-\<fancy dir\>  is made by [eos](https://github.com/iory/eos)
+
+For multiple data.
+```
+infer-function-points -i <input directory> -p <trained model> --task <hanging or pouring>
+```
+
+For specific data.
+```
+infer-function-points -c <color.png> -d <depth.npy> -ci <camera_info.yaml> -p <trained model> --task <hanging or pouring>
+```
