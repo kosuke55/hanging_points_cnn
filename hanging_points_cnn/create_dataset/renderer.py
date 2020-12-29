@@ -965,7 +965,6 @@ class Renderer:
                          - self.object_center
                          + (np.random.rand(3) - 0.5) * 0.2)
             self.step(1)
-            print('no_visible_count: %d' % self.no_visible_count)
             if self.no_visible_count >= self.no_visible_skip_num:
                 return False
             if not self.get_visible_coords(
@@ -1502,7 +1501,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save-dir', '-s',
         type=str, help='save dir',
-        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/mthesi_media')
+        default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1226')
     parser.add_argument(
         '--save-debug-image', '-sdd',
         action='store_true', help='If true, save debug image')
@@ -1663,6 +1662,7 @@ if __name__ == '__main__':
 
     try:
         for file in files:
+            print('load {}'.format(file))
             if use_finish_list:
                 finish_file = osp.join(
                     save_dir_base, 'finish_list.txt')
@@ -1704,7 +1704,6 @@ if __name__ == '__main__':
 
                 if add_mode:
                     num_exsiting_data = count_exsiting_data(save_dir)
-                    print('num_exsiting_data ', num_exsiting_data)
                     if num_exsiting_data == data_num:
                         break
                 else:
