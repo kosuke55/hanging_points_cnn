@@ -1659,6 +1659,8 @@ if __name__ == '__main__':
     no_visible_skip_file_name = str(
         Path(save_dir_base) / 'no_visible_objcts_list.txt')
 
+    finish_list = []
+
     try:
         for file in files:
             if use_finish_list:
