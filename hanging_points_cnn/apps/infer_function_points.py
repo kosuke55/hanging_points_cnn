@@ -4,6 +4,7 @@
 import argparse
 import os.path as osp
 import sys
+from pathlib import Path
 
 import cameramodels
 import open3d as o3d
@@ -42,12 +43,6 @@ def main():
         '--input-dir', '-i', type=str,
         help='input urdf',
         default=None)
-
-    parser.add_argument(
-        '--idx', type=int,
-        help='data idx',
-        default=0)
-
     parser.add_argument(
         '--color', '-c', type=str,
         help='color', default=None)
@@ -65,7 +60,8 @@ def main():
         help='Pretrained models',
         # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt') # shapenet
         # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
-        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201218_1032.pt')  # noqa
+        # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201218_1032.pt')  # noqa
+        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201219_0213.pt')  # noqa
     parser.add_argument(
         '--predict-depth', '-pd', type=int,
         help='predict-depth', default=0)
@@ -76,7 +72,6 @@ def main():
 
     args = parser.parse_args()
     base_dir = args.input_dir
-    start_idx = args.idx
     pretrained_model = args.pretrained_model
 
     config = {
@@ -108,21 +103,34 @@ def main():
 
     viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 
+    if base_dir is not None:
+        color_paths = list(Path(base_dir).glob('**/color/*.png'))
+    elif args.color is not None \
+            and args.depth is not None \
+            and args.camera_info is not None:
+        color_paths = [args.color]
+
+    else:
+        return False
+
+    is_first_loop = True
     try:
-        for idx in range(start_idx, 100000):
-            print(idx)
-            if idx != start_idx:
-                viewer.delete(pc)
-                for c in contact_point_sphere_list:
+        for color_path in color_paths:
+            if not is_first_loop:
+                viewer.delete(pc)  # noqa
+                for c in contact_point_sphere_list:  # noqa
                     viewer.delete(c)
 
             if base_dir is not None:
-                camera_info_path = osp.join(
-                    base_dir, 'camera_info', '{:06}.yaml'.format(idx))
-                color_path = osp.join(
-                    base_dir, 'color', '{:06}.png'.format(idx))
-                depth_path = osp.join(
-                    base_dir, 'depth', '{:06}.npy'.format(idx))
+                camera_info_path = str(
+                    (color_path.parent.parent /
+                     'camera_info' /
+                     color_path.stem).with_suffix('.yaml'))
+                depth_path = str(
+                    (color_path.parent.parent /
+                     'depth' /
+                     color_path.stem).with_suffix('.npy'))
+                color_path = str(color_path)
             else:
                 camera_info_path = args.camera_info
                 color_path = args.color
@@ -131,23 +139,19 @@ def main():
             camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
                 camera_info_path)
             camera_model.target_size = target_size
-            intrinsics = camera_model.open3d_intrinsic
 
             cv_bgr = cv2.imread(color_path)
-            # cv_bgr = cv2.flip(cv_bgr, 0)
+
+            intrinsics = camera_model.open3d_intrinsic
+
             cv_bgr = cv2.resize(cv_bgr, target_size)
             cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
             color = o3d.geometry.Image(cv_rgb)
-            # color = o3d.io.read_image(color_path)
 
             cv_depth = np.load(depth_path)
-            # cv_depth = cv2.flip(cv_depth, 0)
-            # cv_depth = cv2.imread(
-            #     depth_path, cv2.IMREAD_ANYDEPTH).astype(np.float32)
             cv_depth = cv2.resize(cv_depth, target_size,
                                   interpolation=cv2.INTER_NEAREST)
             depth = o3d.geometry.Image(cv_depth)
-            # depth = o3d.geometry.Image(np.load(depth_path))
 
             rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
                 color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
@@ -160,7 +164,6 @@ def main():
             pc = skrobot.model.PointCloudLink(trimesh_pc)
 
             viewer.add(pc)
-            # o3d.visualization.draw_geometries([pcd])
 
             if config['use_bgr2gray']:
                 gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY)
@@ -170,7 +173,7 @@ def main():
                 in_feature = np.concatenate(
                     (normalized_depth, gray), axis=2).astype(np.float32)
             else:
-                raise
+                raise NotImplementedError()
 
             transform = transforms.Compose([
                 transforms.ToTensor()])
@@ -204,12 +207,8 @@ def main():
                 rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
                 q = matrix2quaternion(rot)
 
-                camera_model_crop_resize \
-                    = camera_model.crop_resize_camera_info(
-                        target_size=[256, 256])
-
                 hanging_point = np.array(
-                    camera_model_crop_resize.project_pixel_to_3d_ray(
+                    camera_model.project_pixel_to_3d_ray(
                         [int(hanging_point_x), int(hanging_point_y)]))
 
                 if args.predict_depth:
@@ -248,7 +247,7 @@ def main():
                 viewer.add(contact_point_sphere)
                 contact_point_sphere_list.append(contact_point_sphere)
 
-            if idx == start_idx:
+            if is_first_loop:
                 viewer.show()
 
             heatmap = overlay_heatmap(cv_bgr, confidence_img)
@@ -260,6 +259,9 @@ def main():
             cv2.destroyAllWindows()
             if key == ord('q'):
                 break
+
+            is_first_loop = False
+
     except KeyboardInterrupt:
         pass
 
