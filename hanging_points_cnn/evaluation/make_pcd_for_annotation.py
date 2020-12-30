@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--input', '-i', type=str,
     help='input directory '
-    '<input_directory>/<object>/<color, depth, camra_info>//<png, npy, yaml>',
+    '<input_directory>/<object>/<color, depth, camra_info>/<png, npy, yaml>',
     default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval_pouring')  # noqa
 parser.add_argument(
     '--output', '-o', type=str,
