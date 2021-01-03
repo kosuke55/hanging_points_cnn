@@ -82,7 +82,7 @@ parser.add_argument(
 parser.add_argument(
     '--save-dir', '-s', type=str,
     help='directory to save evaluation result',
-    # default='eval_shapnet')
+    # default='eval_shapenet')
     default='eval_gan')
 parser.add_argument(
     '--image-dir', '-id', type=str,
