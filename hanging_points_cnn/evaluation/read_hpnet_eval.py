@@ -24,7 +24,6 @@ parser.add_argument(
 args = parser.parse_args()
 
 # gan
-# base_dir = '/media/kosuke55/SANDISK-2/meshdata/ycb_eval/eval_gan/diff'
 base_dir = args.gan_diff_directory
 paths = list(sorted(Path(base_dir).glob('*.json')))
 path = paths[1]
@@ -96,7 +95,6 @@ for key in result.keys():
 
 
 # shapenet
-# base_dir = '/media/kosuke55/SANDISK-2/meshdata/ycb_eval/eval_shapenet/diff'
 base_dir = args.shapenet_diff_directory
 paths = list(sorted(Path(base_dir).glob('*.json')))
 path = paths[1]
