@@ -118,15 +118,14 @@ if __name__ == '__main__':
         category_name_list = [
             "024_bowl",
             "025_mug",
-            # "027_skillet",
-            # "031_spoon",
+            "027_skillet",
             "029_plate"
         ]
 
         obj_rot_list = [
             [0, 0, 0],  # 024_bowl
             [0, 0, 0],  # 025_mug
-            # [0, 0, 0],  # 027_skillet"
+            [0, 0, 0],  # 027_skillet"
             [0, 0, 0]   # 029_plate
         ]
 
