@@ -23,7 +23,7 @@ python renderer_create_eval.py -i /media/kosuke55/SANDISK/meshdata/ycb_pouring_o
 python eval_ycb.py -i /media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring -p <pretrained model> -t p -e <eval directory name. ex)eval_gan, eval_shapenet>
 ```
 
-4. Read the evaluation result and print it for tex.
+5. Read the evaluation result and print it for tex.
 ```
 python read_hpnet_eval.py -g <gan diff directory> -s <shapenet diff directory>
 ```
