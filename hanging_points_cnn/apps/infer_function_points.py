@@ -41,17 +41,17 @@ def main():
 
     parser.add_argument(
         '--input-dir', '-i', type=str,
-        help='input urdf',
+        help='input directory',
         default=None)
     parser.add_argument(
         '--color', '-c', type=str,
-        help='color', default=None)
+        help='color image (.png)', default=None)
     parser.add_argument(
         '--depth', '-d', type=str,
-        help='depth', default=None)
+        help='depth image (.npy)', default=None)
     parser.add_argument(
         '--camera-info', '-ci', type=str,
-        help='camera info', default=None)
+        help='camera info file (.yaml)', default=None)
 
     parser.add_argument(
         '--pretrained_model',
