@@ -22,6 +22,7 @@ from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
+from hanging_points_cnn.utils.rois_tools import make_box
 
 
 try:
@@ -69,6 +70,10 @@ parser.add_argument(
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
+parser.add_argument(
+    '--task', '-t', type=str,
+    help='h(hanging) or p(pouring)',
+    default='h')
 
 args = parser.parse_args()
 base_dir = args.input_dir
@@ -84,7 +89,17 @@ config = {
     'use_bgr2gray': True,
     'roi_padding': 50
 }
+target_size = (256, 256)
 depth_range = config['depth_range']
+
+task_type = args.task
+if task_type == 'p':
+    task_type = 'pouring'
+    depth_roi_size = (100, 100)
+else:
+    task_type = 'hanging'
+    depth_roi_size = (20, 20)
+print('task type: {}'.format(task_type))
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = HPNET(config).to(device)
@@ -114,16 +129,16 @@ try:
         annotation_data = load_json(str(annotation_path))
         camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
             str(camera_info_path))
-        camera_model.target_size = (256, 256)
+        camera_model.target_size = target_size
         intrinsics = camera_model.open3d_intrinsic
 
         cv_bgr = cv2.imread(str(color_path))
-        cv_bgr = cv2.resize(cv_bgr, (256, 256))
+        cv_bgr = cv2.resize(cv_bgr, target_size)
         cv_rgb = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2RGB)
         color = o3d.geometry.Image(cv_rgb)
 
         cv_depth = np.load(str(depth_path))
-        cv_depth = cv2.resize(cv_depth, (256, 256),
+        cv_depth = cv2.resize(cv_depth, target_size,
                               interpolation=cv2.INTER_NEAREST)
         depth = o3d.geometry.Image(cv_depth)
         # depth = o3d.geometry.Image(np.load(depth_path))
@@ -143,7 +158,7 @@ try:
 
         if config['use_bgr2gray']:
             gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY)
-            gray = cv2.resize(gray, (256, 256))[..., None] / 255.
+            gray = cv2.resize(gray, target_size)[..., None] / 255.
             normalized_depth = normalize_depth(
                 cv_depth, depth_range[0], depth_range[1])[..., None]
             in_feature = np.concatenate(
@@ -187,7 +202,7 @@ try:
             q = matrix2quaternion(rot)
 
             camera_model_crop_resize \
-                = camera_model.crop_resize_camera_info(target_size=[256, 256])
+                = camera_model.crop_resize_camera_info(target_size=target_size)
 
             hanging_point = np.array(
                 camera_model_crop_resize.project_pixel_to_3d_ray(
@@ -203,11 +218,15 @@ try:
                     dep, depth_range[0], depth_range[1]) * 0.001
                 length = float(dep) / hanging_point[2]
             else:
+                depth_roi = make_box(
+                    roi_center,
+                    width=depth_roi_size[1],
+                    height=depth_roi_size[0],
+                    img_shape=target_size,
+                    xywh=False)
                 depth_roi_clip = cv_depth[
-                    max(0, roi_center[1] - 10):
-                    min(roi_center[1] + 10, cv_depth.shape[0]),
-                    max(0, roi_center[0] - 10):
-                    min(roi_center[0] + 10, cv_depth.shape[1])]
+                    depth_roi[0]:depth_roi[2],
+                    depth_roi[1]:depth_roi[3]]
                 dep_roi_clip = depth_roi_clip[np.where(
                     np.logical_and(config['depth_range'][0] < depth_roi_clip,
                                    depth_roi_clip < config['depth_range'][1]))]
