@@ -50,8 +50,14 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     '--input-dir', '-i', type=str,
-    help='input urdf',
+    help='input directory which is created by renderer_create_eval.py',
     default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')
+parser.add_argument(
+    '--eval-dir-name', '-e', type=str,
+    help='generated evaluation directory name.'
+    'create under the input directory.'
+    '<input_dir>/<eval_dir>',
+    default='eval_shapenet')
 
 parser.add_argument(
     '--pretrained_model',
@@ -66,6 +72,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 base_dir = args.input_dir
+eval_dir_name = args.eval_dir_name
 pretrained_model = args.pretrained_model
 
 config = {
@@ -316,8 +323,7 @@ try:
             print('angle_mean %f' % (diff_dict[key]['angle_mean'] / np.pi * 180))
             print('angle_min %f' % (diff_dict[key]['angle_min'] / np.pi * 180))
 
-        # eval_dir = color_path.parent.parent.parent.parent / 'eval_shapenet'
-        eval_dir = color_path.parent.parent.parent.parent / 'eval_gan'
+        eval_dir = color_path.parent.parent.parent.parent / eval_dir_name
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
         eval_axis_dir = eval_dir / 'axis'
