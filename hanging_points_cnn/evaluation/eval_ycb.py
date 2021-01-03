@@ -54,10 +54,10 @@ parser.add_argument(
     help='input directory which is created by renderer_create_eval.py',
     default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')
 parser.add_argument(
-    '--eval-dir-name', '-e', type=str,
+    '--save-dir', '-s', type=str,
     help='generated evaluation directory name.'
     'create under the input directory.'
-    '<input_dir>/<eval_dir>',
+    '<input_dir>/<save_dir>',
     default='eval_shapenet')
 
 parser.add_argument(
@@ -342,7 +342,7 @@ try:
             print('angle_mean %f' % (diff_dict[key]['angle_mean'] / np.pi * 180))
             print('angle_min %f' % (diff_dict[key]['angle_min'] / np.pi * 180))
 
-        eval_dir = color_path.parent.parent.parent.parent / eval_dir_name
+        eval_dir = color_path.parent.parent.parent.parent / save_dir
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
         eval_axis_dir = eval_dir / 'axis'
