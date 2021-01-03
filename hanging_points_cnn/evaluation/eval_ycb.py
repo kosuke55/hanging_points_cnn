@@ -129,7 +129,7 @@ try:
             np.asarray(
                 pcd.points), np.asarray(
                 pcd.colors))
-        pc = skrobot.models.PointCloudLink(trimesh_pc)
+        pc = skrobot.model.PointCloudLink(trimesh_pc)
 
         viewer.add(pc)
         # o3d.visualization.draw_geometries([pcd])
@@ -270,7 +270,7 @@ try:
                           ]['distance'].append(min_distance)
                 diff_dict[str(gt_labels[min_idx])]['angle'].append(angle)
 
-            contact_point_sphere = skrobot.models.Sphere(
+            contact_point_sphere = skrobot.model.Sphere(
                 0.01, color=color)
             contact_point_sphere.newcoords(
                 skrobot.coordinates.Coordinates(pos=pos, rot=quaternion))
@@ -278,7 +278,7 @@ try:
             contact_point_sphere_list.append(contact_point_sphere)
 
             # gt            gt_quaternon_list[min_idx]
-            gt_contact_point_sphere = skrobot.models.Sphere(
+            gt_contact_point_sphere = skrobot.model.Sphere(
                 0.01, color=[0, 255, 0])
             gt_contact_point_sphere.newcoords(
                 skrobot.coordinates.Coordinates(pos=gt_pos_list[min_idx], rot=gt_quaternon_list[min_idx]))
@@ -317,7 +317,7 @@ try:
             print('angle_min %f' % (diff_dict[key]['angle_min'] / np.pi * 180))
 
         # eval_dir = color_path.parent.parent.parent.parent / 'eval_shapenet'
-        eval_dir = color_path.parent.parent.parent.aarent / 'eval_gan'
+        eval_dir = color_path.parent.parent.parent.parent / 'eval_gan'
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
         eval_axis_dir = eval_dir / 'axis'
