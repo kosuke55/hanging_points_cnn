@@ -141,7 +141,7 @@ thresh_distance = 0.03
 
 if is_sim_data:
     print('Inference with sim data')
-    color_paths = Path(base_dir).glob('*/*/color/*.png')
+    color_paths = list(sorted(Path(base_dir).glob('*/*/color/*.png')))
 else:
     print('Inference with real data')
     color_paths = list(sorted(Path(base_dir).glob('*/color/*.png')))
