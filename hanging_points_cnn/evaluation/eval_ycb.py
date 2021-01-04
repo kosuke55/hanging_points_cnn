@@ -243,7 +243,7 @@ try:
         heatmap = overlay_heatmap(cv_bgr, confidence_img)
 
         gt_pos_list = []
-        gt_quaternon_list = []
+        gt_quaternion_list = []
         gt_labels = []
         for annotation in annotation_data:
             cx = annotation['xy'][0]
@@ -256,7 +256,7 @@ try:
             length = dep * 0.001 / pos[2]
             pos = pos * length
             gt_pos_list.append(pos)
-            gt_quaternon_list.append(q)
+            gt_quaternion_list.append(q)
             gt_labels.append(label)
 
         # Calculate diff
@@ -281,7 +281,7 @@ try:
 
             pos_diff = pos_diff[min_idx].tolist()
             vec = quaternion2xvec(quaternion)
-            gt_vec = quaternion2xvec(gt_quaternon_list[min_idx])
+            gt_vec = quaternion2xvec(gt_quaternion_list[min_idx])
             angle = min(two_vectors_angle(vec, gt_vec),
                         two_vectors_angle(vec, -gt_vec))
 
@@ -304,11 +304,12 @@ try:
             viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
 
-            # gt            gt_quaternon_list[min_idx]
             gt_contact_point_sphere = skrobot.model.Sphere(
                 0.01, color=[0, 255, 0])
             gt_contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(pos=gt_pos_list[min_idx], rot=gt_quaternon_list[min_idx]))
+                skrobot.coordinates.Coordinates(
+                    pos=gt_pos_list[min_idx],
+                    rot=gt_quaternion_list[min_idx]))
             viewer.add(gt_contact_point_sphere)
             gt_contact_point_sphere_list.append(gt_contact_point_sphere)
 
