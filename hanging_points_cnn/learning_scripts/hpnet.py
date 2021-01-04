@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from __future__ import division
 
 import sys
+import warnings
 
 import torch
 import torch.nn as nn
@@ -86,6 +87,7 @@ class HPNET(nn.Module):
         nn.Module.__init__(self)
 
         if config is None:
+            warnings.warn('confing is not specified. use defalut confing.a')
             config = {
                 'output_channels': 1,
                 'depth_range': [100, 1500],
@@ -95,6 +97,9 @@ class HPNET(nn.Module):
                 'use_bgr2gray': True,
                 'roi_padding': 50
             }
+        print('--- config ---')
+        for item in config.items():
+            print(item)
 
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')

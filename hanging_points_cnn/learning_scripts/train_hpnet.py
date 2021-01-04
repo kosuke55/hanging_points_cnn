@@ -5,7 +5,6 @@ import argparse
 import copy
 import os
 import os.path as osp
-
 import sys
 import yaml
 from datetime import datetime
@@ -52,6 +51,7 @@ class Trainer(object):
                  train_depth=False, port=6006, object_list=None):
 
         if config is None:
+            warnings.warn('confing is not specified. use defalut confing.')
             config = {
                 'output_channels': 1,
                 'feature_extractor_name': 'resnet50',
