@@ -100,6 +100,9 @@ parser.add_argument(
 parser.add_argument(
     '--visualize-gt', '-vg', action='store_true',
     help='visualize groud truth data')
+parser.add_argument(
+    '--reverse', '-r', action='store_true',
+    help='reverse x direction')
 
 args = parser.parse_args()
 base_dir = args.input_dir
@@ -108,6 +111,7 @@ pretrained_model = args.pretrained_model
 save_3d_image = args.save_3d_image
 is_sim_data = args.sim_data
 visualize_gt = args.visualize_gt
+reverse_x = args.reverse
 
 config_path = str(Path(osp.abspath(__file__)).parent.parent
                   / 'learning_scripts' / 'config' / 'gray_model.yaml')
@@ -289,8 +293,8 @@ try:
             quaternion_list.append(quaternion)
 
         if is_sim_data:
+            category = color_path.parent.parent.parent.parent.name
             eval_dir = color_path.parent.parent.parent.parent / save_dir
-            category = color_path.parent.parent.parent.name
             gt_pos_list = []
             gt_quaternion_list = []
             gt_vec_list = []
@@ -382,6 +386,8 @@ try:
                     contact_point_marker.newcoords(
                         skrobot.coordinates.Coordinates(
                             pos=pos, rot=quaternion))
+                    if reverse_x:
+                        contact_point_marker.rotate(np.pi, 'y')
                     viewer.add(contact_point_marker)
                     contact_point_marker_list.append(contact_point_marker)
 
@@ -478,7 +484,7 @@ try:
             if save_3d_image:
                 image_file = osp.join(
                     eval_3d_result_dir,
-                    color_path.parent.parent.name + '_' + color_path.name)
+                    category + '_' + color_path.name)
                 from PIL import Image
                 loop = True
                 while loop:
