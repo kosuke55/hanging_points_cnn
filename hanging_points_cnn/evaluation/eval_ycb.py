@@ -293,7 +293,7 @@ try:
             quaternion_list.append(quaternion)
 
         if is_sim_data:
-            category = color_path.parent.parent.parent.parent.name
+            category = color_path.parent.parent.parent.name
             eval_dir = color_path.parent.parent.parent.parent / save_dir
             gt_pos_list = []
             gt_quaternion_list = []
