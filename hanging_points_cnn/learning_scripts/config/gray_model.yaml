@@ -1,7 +1,11 @@
 output_channels: 1
 depth_range: [100, 1500]
 feature_extractor_name: "resnet50"
-confidence_thresh: 0.3
+confidence_thresh: 0.25
 use_bgr: True
 use_bgr2gray: True
 roi_padding: 50
+target_size: [256, 256]
+depth_roi_size:
+    hanging: [20, 20]
+    pouring: [20, 20]

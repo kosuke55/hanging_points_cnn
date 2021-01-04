@@ -4,6 +4,7 @@
 import argparse
 import os.path as osp
 import sys
+import yaml
 from pathlib import Path
 
 import cameramodels
@@ -74,27 +75,23 @@ def main():
     base_dir = args.input_dir
     pretrained_model = args.pretrained_model
 
-    config = {
-        'output_channels': 1,
-        'feature_extractor_name': 'resnet50',
-        'confidence_thresh': 0.1,
-        'depth_range': [100, 1500],
-        'use_bgr': True,
-        'use_bgr2gray': True,
-        'roi_padding': 50
-    }
-    target_size = (256, 256)
-
-    depth_range = config['depth_range']
+    config_path = str(Path(osp.abspath(__file__)).parent.parent
+                      / 'learning_scripts' / 'config' / 'gray_model.yaml')
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
 
     task_type = args.task
     if task_type == 'p':
         task_type = 'pouring'
-        depth_roi_size = (100, 100)
     else:
         task_type = 'hanging'
-        depth_roi_size = (20, 20)
+
+    target_size = tuple(config['target_size'])
+    depth_range = config['depth_range']
+    depth_roi_size = config['depth_roi_size'][task_type]
+
     print('task type: {}'.format(task_type))
+    print('depth roi size: {}'.format(depth_roi_size))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = HPNET(config).to(device)
