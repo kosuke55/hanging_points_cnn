@@ -1,6 +1,5 @@
-## An example for pouring
-
-### For simulation data
+# evaluation
+## an example for pouring
 
 1. Annotate objects using [pose_annotation_tool](https://github.com/kosuke55/pose_annotation_tool) after making an annotation directory with [make_annotation_dir.py](https://github.com/kosuke55/pose_annotation_tool/blob/master/utils/make_annotation_dir.py)
 
@@ -13,7 +12,7 @@ rosrun annotation_tool annotation_tool
 python make_coords_json.py -i '/media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/textured_urdf/annotation_obj'
 ```
 
-3. Create evaluation data with [renderer_create_eval.py](hanging_points_cnn/create_datase/renderer_create_eval.py)
+3. Create evaluation data with [renderer_create_eval.py](hanging_points_cnn/create_datase/renderer_create_eval.py) (only for sim data)
 ```
 python renderer_create_eval.py -i /media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/textured_urdf -a /media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/textured_urdf/annotation_obj --task pouring
 ```
@@ -27,5 +26,3 @@ python eval_ycb.py -i /media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring -p
 ```
 python read_hpnet_eval.py -g <gan diff directory> -s <shapenet diff directory>
 ```
-
-### For real data
