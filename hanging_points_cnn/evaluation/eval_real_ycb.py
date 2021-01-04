@@ -131,7 +131,7 @@ annotation_dir = args.annotation_dir
 try:
     for color_path in color_paths:
         print(color_path)
-        if gui:
+        if gui or save_3d_image:
             if not first:
                 viewer.delete(pc)
                 for c in contact_point_sphere_list:
@@ -167,7 +167,7 @@ try:
                 pcd.colors))
         pc = skrobot.model.PointCloudLink(trimesh_pc)
 
-        if gui:
+        if gui or save_3d_image:
             viewer.add(pc)
 
         if config['use_bgr2gray']:
@@ -264,7 +264,7 @@ try:
             contact_point_sphere.newcoords(
                 skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
 
-            if gui:
+            if gui or save_3d_image:
                 viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
 
@@ -388,10 +388,6 @@ try:
             color_path.with_suffix('.json').name)), diff_dict)
 
         if gui or save_3d_image:
-            cv2.imshow('heatmap', heatmap)
-            cv2.imshow('roi', roi_image)
-            cv2.imshow('axis', axis_image)
-
             if first:
                 if not save_3d_image:
                     viewer.show()
@@ -401,12 +397,17 @@ try:
             if save_3d_image:
                 viewer._init_and_start_app()
 
-            print('Next data: [ENTER] on image window.\n'
-                  'Quit: [q] on image window.')
-            key = cv2.waitKey(0)
-            cv2.destroyAllWindows()
-            if key == ord('q'):
-                break
+            if gui:
+                cv2.imshow('heatmap', heatmap)
+                cv2.imshow('roi', roi_image)
+                cv2.imshow('axis', axis_image)
+
+                print('Next data: [ENTER] on image window.\n'
+                      'Quit: [q] on image window.')
+                key = cv2.waitKey(0)
+                cv2.destroyAllWindows()
+                if key == ord('q'):
+                    break
 
             if save_3d_image:
                 image_file = osp.join(
