@@ -86,13 +86,14 @@ parser.add_argument(
     # default='eval_shapenet')
     default='eval_gan')
 parser.add_argument(
-    '--image-dir', '-id', type=str,
-    help='directory to save image', default='')
+    '--save-3d-image', '-s3i', action='store_true',
+    help='Save 3D inference image')
 
 args = parser.parse_args()
 base_dir = args.input_dir
 save_dir = args.save_dir
 pretrained_model = args.pretrained_model
+save_3d_image = args.save_3d_image
 
 config_path = str(Path(osp.abspath(__file__)).parent.parent
                   / 'learning_scripts' / 'config' / 'gray_model.yaml')
@@ -126,7 +127,6 @@ first = True
 gui = args.gui
 save_dir = args.save_dir
 annotation_dir = args.annotation_dir
-image_dir = args.image_dir
 
 try:
     for color_path in color_paths:
@@ -260,14 +260,10 @@ try:
             vec_list.append(v)
             quaternion_list.append(q)
 
-            # contact_point_sphere = skrobot.models.Sphere(
-            #     0.001, color=[255, 0, 0])
-            contact_point_sphere = skrobot.model.Axis(0.003, 0.05)
+            contact_point_sphere = skrobot.model.Axis(0.006, 0.1)
             contact_point_sphere.newcoords(
                 skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
-            # contact_point_sphere.newcoords(
-            #     skrobot.coordinates.Coordinates(
-            #         pos=hanging_point, rot=q).rotate(np.pi, 'y'))
+
             if gui:
                 viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
@@ -358,12 +354,18 @@ try:
         eval_roi_dir = eval_dir / 'roi'
         eval_roi_heatmap_dir = eval_dir / 'roi_heatmap'
         eval_axis_dir = eval_dir / 'axis'
+
         os.makedirs(str(eval_dir), exist_ok=True)
         os.makedirs(str(eval_heatmap_dir), exist_ok=True)
         os.makedirs(str(eval_roi_dir), exist_ok=True)
         os.makedirs(str(eval_roi_heatmap_dir), exist_ok=True)
         os.makedirs(str(eval_axis_dir), exist_ok=True)
         os.makedirs(str(eval_diff_dir), exist_ok=True)
+
+        if save_3d_image:
+            eval_3d_result_dir = eval_dir / '3d_result'
+            os.makedirs(str(eval_3d_result_dir), exist_ok=True)
+
         cv2.imwrite(str(eval_heatmap_dir / Path(
             category +
             '_' +
@@ -385,16 +387,18 @@ try:
             '_' +
             color_path.with_suffix('.json').name)), diff_dict)
 
-        if gui:
-            if first:
-                if image_dir == '':
-                    viewer.show()
-
-                first = False
+        if gui or save_3d_image:
             cv2.imshow('heatmap', heatmap)
             cv2.imshow('roi', roi_image)
             cv2.imshow('axis', axis_image)
-            if image_dir != '':
+
+            if first:
+                if not save_3d_image:
+                    viewer.show()
+
+                first = False
+
+            if save_3d_image:
                 viewer._init_and_start_app()
 
             print('Next data: [ENTER] on image window.\n'
@@ -404,21 +408,21 @@ try:
             if key == ord('q'):
                 break
 
-        if image_dir != '':
-            image_file = osp.join(
-                image_dir,
-                color_path.parent.parent.name + '_' + color_path.name)
-            from PIL import Image
-            loop = True
-            while loop:
-                try:
-                    data = viewer.scene.save_image(visible=True)
-                    rendered = Image.open(trimesh.util.wrap_as_stream(data))
-                    rendered.save(image_file)
-                    loop = False
-                    print('Save %s' % image_file)
-                except AttributeError:
-                    print('Fail to save. Try again.')
+            if save_3d_image:
+                image_file = osp.join(
+                    eval_3d_result_dir,
+                    color_path.parent.parent.name + '_' + color_path.name)
+                from PIL import Image
+                loop = True
+                while loop:
+                    try:
+                        data = viewer.scene.save_image(visible=True)
+                        rendered = Image.open(trimesh.util.wrap_as_stream(data))
+                        rendered.save(image_file)
+                        loop = False
+                        print('Save %s' % image_file)
+                    except AttributeError:
+                        print('Fail to save. Try again.')
 
 
 except KeyboardInterrupt:
