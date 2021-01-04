@@ -268,10 +268,6 @@ try:
                 viewer.add(contact_point_sphere)
             contact_point_sphere_list.append(contact_point_sphere)
 
-        gt_pos_list = []
-        gt_quaternon_list = []
-        gt_labels = []
-
         idx = int(color_path.stem)
         category = color_path.parent.parent.name
 
@@ -288,9 +284,6 @@ try:
         diff_dict['-1']['pos_diff'] = []
         diff_dict['-1']['distance'] = []
         diff_dict['-1']['angle'] = []
-
-        # if pos_list == []:
-        #     continue
 
         for pos, vec in zip(pos_list, vec_list):
             pos = np.array(pos)
