@@ -1,6 +1,6 @@
 """Visualize the manual annotation and save images
 
-saved images are pointcloud, colored depth, and heatmap/
+saved images are pointcloud, colored depth, and heatmap
 """
 
 from __future__ import division
