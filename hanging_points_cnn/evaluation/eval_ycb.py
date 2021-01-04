@@ -53,25 +53,23 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     '--input-dir', '-i', type=str,
-    help='input directory which is created by renderer_create_eval.py',
-    # default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring')
+    help='input directory',
+    # default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval')
+    default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval_pouring')
 parser.add_argument(
-    '--save-dir', '-s', type=str,
-    help='generated evaluation directory name.'
-    'create under the input directory.'
-    '<input_dir>/<save_dir>',
-    default='eval_shapenet')
-
+    '--annotation-dir', '-a', type=str,
+    help='annotation directory',
+    # default='/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/real_ycb_annotation')
+    default='/media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/real_ycb_annotation_pouring')
 parser.add_argument(
     '--pretrained_model',
     '-p',
     type=str,
     help='Pretrained models',
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapene # noqa
-    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapenet  # noqa
+    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan  # noqa
     # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1222/pouring_shapenet_20201229_2111_5epoch.pt')  # shapene pouring # noqa
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqapa
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
@@ -79,11 +77,23 @@ parser.add_argument(
     '--task', '-t', type=str,
     help='h(hanging) or p(pouring)',
     default='h')
+parser.add_argument(
+    '--gui', '-g', action='store_true',
+    help='visualzie')
+parser.add_argument(
+    '--save-dir', '-s', type=str,
+    help='directory to save evaluation result',
+    # default='eval_shapenet')
+    default='eval_gan')
+parser.add_argument(
+    '--save-3d-image', '-s3i', action='store_true',
+    help='Save 3D inference image')
 
 args = parser.parse_args()
 base_dir = args.input_dir
 save_dir = args.save_dir
 pretrained_model = args.pretrained_model
+save_3d_image = args.save_3d_image
 
 config_path = str(Path(osp.abspath(__file__)).parent.parent
                   / 'learning_scripts' / 'config' / 'gray_model.yaml')
@@ -111,24 +121,27 @@ model.eval()
 viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 480))
 thresh_distance = 0.03
 
-color_paths = Path(base_dir).glob('*/*/color/*.png')
+color_paths = list(sorted(Path(base_dir).glob('*/color/*.png')))
 first = True
+
+gui = args.gui
+save_dir = args.save_dir
+annotation_dir = args.annotation_dir
+
 try:
     for color_path in color_paths:
-        if not first:
-            viewer.delete(pc)
-            for c, gt_c in zip(contact_point_sphere_list, gt_contact_point_sphere_list):
-                viewer.delete(c)
-                viewer.delete(gt_c)
-        annotation_path = color_path.parent.parent / \
-            'annotation' / color_path.with_suffix('.json').name
+        print(color_path)
+        if gui or save_3d_image:
+            if not first:
+                viewer.delete(pc)
+                for c in contact_point_sphere_list:
+                    viewer.delete(c)
+
         camera_info_path = color_path.parent.parent / \
             'camera_info' / color_path.with_suffix('.yaml').name
         depth_path = color_path.parent.parent / \
             'depth' / color_path.with_suffix('.npy').name
-        # color_path = str(color_path)
 
-        annotation_data = load_json(str(annotation_path))
         camera_model = cameramodels.PinholeCameraModel.from_yaml_file(
             str(camera_info_path))
         camera_model.target_size = target_size
@@ -143,7 +156,6 @@ try:
         cv_depth = cv2.resize(cv_depth, target_size,
                               interpolation=cv2.INTER_NEAREST)
         depth = o3d.geometry.Image(cv_depth)
-        # depth = o3d.geometry.Image(np.load(depth_path))
 
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
             color, depth, depth_trunc=4.0, convert_rgb_to_intensity=False)
@@ -155,8 +167,8 @@ try:
                 pcd.colors))
         pc = skrobot.model.PointCloudLink(trimesh_pc)
 
-        viewer.add(pc)
-        # o3d.visualization.draw_geometries([pcd])
+        if gui or save_3d_image:
+            viewer.add(pc)
 
         if config['use_bgr2gray']:
             gray = cv2.cvtColor(cv_bgr, cv2.COLOR_BGR2GRAY)
@@ -183,10 +195,12 @@ try:
         confidence_np[confidence_np <= 0] = 0
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
+        heatmap = overlay_heatmap(cv_bgr, confidence_img)
+        roi_heatmap = heatmap.copy()
 
         contact_point_sphere_list = []
-        gt_contact_point_sphere_list = []
         pos_list = []
+        vec_list = []
         quaternion_list = []
         roi_image = cv_bgr.copy()
         axis_image = cv_bgr.copy()
@@ -196,15 +210,19 @@ try:
                 continue
             roi = roi.cpu().detach().numpy().copy()
             roi_image = draw_roi(roi_image, roi)
+            roi_heatmap = draw_roi(roi_heatmap, roi)
             hanging_point_x = roi_center[0]
             hanging_point_y = roi_center[1]
+            cv2.circle(roi_image, (hanging_point_x, hanging_point_y),
+                       10, (19, 208, 251), thickness=-1)
             v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
+
             rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
             q = matrix2quaternion(rot)
 
             camera_model_crop_resize \
-                = camera_model.crop_resize_camera_info(target_size=target_size)
+                = camera_model.crop_resize_camera_info(target_size=[256, 256])
 
             hanging_point = np.array(
                 camera_model_crop_resize.project_pixel_to_3d_ray(
@@ -239,37 +257,37 @@ try:
 
             hanging_point *= length
             pos_list.append(hanging_point)
+            vec_list.append(v)
             quaternion_list.append(q)
 
-        heatmap = overlay_heatmap(cv_bgr, confidence_img)
+            contact_point_sphere = skrobot.model.Axis(0.006, 0.1)
+            contact_point_sphere.newcoords(
+                skrobot.coordinates.Coordinates(pos=hanging_point, rot=q))
 
-        gt_pos_list = []
-        gt_quaternion_list = []
-        gt_labels = []
-        for annotation in annotation_data:
-            cx = annotation['xy'][0]
-            cy = annotation['xy'][1]
-            q = np.array(annotation['quaternion'])
-            dep = annotation['depth']
-            label = annotation['label']
-            pos = np.array(
-                camera_model.project_pixel_to_3d_ray([cx, cy]))
-            length = dep * 0.001 / pos[2]
-            pos = pos * length
-            gt_pos_list.append(pos)
-            gt_quaternion_list.append(q)
-            gt_labels.append(label)
+            if gui or save_3d_image:
+                viewer.add(contact_point_sphere)
+            contact_point_sphere_list.append(contact_point_sphere)
 
-        # Calculate diff
+        idx = int(color_path.stem)
+        category = color_path.parent.parent.name
+
+        gt_file = str(Path(annotation_dir) / category) + '_{}.json'.format(idx)
+        gt_data = load_json(gt_file)
+        gt_pos = [p[0] for p in gt_data['contact_points']]
+        gt_vec = [np.array(p)[1:, 0] for p in gt_data['contact_points']]
+        gt_labels = [label for label in gt_data['labels']]
+
+        thresh_distance = 0.03
+
         diff_dict = {}
         diff_dict['-1'] = {}
         diff_dict['-1']['pos_diff'] = []
         diff_dict['-1']['distance'] = []
         diff_dict['-1']['angle'] = []
 
-        for pos, quaternion in zip(pos_list, quaternion_list):
+        for pos, vec in zip(pos_list, vec_list):
             pos = np.array(pos)
-            pos_diff = pos - gt_pos_list
+            pos_diff = np.abs(pos - gt_pos)
             distances = np.linalg.norm(pos_diff, axis=1)
             min_idx = np.argmin(distances)
             min_distance = np.min(distances)
@@ -281,42 +299,20 @@ try:
                 diff_dict[str(gt_labels[min_idx])]['angle'] = []
 
             pos_diff = pos_diff[min_idx].tolist()
-            vec = quaternion2xvec(quaternion)
-            gt_vec = quaternion2xvec(gt_quaternion_list[min_idx])
-            angle = min(two_vectors_angle(vec, gt_vec),
-                        two_vectors_angle(vec, -gt_vec))
+            angle = min(two_vectors_angle(vec, gt_vec[min_idx]),
+                        two_vectors_angle(vec, -gt_vec[min_idx]))
 
             if min_distance > thresh_distance:
-                color = [0, 0, 255]
                 diff_dict['-1']['pos_diff'].append(pos_diff)
                 diff_dict['-1']['distance'].append(min_distance)
                 diff_dict['-1']['angle'].append(angle)
             else:
-                color = [255, 0, 0]
                 diff_dict[str(gt_labels[min_idx])]['pos_diff'].append(pos_diff)
                 diff_dict[str(gt_labels[min_idx])
                           ]['distance'].append(min_distance)
                 diff_dict[str(gt_labels[min_idx])]['angle'].append(angle)
 
-            contact_point_sphere = skrobot.model.Sphere(
-                0.01, color=color)
-            contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(pos=pos, rot=quaternion))
-            viewer.add(contact_point_sphere)
-            contact_point_sphere_list.append(contact_point_sphere)
-
-            gt_contact_point_sphere = skrobot.model.Sphere(
-                0.01, color=[0, 255, 0])
-            gt_contact_point_sphere.newcoords(
-                skrobot.coordinates.Coordinates(
-                    pos=gt_pos_list[min_idx],
-                    rot=gt_quaternion_list[min_idx]))
-            viewer.add(gt_contact_point_sphere)
-            gt_contact_point_sphere_list.append(gt_contact_point_sphere)
-
-        print('\n\n')
-        print(color_path)
-        for key in diff_dict:
+        for key in diff_dict.keys():
             print('----label %s ----' % key)
             print('len: %d' % len(diff_dict[key]['angle']))
             if key == '-1':
@@ -341,45 +337,87 @@ try:
             diff_dict[key]['angle_max'] = np.max(angle).tolist()
             diff_dict[key]['angle_min'] = np.min(angle).tolist()
 
-            print('angle_max %f' % (diff_dict[key]['angle_max'] / np.pi * 180))
-            print('angle_mean %f' % (diff_dict[key]['angle_mean'] / np.pi * 180))
-            print('angle_min %f' % (diff_dict[key]['angle_min'] / np.pi * 180))
+            print('angle_max %f' % diff_dict[key]['angle_max'])
+            print('angle_mean %f' % diff_dict[key]['angle_mean'])
+            print('angle_min %f' % diff_dict[key]['angle_min'])
 
-        eval_dir = color_path.parent.parent.parent.parent / save_dir
+        eval_dir = color_path.parent.parent.parent / save_dir
         eval_heatmap_dir = eval_dir / 'heatmap'
         eval_diff_dir = eval_dir / 'diff'
+        eval_roi_dir = eval_dir / 'roi'
+        eval_roi_heatmap_dir = eval_dir / 'roi_heatmap'
         eval_axis_dir = eval_dir / 'axis'
-        category_name = color_path.parent.parent.parent.name
+
         os.makedirs(str(eval_dir), exist_ok=True)
         os.makedirs(str(eval_heatmap_dir), exist_ok=True)
+        os.makedirs(str(eval_roi_dir), exist_ok=True)
+        os.makedirs(str(eval_roi_heatmap_dir), exist_ok=True)
         os.makedirs(str(eval_axis_dir), exist_ok=True)
         os.makedirs(str(eval_diff_dir), exist_ok=True)
+
+        if save_3d_image:
+            eval_3d_result_dir = eval_dir / '3d_result'
+            os.makedirs(str(eval_3d_result_dir), exist_ok=True)
+
         cv2.imwrite(str(eval_heatmap_dir / Path(
-            category_name +
+            category +
             '_' +
             color_path.name)), heatmap)
         cv2.imwrite(str(eval_axis_dir / Path(
-            category_name +
+            category +
             '_' +
             color_path.name)), axis_image)
+        cv2.imwrite(str(eval_roi_dir / Path(
+            category +
+            '_' +
+            color_path.name)), roi_image)
+        cv2.imwrite(str(eval_roi_heatmap_dir / Path(
+            category +
+            '_' +
+            color_path.name)), roi_heatmap)
         save_json(str(eval_diff_dir / Path(
-            category_name +
+            category +
             '_' +
             color_path.with_suffix('.json').name)), diff_dict)
 
-        if first:
-            viewer.show()
-            first = False
-        cv2.imshow('heatmap', heatmap)
-        cv2.imshow('roi', roi_image)
-        cv2.imshow('axis', axis_image)
+        if gui or save_3d_image:
+            if first:
+                if not save_3d_image:
+                    viewer.show()
 
-        print('Next data: [ENTER] on image window.\n'
-              'Quit: [q] on image window.')
-        key = cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        if key == ord('q'):
-            break
+                first = False
+
+            if save_3d_image:
+                viewer._init_and_start_app()
+
+            if gui:
+                cv2.imshow('heatmap', heatmap)
+                cv2.imshow('roi', roi_image)
+                cv2.imshow('axis', axis_image)
+
+                print('Next data: [ENTER] on image window.\n'
+                      'Quit: [q] on image window.')
+                key = cv2.waitKey(0)
+                cv2.destroyAllWindows()
+                if key == ord('q'):
+                    break
+
+            if save_3d_image:
+                image_file = osp.join(
+                    eval_3d_result_dir,
+                    color_path.parent.parent.name + '_' + color_path.name)
+                from PIL import Image
+                loop = True
+                while loop:
+                    try:
+                        data = viewer.scene.save_image(visible=True)
+                        rendered = Image.open(trimesh.util.wrap_as_stream(data))
+                        rendered.save(image_file)
+                        loop = False
+                        print('Save %s' % image_file)
+                    except AttributeError:
+                        print('Fail to save. Try again.')
+
 
 except KeyboardInterrupt:
     pass
