@@ -54,7 +54,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--input-dir', '-i', type=str,
     help='input directory which is created by renderer_create_eval.py',
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')
+    # default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')
+    default='/media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring')
 parser.add_argument(
     '--save-dir', '-s', type=str,
     help='generated evaluation directory name.'
@@ -68,9 +69,9 @@ parser.add_argument(
     type=str,
     help='Pretrained models',
     # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/shapenet_2000perobj_1020.pt') # shapene # noqa
-    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan
+    # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan
     # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1222/pouring_shapenet_20201229_2111_5epoch.pt')  # shapene pouring # noqa
-    # default='media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqa
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)
