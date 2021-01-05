@@ -25,15 +25,14 @@ def quaternion2vec(q, axis='x'):
 
     Parameters
     ----------
-    q : [type]
-        [description]
+    q : np.ndarray
+        qauternion
     axis : str, optional
-        [description], by default 'x'
+        axis x, y, z, by default 'x'
 
     Returns
     -------
-    [type]
-        [description]
+    vec : numpy.ndarray
     """
     m = quaternion2matrix(q)
     return matrix2vec(m, axis=axis)
