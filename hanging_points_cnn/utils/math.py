@@ -15,6 +15,7 @@ def two_vectors_angle(v1, v2):
     Returns
     -------
     angle : float
+       rad unit
     """
     cos = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
     return np.arccos(cos)
