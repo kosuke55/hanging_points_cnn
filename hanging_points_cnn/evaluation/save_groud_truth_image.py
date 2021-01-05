@@ -22,7 +22,8 @@ from hanging_points_generator.generator_utils import load_json
 from hanging_points_cnn.utils.image import create_gradient_circle
 from hanging_points_cnn.utils.image import colorize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
-
+from hanging_points_cnn.utils.math import matrix2vec
+from hanging_points_cnn.utils.math import two_vectors_angle
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -51,8 +52,11 @@ parser.add_argument(
     '--visualize-image', '-vi', action='store_true',
     help='visualize image')
 parser.add_argument(
-    '--reverse', '-r', action='store_true',
-    help='reverse x direction')
+    '--reverse', '-r', type=int,
+    help='reverse x direction'
+    '1: frontward '
+    '2: backward',
+    default=0)
 parser.add_argument(
     '--sim-data', '-sim', action='store_true',
     help='Use sim data')
@@ -154,8 +158,15 @@ try:
             contact_point_marker = skrobot.model.Axis(0.003, 0.05)
             contact_point_marker.newcoords(
                 skrobot.coordinates.Coordinates(pos=cp[0], rot=cp[1:]))
-            if reverse_x:
-                contact_point_marker.rotate(np.pi, 'y')
+            if reverse_x in [1, 2]:
+                x_vec = matrix2vec(np.array(cp[1:]), axis='x')
+                camera_z_vec = [0, 0, 1]
+                if reverse_x == 1:
+                    if two_vectors_angle(x_vec, camera_z_vec) < np.pi / 2:
+                        contact_point_marker.rotate(np.pi, 'y')
+                if reverse_x == 2:
+                    if two_vectors_angle(x_vec, camera_z_vec) > np.pi / 2:
+                        contact_point_marker.rotate(np.pi, 'y')
 
             contact_point_marker_list.append(contact_point_marker)
 
