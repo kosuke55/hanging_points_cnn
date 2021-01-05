@@ -14,7 +14,6 @@ import trimesh
 from hanging_points_generator.generator_utils import load_json
 from skrobot.coordinates.math import matrix2quaternion
 from skrobot.coordinates.math import rotation_matrix_from_axis
-from skrobot.coordinates.math import quaternion2matrix
 from hanging_points_generator.generator_utils import save_json
 from torchvision import transforms
 
@@ -24,6 +23,8 @@ from hanging_points_cnn.utils.image import draw_roi
 from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
+from hanging_points_cnn.utils.math import two_vectors_angle
+from hanging_points_cnn.utils.math import quaternion2vec
 from hanging_points_cnn.utils.rois_tools import make_box
 
 
@@ -36,17 +37,6 @@ except ImportError:
             sys.path.remove(path)
             import cv2
             sys.path.append(path)
-
-
-def quaternion2xvec(q):
-    m = quaternion2matrix(q)
-    return m[:, 0]
-
-
-def two_vectors_angle(v1, v2):
-    cos = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-    return np.arccos(cos)
-
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -311,7 +301,8 @@ try:
                 pos = pos * length
                 gt_pos_list.append(pos)
                 gt_quaternion_list.append(quaternion)
-                gt_vec_list.append(quaternion2xvec(quaternion))
+                gt_vec_list.append(
+                    quaternion2vec(quaternion, axis='x'))
                 gt_labels.append(label)
         else:
             category = color_path.parent.parent.name
