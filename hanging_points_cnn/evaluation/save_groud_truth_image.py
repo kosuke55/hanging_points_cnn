@@ -32,25 +32,30 @@ parser.add_argument(
     help='input directory'
     'input dir which has each category and '
     'their color, depth, camera_info data.',
+    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')  # hanging sim # noqa
+    # default='/media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring')  # pouring sim # noqa
     # default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval')  # hanging real # noqa
-    default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval_pouring')  # pouring real # noqa
+    # default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval_pouring')  # pouring real # noqa
 parser.add_argument(
     '--annotation-dir', '-a', type=str,
-    help='annotation directory.',
-    # default='/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/real_ycb_annotation_1027')  # hanging real # noqa
-    default='/media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/real_ycb_annotation_pouring')  # pouring real # noqa
+    help='annotation directory. required only for real data.',
+    default='/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/real_ycb_annotation_1027')  # hanging real # noqa
+    # default='/media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/real_ycb_annotation_pouring')  # pouring real # noqa
 parser.add_argument(
     '--save-dir', '-s', type=str,
-    help='directory to save PointCloud with annotation, colorized depth and heatmap. '
+    help='directory to save PointCloud with annotation, '
+    'colorized depth and heatmap. '
     '<input_dir>/<save_dir>',
-    # default='groud_truth_hanging')
-    default='groud_truth_pouring')
+    default='groud_truth')
 parser.add_argument(
     '--visualize-image', '-vi', action='store_true',
     help='visualize image')
 parser.add_argument(
     '--reverse', '-r', action='store_true',
     help='reverse x direction')
+parser.add_argument(
+    '--sim-data', '-sim', action='store_true',
+    help='Use sim data')
 
 args = parser.parse_args()
 
@@ -59,6 +64,7 @@ annotation_dir = args.annotation_dir
 save_dir = str(Path(input_dir) / args.save_dir)
 visualize_image = args.visualize_image
 reverse_x = args.reverse
+is_sim_data = args.sim_data
 
 os.makedirs(save_dir, exist_ok=True)
 print(save_dir)
@@ -66,9 +72,23 @@ print(save_dir)
 regex = re.compile(r'\d+')
 
 target_size = (256, 256)
+
 color_paths = list(sorted(Path(input_dir).glob('*/color/*.png')))
+if is_sim_data:
+    print('Visualize sim data')
+    color_paths = list(sorted(
+        Path(input_dir).glob('*/*/color/*.png')))
+else:
+    print('Visualize real data')
+    color_paths = list(sorted(
+        Path(input_dir).glob('*/color/*.png')))
+
 try:
     for color_path in color_paths:
+        if is_sim_data:
+            annotation_path = color_path.parent.parent / \
+                'annotation' / color_path.with_suffix('.json').name
+
         camera_info_path = color_path.parent.parent / \
             'camera_info' / color_path.with_suffix('.yaml').name
         depth_path = color_path.parent.parent / \
@@ -101,10 +121,34 @@ try:
 
         idx = int(regex.findall(color_path.stem)[0])
 
-        category = color_path.parent.parent.name
-        pose_file = osp.join(annotation_dir, category + '_{}.json'.format(idx))
-        contact_points_dict = load_json(str(pose_file))
-        contact_points = contact_points_dict['contact_points']
+        if is_sim_data:
+            category = color_path.parent.parent.parent.name
+
+            annotation_data = load_json(str(annotation_path))
+            contact_points = []
+            for annotation in annotation_data:
+                cx = annotation['xy'][0]
+                cy = annotation['xy'][1]
+                q = np.array(annotation['quaternion'])
+                dep = annotation['depth']
+                pos = np.array(
+                    camera_model.project_pixel_to_3d_ray([cx, cy]))
+                length = dep * 0.001 / pos[2]
+                pos = pos * length
+                coords = skrobot.coordinates.Coordinates(
+                    pos=pos, rot=q)
+                contact_point = np.concatenate(
+                    [coords.T()[:3, 3][None, :],
+                     coords.T()[:3, :3]]).tolist()
+                contact_points.append(contact_point)
+        else:
+            category = color_path.parent.parent.name
+
+            annotation_file = osp.join(
+                annotation_dir, category + '_{}.json'.format(idx))
+            contact_points_dict = load_json(str(annotation_file))
+            contact_points = contact_points_dict['contact_points']
+
         contact_point_marker_list = []
         for i, cp in enumerate(contact_points):
             contact_point_marker = skrobot.model.Axis(0.003, 0.05)
