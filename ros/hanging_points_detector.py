@@ -46,14 +46,6 @@ except ImportError:
             sys.path.append(path)
 
 
-def frame_img(img, frame=1):
-    height, width = img.shape[:2]
-    resized_img = cv2.resize(img, (width - frame * 2, height - frame * 2))
-    framed_img = np.zeros(img.shape)
-    framed_img[frame:height - frame, frame:width - frame] = resized_img
-    return framed_img
-
-
 class HangingPointsNet():
     def __init__(self):
         self.bridge = CvBridge()
