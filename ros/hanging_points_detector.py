@@ -8,10 +8,12 @@ import copy
 import os
 import os.path as osp
 import sys
+import yaml
 
 import cameramodels
 import message_filters
 import numpy as np
+import rospkg
 import rospy
 import torch
 from geometry_msgs.msg import PoseArray, Pose
@@ -30,6 +32,7 @@ from hanging_points_cnn.utils.image import normalize_depth
 from hanging_points_cnn.utils.image import unnormalize_depth
 from hanging_points_cnn.utils.image import overlay_heatmap
 from hanging_points_cnn.utils.image import remove_nan
+from hanging_points_cnn.utils.rois_tools import make_box
 
 
 try:
@@ -55,7 +58,8 @@ class HangingPointsNet():
     def __init__(self):
         self.bridge = CvBridge()
         self.pub = rospy.Publisher("~output", Image, queue_size=10)
-        self.pub_confidence = rospy.Publisher("~output/confidence", Image, queue_size=10)
+        self.pub_confidence = rospy.Publisher(
+            "~output/confidence", Image, queue_size=10)
         self.pub_depth = rospy.Publisher(
             "~colorized_depth", Image, queue_size=10)
         self.pub_axis = rospy.Publisher(
@@ -75,32 +79,48 @@ class HangingPointsNet():
 
         pretrained_model = rospy.get_param(
             '~pretrained_model',
-            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20200922_1626.pt')
+            '/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_bestmodel_20201025_1542.pt')  # noqa
+        task_type = rospy.get_param('~task_type', 'hanging')
+        config_path = rospy.get_param('~config', None)
+
+        if config_path is None:
+            rospack = rospkg.RosPack()
+            pack_path = rospack.get_path('hanging_points_cnn')
+            config_path = osp.join(
+                pack_path,
+                'hanging_points_cnn',
+                'learning_scripts',
+                'config',
+                'gray_model.yaml')
+        print('Load ' + config_path)
+        with open(config_path) as f:
+            self.config = yaml.safe_load(f)
+
         self.transform = transforms.Compose([
             transforms.ToTensor()])
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.config = {
-            'output_channels': 1,
-            'feature_extractor_name': 'resnet50',
-            'confidence_thresh': 0.25,
-            'depth_range': [100, 1500],
-            'use_bgr': True,
-            'use_bgr2gray': True,
-            'roi_padding': 50
-        }
         self.depth_range = self.config['depth_range']
+        self.target_size = tuple(self.config['target_size'])
+        self.depth_roi_size = self.config['depth_roi_size'][task_type]
+        print('task type: {}'.format(task_type))
+        print('depth roi size: {}'.format(self.depth_roi_size))
+
         self.model = HPNET(self.config).to(device)
+
         if osp.exists(pretrained_model):
             print('use pretrained model')
             self.model.load_state_dict(
                 torch.load(pretrained_model), strict=False)
+
         self.model.eval()
+
         self.camera_model = None
         self.load_camera_info()
+
         self.use_coords = False
-        # self.hanging_points_pose_array = PoseArray()
+
         self.subscribe()
 
     def subscribe(self):
@@ -144,35 +164,28 @@ class HangingPointsNet():
         ymax = camera_info_msg.roi.y_offset + camera_info_msg.roi.height
         xmax = camera_info_msg.roi.x_offset + camera_info_msg.roi.width
         self.camera_model.roi = [ymin, xmin, ymax, xmax]
+        self.camera_model.target_size = self.target_size
 
         bgr_raw = self.bridge.imgmsg_to_cv2(img_raw_msg, "bgr8")
         bgr = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-
         cv_depth = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
-
         if cv_depth is None or bgr is None:
             return
-
         remove_nan(cv_depth)
         cv_depth[cv_depth < self.depth_range[0]] = 0
         cv_depth[cv_depth > self.depth_range[1]] = 0
-
-        bgr = cv2.resize(bgr, (256, 256))
-        cv_depth = cv2.resize(cv_depth, (256, 256),
+        bgr = cv2.resize(bgr, self.target_size)
+        cv_depth = cv2.resize(cv_depth, self.target_size,
                               interpolation=cv2.INTER_NEAREST)
 
-        # depth = frame_img(depth)
-        # kernel = np.ones((10, 10), np.uint8)
-        # depth = cv2.morphologyEx(depth, cv2.MORPH_CLOSE, kernel)
         depth_bgr = colorize_depth(
             cv_depth, ignore_value=0)
-        # depth_bgr[np.where(np.all(bgr == [0, 0, 0], axis=-1))] = [0, 0, 0]
-        # depth_bgr[np.where(depth == 0)] = [0, 0, 0]
+
         in_feature = cv_depth.copy().astype(np.float32) * 0.001
 
         if self.config['use_bgr2gray']:
             gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-            gray = cv2.resize(gray, (256, 256))[..., None] / 255.
+            gray = cv2.resize(gray, self.target_size)[..., None] / 255.
             normalized_depth = normalize_depth(
                 cv_depth, self.depth_range[0], self.depth_range[1])[..., None]
             in_feature = np.concatenate(
@@ -184,7 +197,6 @@ class HangingPointsNet():
         in_feature = in_feature.to(self.device)
         in_feature = in_feature.unsqueeze(0)
 
-        # confidence, depth_and_rotation = self.model(in_feature)
         confidence, depth, rotation = self.model(in_feature)
         confidence = confidence[0, 0:1, ...]
         confidence_np = confidence.cpu().detach().numpy().copy() * 255
@@ -192,7 +204,7 @@ class HangingPointsNet():
         confidence_np[confidence_np <= 0] = 0
         confidence_np[confidence_np >= 255] = 255
         confidence_img = confidence_np.astype(np.uint8)
-        confidence_img = cv2.resize(confidence_img, (256, 256))
+        confidence_img = cv2.resize(confidence_img, self.target_size)
         heatmap = overlay_heatmap(bgr, confidence_img)
 
         axis_pred = bgr.copy()
@@ -205,48 +217,33 @@ class HangingPointsNet():
             if roi.tolist() == [0, 0, 0, 0]:
                 continue
             roi = roi.cpu().detach().numpy().copy()
-            # hanging_point_x = int((roi[0] + roi[2]) / 2)
-            # hanging_point_y = int((roi[1] + roi[3]) / 2)
             hanging_point_x = roi_center[0]
             hanging_point_y = roi_center[1]
             v = rotation[i].cpu().detach().numpy()
             v /= np.linalg.norm(v)
             rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
             q = matrix2quaternion(rot)
-            # if self.use_coords:
-            #     q = depth_and_rotation[i, 1:].cpu().detach().numpy().copy()
-            #     q /= np.linalg.norm(q)
-            # else:
-            #     v = depth_and_rotation[i, 1:4].cpu().detach().numpy()
-            #     v /= np.linalg.norm(v)
-            #     rot = rotation_matrix_from_axis(v, [0, 1, 0], 'xy')
-            #     q = matrix2quaternion(rot)
-
-            # coords = coordinates.Coordinates()
-            # coordinates.geo.orient_coords_to_axis(coords, v, 'x')
-            # q = coords.quaternion
-
-            camera_model_crop_resize \
-                = self.camera_model.crop_resize_camera_info(
-                    target_size=[256, 256])
 
             hanging_point = np.array(
-                camera_model_crop_resize.project_pixel_to_3d_ray(
+                self.camera_model.project_pixel_to_3d_ray(
                     [int(hanging_point_x),
                      int(hanging_point_y)]))
 
             if self.predict_depth:
-                # dep = depth_and_rotation[i, 0].cpu().detach().numpy().copy()
                 dep = depth[i].cpu().detach().numpy().copy()
                 dep = unnormalize_depth(
                     dep, self.depth_range[0], self.depth_range[1]) * 0.001
                 length = float(dep) / hanging_point[2]
             else:
-                # depth_roi_clip = depth[int(roi[1]):int(roi[3]),
-                #                        int(roi[0]):int(roi[2])]
+                depth_roi = make_box(
+                    roi_center,
+                    width=self.depth_roi_size[1],
+                    height=self.depth_roi_size[0],
+                    img_shape=self.target_size,
+                    xywh=False)
                 depth_roi_clip = cv_depth[
-                    roi_center[1] - 10:roi_center[1] + 10,
-                    roi_center[0] - 10:roi_center[0] + 10]
+                    depth_roi[0]:depth_roi[2],
+                    depth_roi[1]:depth_roi[3]]
                 dep_roi_clip = depth_roi_clip[np.where(
                     np.logical_and(self.depth_range[0] < depth_roi_clip,
                                    depth_roi_clip < self.depth_range[1]))]
@@ -256,7 +253,6 @@ class HangingPointsNet():
                 length = float(dep_roi_clip) / hanging_point[2]
 
             hanging_point *= length
-
             hanging_point_pose = Pose()
             hanging_point_pose.position.x = hanging_point[0]
             hanging_point_pose.position.y = hanging_point[1]
@@ -269,10 +265,10 @@ class HangingPointsNet():
 
             axis_pred_raw = cv2.rectangle(
                 axis_pred_raw,
-                (int(roi[0] * (xmax - xmin) / float(256) + xmin),
-                 int(roi[1] * (ymax - ymin) / float(256) + ymin)),
-                (int(roi[2] * (xmax - xmin) / float(256) + xmin),
-                 int(roi[3] * (ymax - ymin) / float(256) + ymin)),
+                (int(roi[0] * (xmax - xmin) / self.target_size[1] + xmin),
+                 int(roi[1] * (ymax - ymin) / self.target_size[0] + ymin)),
+                (int(roi[2] * (xmax - xmin) / self.target_size[1] + xmin),
+                 int(roi[3] * (ymax - ymin) / self.target_size[0] + ymin)),
                 (0, 255, 0), 1)
             try:
                 axis_pred_raw = draw_axis(axis_pred_raw,
