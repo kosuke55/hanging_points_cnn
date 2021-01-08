@@ -21,7 +21,6 @@ from torchvision import transforms
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-from skrobot import coordinates
 from skrobot.coordinates.math import matrix2quaternion
 from skrobot.coordinates.math import rotation_matrix_from_axis
 from skrobot.coordinates.math import quaternion2matrix
@@ -202,7 +201,6 @@ class HangingPointsNet():
         axis_pred = bgr.copy()
         axis_pred_raw = bgr_raw.copy()
 
-        dep_pred = []
         hanging_points_pose_array = PoseArray()
         for i, (roi, roi_center) in enumerate(
                 zip(self.model.rois_list[0], self.model.rois_center_list[0])):
