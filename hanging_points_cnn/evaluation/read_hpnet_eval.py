@@ -325,7 +325,6 @@ elif print_mode == 2:
             print('{} &{} &{} &{} &{:.2f} &{:.2f} &{} &{} &{} &- &-\\\\'.format(
                 key[4:].replace('_',' '),
                 len(s_data['tp']), len(s_data['fp']), len(s_data['fn']),
-                s_data['pos_mean'][0], s_data['pos_mean'][1], s_data['pos_mean'][2],
                 s_data['distance_mean'],
                 s_data['angle_mean'],
                 len(data['tp']),
