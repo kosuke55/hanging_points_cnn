@@ -58,9 +58,11 @@ if __name__ == '__main__':
         '--task', '-t', type=str,
         help='h(hanging) or p(pouring)',
         default='h')
+    parser.add_argument(
+        '--interactive',
+        action='store_true', help='interactive save mode')
     args = parser.parse_args()
 
-    data_num = args.data_num
     dataset_type = args.dataset_type
     gui = args.gui
     input_dir = args.input_dir
@@ -68,6 +70,7 @@ if __name__ == '__main__':
     save_dir_base = args.save_dir
     urdf_name = args.urdf_name
     skip_list = args.skip_list
+    interctive = args.interactive
 
     task_type = args.task
     if task_type == 'p':
@@ -183,7 +186,7 @@ if __name__ == '__main__':
                     osp.join(dirname, urdf_name),
                     contact_points, camera_pos,
                     obj_pos=[0, 0, 0], obj_rot=obj_rot,
-                        gui=gui, interactive=False):
+                        gui=gui, interactive=interctive):
                     save_data += 1
                 print(r.data_id)
                 i += 1
