@@ -33,7 +33,7 @@ parser.add_argument(
     help='input directory'
     'input dir which has each category and '
     'their color, depth, camera_info data.',
-    default='/media/kosuke55/SANDISK-2/meshdata/ycb_eval')  # hanging sim # noqa
+    default='/media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_hanging')  # hanging sim # noqa
     # default='/media/kosuke55/SANDISK-2/meshdata/ycb_sim_eval_pouring')  # pouring sim # noqa
     # default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval')  # hanging real # noqa
     # default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/ycb_real_eval_pouring')  # pouring real # noqa
@@ -52,6 +52,9 @@ parser.add_argument(
     '--visualize-image', '-vi', action='store_true',
     help='visualize image')
 parser.add_argument(
+    '--visualize-3d', '-v3', action='store_true',
+    help='visualize 3d')
+parser.add_argument(
     '--reverse', '-r', type=int,
     help='reverse x direction'
     '1: frontward '
@@ -67,6 +70,7 @@ input_dir = args.input_dir
 annotation_dir = args.annotation_dir
 save_dir = str(Path(input_dir) / args.save_dir)
 visualize_image = args.visualize_image
+visualize_3d = args.visualize_3d
 reverse_x = args.reverse
 is_sim_data = args.sim_data
 
@@ -180,11 +184,12 @@ try:
         heatmap = overlay_heatmap(cv_bgr, confidence.astype(np.uint8))
         depth_bgr = colorize_depth(cv_depth, ignore_value=0)
 
-        viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 640))
-        viewer.add(pc)
-        for contact_point_marker in contact_point_marker_list:
-            viewer.add(contact_point_marker)
-        viewer._init_and_start_app()
+        if visualize_3d:
+            viewer = skrobot.viewers.TrimeshSceneViewer(resolution=(640, 640))
+            viewer.add(pc)
+            for contact_point_marker in contact_point_marker_list:
+                viewer.add(contact_point_marker)
+            viewer._init_and_start_app()
 
         skip = False
         if visualize_image:
@@ -211,20 +216,21 @@ try:
                     '_depth_bgr_{}.png'.format(idx)),
                 depth_bgr)
 
-        from PIL import Image
-        loop = True
-        while loop and not skip:
-            try:
-                data = viewer.scene.save_image(visible=True)
-                rendered = Image.open(trimesh.util.wrap_as_stream(data))
-                rendered.save(
-                    osp.join(
-                        save_dir,
-                        category +
-                        '_hp_{}.png'.format(idx)))
-                loop = False
-            except AttributeError:
-                print('Fail to save pcd image. Try again.')
+        if visualize_3d:
+            from PIL import Image
+            loop = True
+            while loop and not skip:
+                try:
+                    data = viewer.scene.save_image(visible=True)
+                    rendered = Image.open(trimesh.util.wrap_as_stream(data))
+                    rendered.save(
+                        osp.join(
+                            save_dir,
+                            category +
+                            '_hp_{}.png'.format(idx)))
+                    loop = False
+                except AttributeError:
+                    print('Fail to save pcd image. Try again.')
 
 except KeyboardInterrupt:
     pass
