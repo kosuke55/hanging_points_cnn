@@ -152,6 +152,8 @@ class Renderer:
 
         self.texture_paths = list(
             map(str, list(Path(random_texture_path).glob('**/*.jpg'))))
+        current_dir = osp.dirname(osp.abspath(__file__))
+        self.gray_texture = osp.join(current_dir, 'images', 'gray.jpg')
 
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
         pybullet.setPhysicsEngineParameter(enableFileCaching=0)
@@ -956,6 +958,11 @@ class Renderer:
             self.change_texture(self.plane_id)
         if random_texture:
             self.change_texture(self.object_id)
+        else:
+            textureId = pybullet.loadTexture(self.gray_texture)
+            pybullet.changeVisualShape(
+                self.object_id, -1, textureUniqueId=textureId)
+
         self.create_camera()
         loop = True
 
