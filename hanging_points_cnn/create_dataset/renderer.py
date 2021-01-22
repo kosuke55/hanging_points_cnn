@@ -60,8 +60,9 @@ class Renderer:
             target_width=256, target_height=256,
             use_change_light=True, labels=None,
             save_dir='./', save_debug_image=False,
-            gui=False, task_type='hanging', stop_per_data=False):
-        """Create training data of CNN
+            gui=False, task_type='hanging', stop_per_data=False,
+            random_texture_path=None):
+        """Create training data for CNN
 
         Parameters
         ----------
@@ -150,7 +151,7 @@ class Renderer:
         self.no_visible_skip_num = 300
 
         self.texture_paths = list(
-            map(str, list(Path('/media/kosuke/SANDISK/dtd').glob('**/*.jpg'))))
+            map(str, list(Path(random_texture_path).glob('**/*.jpg'))))
 
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
         pybullet.setPhysicsEngineParameter(enableFileCaching=0)
@@ -1532,9 +1533,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--input-dir', '-i',
         type=str, help='input dir',
-        # default='/media/kosuke/SANDISK/meshdata/hanging_object')
+        default='/media/kosuke55/SANDISK/meshdata/shapenet_mini_hanging_50')
         # default='/media/kosuke55/SANDISK/meshdata/random_shape_shapenet_hanging_1016')
-        default='/media/kosuke55/SANDISK/meshdata/shapenet_mini_pouring_50')
+        # default='/media/kosuke55/SANDISK/meshdata/shapenet_mini_pouring_50')
+        # default='/media/kosuke55/SANDISK/meshdata/random_shape_shapenet_pouring')
+    parser.add_argument(
+        '--random-texture-path',
+        type=str, help='random texture directory path',
+        default='/media/kosuke/SANDISK/dtd')
     parser.add_argument(
         '--dataset-type', '-dt',
         type=str, help='dataset type',
@@ -1579,6 +1585,14 @@ if __name__ == '__main__':
         '--stop-per-data', '-spd',
         action='store_true',
         help='stop the window per data for checking')
+    parser.add_argument(
+        '--disable-random-texture', '-drt',
+        action='store_false',
+        help='do not use random texture')
+    parser.add_argument(
+        '--disable-change-light', '-dcl',
+        action='store_false',
+        help='disable change light')
     args = parser.parse_args()
 
     data_num = args.data_num
@@ -1593,6 +1607,9 @@ if __name__ == '__main__':
     stop_per_data = args.stop_per_data
     use_finish_list = args.use_finish_list
     add_mode = args.add_mode
+    random_texture = args.disable_random_texture
+    use_change_light = args.disable_change_light
+    random_texture_path = args.random_texture_path
 
     if args.task_type is not None:
         task_type = args.task_type
@@ -1716,7 +1733,9 @@ if __name__ == '__main__':
                     save_dir=fancy_save_dir,
                     save_debug_image=save_debug_image,
                     task_type=task_type,
-                    stop_per_data=stop_per_data)
+                    stop_per_data=stop_per_data,
+                    use_change_light=use_change_light,
+                    random_texture_path=random_texture_path)
 
                 if add_mode:
                     num_exsiting_data = count_exsiting_data(save_dir)
@@ -1727,7 +1746,8 @@ if __name__ == '__main__':
                     if r.data_id == data_num:
                         break
 
-                r.create_data(osp.join(dirname, urdf_name), contact_points)
+                r.create_data(osp.join(dirname, urdf_name), contact_points,
+                              random_texture=random_texture)
                 if r.no_visible_count >= r.no_visible_skip_num:
                     print('Skip because this object has no visible points ')
                     shutil.rmtree(fancy_save_dir)
