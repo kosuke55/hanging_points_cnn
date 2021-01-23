@@ -55,12 +55,13 @@ def collate_fn(batch):
 
 
 def load_dataset(data_path, batch_size, use_bgr, use_bgr2gray,
-                 depth_range, object_list=None):
+                 depth_range, object_list=None, data_augmentation=True):
     transform = transforms.Compose([
         transforms.ToTensor()])
     hp_data = HangingPointsDataset(
         data_path, transform, use_bgr, use_bgr2gray,
-        depth_range, object_list=object_list)
+        depth_range, object_list=object_list,
+        data_augmentation=data_augmentation)
 
     print('Load {} data'.format(len(hp_data)))
     train_size = int(0.9 * len(hp_data))
@@ -93,7 +94,7 @@ class HangingPointsDataset(Dataset):
     def __init__(self, data_path, transform=None,
                  use_bgr=True, use_bgr2gray=True,
                  depth_range=[0.2, 0.7], test=False,
-                 object_list=None):
+                 object_list=None, data_augmentation=True):
         self.test = test
         self.data_path = data_path
         self.transform = transform
@@ -119,6 +120,7 @@ class HangingPointsDataset(Dataset):
         self.use_bgr2gray = use_bgr2gray
         self.depth_range = depth_range
         self.data_shape = (256, 256)
+        self.data_augmentation = data_augmentation
 
         self.aug_seq = iaa.Sequential([
             iaa.Dropout([0, 0.8]),
@@ -138,14 +140,15 @@ class HangingPointsDataset(Dataset):
         else:
             depth = depth_edges_erase(depth)
             depth = self.aug_seq.augment_image(depth)
-            nonzero_depth = depth.copy()
-            nonzero_depth[nonzero_depth == 0] = depth.max()
-            depth_eraser = get_random_eraser(
-                p=0.9, s_l=0.1, s_h=0.5,
-                v_l=nonzero_depth.min(),
-                v_h=depth.max(),
-                pixel_level=True)
-            depth = depth_eraser(depth)
+            if self.data_augmentation:
+                nonzero_depth = depth.copy()
+                nonzero_depth[nonzero_depth == 0] = depth.max()
+                depth_eraser = get_random_eraser(
+                    p=0.9, s_l=0.1, s_h=0.5,
+                    v_l=nonzero_depth.min(),
+                    v_h=depth.max(),
+                    pixel_level=True)
+                depth = depth_eraser(depth)
 
         # r = np.random.randint(20)
         # kernel = np.ones((r, r), np.uint8)
