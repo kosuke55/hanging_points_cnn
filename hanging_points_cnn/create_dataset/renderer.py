@@ -1618,6 +1618,7 @@ if __name__ == '__main__':
     use_change_light = args.disable_change_light
     random_texture_path = args.random_texture_path
 
+    os.makedirs(save_dir_base, exist_ok=True)
     if args.task_type is not None:
         task_type = args.task_type
     else:
