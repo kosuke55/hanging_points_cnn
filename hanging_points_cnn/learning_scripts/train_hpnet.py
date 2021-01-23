@@ -6,6 +6,7 @@ import copy
 import os
 import os.path as osp
 import sys
+import warnings
 import yaml
 from datetime import datetime
 
@@ -48,7 +49,8 @@ class Trainer(object):
     def __init__(self, data_path, test_data_path,
                  batch_size, max_epoch, pretrained_model, train_data_num,
                  val_data_num, save_dir, lr, config=None,
-                 train_depth=False, port=6006, object_list=None):
+                 train_depth=False, port=6006, object_list=None,
+                 data_augmentation=True):
 
         if config is None:
             warnings.warn('confing is not specified. use defalut confing.')
@@ -68,7 +70,8 @@ class Trainer(object):
                            use_bgr=self.config['use_bgr'],
                            use_bgr2gray=self.config['use_bgr2gray'],
                            depth_range=self.depth_range,
-                           object_list=object_list)
+                           object_list=object_list,
+                           data_augmentation=data_augmentation)
         self.test_dataloader \
             = load_test_dataset(test_data_path,
                                 use_bgr=self.config['use_bgr'],
@@ -497,13 +500,14 @@ if __name__ == "__main__":
         '-dp',
         type=str,
         help='Training and Validation data path',
-        default='/media/kosuke/SANDISK-2/meshdata/hanging_object/0927')
+        # default='/media/kosuke/SANDISK-2/meshdata/hanging_object/0927')
+        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl')  # noqa
     parser.add_argument(
         '--test-data-path',
         '-tdp',
         type=str,
         help='Test data path',
-        default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/test_images')  # noqa
+        default='/home/kosuke55/catkin_ws/src/hanging_points_cnn/data/test_images_pouring')  # noqa
     parser.add_argument('--batch_size', '-bs', type=int,
                         help='batch size',
                         default=4)
@@ -515,31 +519,34 @@ if __name__ == "__main__":
         '-p',
         type=str,
         help='Pretrained model',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_0347.pt')  # noqa
-    parser.add_argument('--train_data_num', '-tr', type=int,
-                        help='How much data to use for training',
-                        default=1000000)
-    parser.add_argument('--val_data_num', '-te', type=int,
-                        help='How much data to use for validation',
-                        default=1000000)
-    parser.add_argument('--confing', '-c', type=str,
-                        help='config',
-                        default='config/gray_model.yaml')
-    parser.add_argument('--port', type=int,
-                        help='port',
-                        default=6006)
+        # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray/hpnet_latestmodel_20201014_0347.pt')  # noqa
+        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201218_1032_fix.pt')  # noqa
     parser.add_argument(
-        '--save_dir',
-        '-sd',
-        type=str,
-        help='pt model save dir',
-        default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/gray')  # noqa
-        # default='/media/kosuke/SANDISK/hanging_points_net/checkpoints/resnet')  # noqa
-        # parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')  # noqa
-    parser.add_argument('--lr', type=float, default=1e-5, help='learning rate')
-    parser.add_argument('--train-depth', '-td',
-                        action='store_true',
-                        help='if true, train depth')
+        '--train_data_num', '-tr', type=int,
+        help='How much data to use for training',
+        default=1000000)
+    parser.add_argument(
+        '--val_data_num', '-te', type=int,
+        help='How much data to use for validation',
+        default=1000000)
+    parser.add_argument(
+        '--confing', '-c', type=str,
+        help='config',
+        default='config/gray_model.yaml')
+    parser.add_argument(
+        '--port', type=int,
+        help='port',
+        default=6006)
+    parser.add_argument(
+        '--lr', type=float, default=1e-5, help='learning rate')
+    parser.add_argument(
+        '--train-depth', '-td',
+        action='store_true',
+        help='if true, train depth')
+    parser.add_argument(
+        '--disable_data_augmentation', '-dda',
+        action='store_false',
+        help='if true, disable_data_augmentation')
     parser.add_argument(
         '--object_list',
         '-ol',
@@ -550,6 +557,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
+
+    data_augmentation = args.disable_data_augmentation
 
     with open(args.confing) as f:
         config = yaml.safe_load(f)
@@ -575,5 +584,6 @@ if __name__ == "__main__":
         config=config,
         train_depth=args.train_depth,
         port=args.port,
-        object_list=object_list)
+        object_list=object_list,
+        data_augmentation=data_augmentation)
     trainer.train()
