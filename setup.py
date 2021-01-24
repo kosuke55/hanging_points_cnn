@@ -63,7 +63,9 @@ setup(
     entry_points={
         'console_scripts':
         ['visualize-function-points=hanging_points_cnn.apps.visualize_function_points:main',
-         'infer-function-points=hanging_points_cnn.apps.infer_function_points:main']},
+         'infer-function-points=hanging_points_cnn.apps.infer_function_points:main',
+         'unable-new-zipfile-serialization=hanging_points_cnn.apps.unable_new_zipfile_serialization:main'
+         ]},
     zip_safe=False,
     setup_requires=setup_requires,
     install_requires=install_requires,
