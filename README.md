@@ -96,3 +96,14 @@ For specific data.
 ```
 infer-function-points -c <color.png> -d <depth.npy> -ci <camera_info.yaml> -p <trained model> --task <hanging or pouring>
 ```
+
+## Citation
+```
+@inproceedings{takeuchi_icra_2021,
+ author = {Takeuchi, Kosuke and Yanokura, Iori and Kakiuchi, Yohei and Okada, Kei and Inaba, Masayuki},
+ booktitle = {ICRA},
+ month = {May},
+ title = {Annotation-Free Hanging Point Learning from Random Shape Generation and Physical Function Validation},
+ year = {2021},
+}
+```
