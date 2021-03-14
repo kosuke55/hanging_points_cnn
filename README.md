@@ -97,6 +97,10 @@ For specific data.
 infer-function-points -c <color.png> -d <depth.npy> -ci <camera_info.yaml> -p <trained model> --task <hanging or pouring>
 ```
 
+Download ycb rgbd with annotation and trained model.
+[ycb_real_eval](https://drive.google.com/file/d/1jGcLZ0vDQBx_rqViCwI6bBqhu5RuOiS9/view?usp=sharing)
+[pretrained_model](https://drive.google.com/file/d/1m8qluHL0rUYiaef_0WzrMj0nQ9AFWReX/view?usp=sharing)
+
 ## Citation
 ```
 @inproceedings{takeuchi_icra_2021,
