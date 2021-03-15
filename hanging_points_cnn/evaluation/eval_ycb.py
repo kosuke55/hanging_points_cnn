@@ -66,7 +66,7 @@ parser.add_argument(
     default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan hanging # noqa
     # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1222/pouring_shapenet_20201229_2111_5epoch.pt')  # shapene pouring # noqa
     # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqa
-    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render_without_domain_radomization/hpnet_latestmodel_20210125_2242.pt')  #without_domain_randomization  # noqa
+    # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render_without_domain_radomization/hanging_without_domain_randomization.pt')  #without_domain_randomization  # noqa
 parser.add_argument(
     '--predict-depth', '-pd', type=int,
     help='predict-depth', default=0)

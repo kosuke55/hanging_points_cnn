@@ -23,12 +23,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--save-dir', '-s',
         type=str, help='save dir',
-        # default='/media/kosuke/SANDISK-2/meshdata/ycb_eval')
-        default='/media/kosuke/SANDISK-2/meshdata/ycb_sim_eval_pouring')
-    parser.add_argument(
-        '--data-num', '-n',
-        type=int, help='num of data per object',
-        default=1000)
+        default='/media/kosuke/SANDISK-2/meshdata/ycb_sim_eval_hanging')
+        # default='/media/kosuke/SANDISK-2/meshdata/ycb_sim_eval_pouring')
     parser.add_argument(
         '--input-dir', '-i',
         type=str, help='input directory',
@@ -37,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--annotation-dir', '-a',
         type=str, help='annotation directory',
-        # default='/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/urdf2/annotation_obj')
+        # default='/media/kosuke55/SANDISK/meshdata/ycb_hanging_object/urdf2/annotation_obj_1027')
         default='/media/kosuke55/SANDISK/meshdata/ycb_pouring_object_16/textured_urdf/annotation_obj')
     parser.add_argument(
         '--dataset-type', '-dt',
