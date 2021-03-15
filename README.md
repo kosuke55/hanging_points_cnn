@@ -20,7 +20,7 @@ Render the training image by loading contact points and textures.
 Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blob/master/eos/run_many.py).  
 ```
 cd hangning_points_cnn/create_dataset
-run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir> --random-texuture-path <random_texture_path>' -j 10 -n 10
+run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir> --random-texture-path <random_texture_path>' -j 10 -n 10
 ```
 
 ### Check annotated data
