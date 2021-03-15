@@ -88,6 +88,8 @@ class Renderer:
             hanging or pouring.
             the value of translate depends on task_type.
             if task_type is hanging, tranlate value is [0, 0.01, 0]
+        random_texture_path : str
+
         """
         self.objects = []
         self.im_width = im_width

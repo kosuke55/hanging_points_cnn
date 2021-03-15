@@ -8,21 +8,21 @@ pip install -e .
 
 ## Create training dataset
 ### Rendering
-Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator)  
+Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator).
 If you use ycb to generate hanging points
 `run-many 'python generate_hanging_points.py'`  
 you can get contact_points.json like  
 `<path to ycb urdf> /019_pitcher_base/contact_points/pocky-2020-08-14-18-23-50-720607-41932/contact_points.json`
 
 
-Next, load the generated contact points and generate training data by rendering on the simulator.
-Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blob/master/eos/run_many.py).
+Download [Describable Textures Dataset](https://www.robots.ox.ac.uk/~vgg/data/dtd/) to <random_texture_path>. 
+
+Render the training image by loading contact points and textures.  
+Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blob/master/eos/run_many.py).  
 ```
 cd hangning_points_cnn/create_dataset
-run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir>' -j 10 -n 10
+run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir> --random-texuture-path <random_texture_path>' -j 10 -n 10
 ```
-<!-- For example,
-Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'` -->
 
 ### Check annotated data
 Use `visualize-function-points` app.
