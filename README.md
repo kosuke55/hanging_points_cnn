@@ -14,7 +14,6 @@ If you use ycb to generate hanging points
 you can get contact_points.json like  
 `<path to ycb urdf> /019_pitcher_base/contact_points/pocky-2020-08-14-18-23-50-720607-41932/contact_points.json`
 
-
 Download [Describable Textures Dataset](https://www.robots.ox.ac.uk/~vgg/data/dtd/) to <random_texture_path>. 
 
 Render the training image by loading contact points and textures.  
