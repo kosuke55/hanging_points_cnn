@@ -73,7 +73,8 @@ def main():
         help='predict-depth', default=0)
     parser.add_argument(
         '--task', '-t', type=str,
-        help='h(hanging) or p(pouring)',
+        help='h(hanging) or p(pouring)'
+        'Not needed if roi size is the same in config.',
         default='h')
 
     args = parser.parse_args()

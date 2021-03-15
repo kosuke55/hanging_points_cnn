@@ -83,22 +83,22 @@ optional arguments:
                         owl/hpnet_latestmodel_20201219_0213.pt)
   --predict-depth PREDICT_DEPTH, -pd PREDICT_DEPTH
                         predict-depth (default: 0)
-  --task TASK, -t TASK  h(hanging) or p(pouring) (default: h)
-INFO - 2020-12-29 22:41:03,442 - core - signal_shutdown [atexit]
+  --task TASK, -t TASK  h(hanging) or p(pouring)
+                        Not needed if roi size is the same in config. (default: h)
 ```
 
 For multiple data.
 ```
-infer-function-points -i <input directory> -p <trained model> --task <hanging or pouring>
+infer-function-points -i <input directory> -p <trained model>
 ```
 
 For specific data.
 ```
-infer-function-points -c <color.png> -d <depth.npy> -ci <camera_info.yaml> -p <trained model> --task <hanging or pouring>
+infer-function-points -c <color.png> -d <depth.npy> -ci <camera_info.yaml> -p <trained model>
 ```
 
-Download ycb rgbd with annotation and trained model.
-[ycb_real_eval](https://drive.google.com/file/d/1jGcLZ0vDQBx_rqViCwI6bBqhu5RuOiS9/view?usp=sharing)
+Download ycb rgbd with annotation and trained model.  
+[ycb_real_eval](https://drive.google.com/file/d/1jGcLZ0vDQBx_rqViCwI6bBqhu5RuOiS9/view?usp=sharing)  
 [pretrained_model](https://drive.google.com/file/d/1m8qluHL0rUYiaef_0WzrMj0nQ9AFWReX/view?usp=sharing)
 
 ## Citation
