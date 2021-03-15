@@ -8,13 +8,13 @@ pip install -e .
 
 ## Create training dataset
 ### Rendering
+Download [Describable Textures Dataset](https://www.robots.ox.ac.uk/~vgg/data/dtd/) to <random_texture_path>. 
+
 Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator).
 If you use ycb to generate hanging points
 `run-many 'python generate_hanging_points.py'`  
 you can get contact_points.json like  
 `<path to ycb urdf> /019_pitcher_base/contact_points/pocky-2020-08-14-18-23-50-720607-41932/contact_points.json`
-
-Download [Describable Textures Dataset](https://www.robots.ox.ac.uk/~vgg/data/dtd/) to <random_texture_path>. 
 
 Render the training image by loading contact points and textures.  
 Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blob/master/eos/run_many.py).  
