@@ -39,7 +39,7 @@ optional arguments:
                         a/ycb_eval/019_pitcher_base/pocky-2020-10-17-06-01-16-
                         481902-45682)
   --idx IDX             data idx (default: 0)
-  --large-axis, -la     use large axis as visulaizing marker (default: False)
+  --large-axis, -la     use large axis as visualizing marker (default: False)
 INFO - 2020-12-28 01:56:39,356 - core - signal_shutdown [atexit]
 ```
 

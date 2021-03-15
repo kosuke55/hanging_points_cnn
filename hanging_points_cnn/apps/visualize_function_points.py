@@ -61,7 +61,7 @@ def main():
         default=0)
     parser.add_argument(
         '--large-axis', '-la', action='store_true',
-        help='use large axis as visulaizing marker')
+        help='use large axis as visualizing marker')
 
     args = parser.parse_args()
     base_dir = args.input_dir
