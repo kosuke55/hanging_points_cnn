@@ -21,8 +21,8 @@ Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blo
 cd hangning_points_cnn/create_dataset
 run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir>' -j 10 -n 10
 ```
-For example,
-Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'`
+<!-- For example,
+Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'` -->
 
 ### Check annotated data
 Use `visualize-function-points` app.
