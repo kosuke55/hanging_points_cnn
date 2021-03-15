@@ -16,9 +16,10 @@ you can get contact_points.json like
 
 
 Next, load the generated contact points and generate training data by rendering on the simulator.
+Can be executed in parallel using [eos run-many](https://github.com/iory/eos/blob/master/eos/run_many.py).
 ```
 cd hangning_points_cnn/create_dataset
-python run_many.py 'python renderer.py -n 1000 -i <path to ycb urdf> -s <save dir>'
+run-many 'python renderer.py -n 200 -i <path to ycb urdf> -s <save dir>' -j 10 -n 10
 ```
 For example,
 Set \<save dir\> to `'/media/kosuke/SANDISK-2/meshdata/ycb_hanging_object/rendering'`
