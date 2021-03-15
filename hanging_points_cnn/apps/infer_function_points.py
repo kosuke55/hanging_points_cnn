@@ -37,6 +37,10 @@ except ImportError:
 
 
 def main():
+    current_dir = osp.dirname(osp.abspath(__file__))
+    trained_model_dir = osp.join(
+        osp.dirname(osp.dirname(current_dir)), 'pretrained_model')
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -59,10 +63,11 @@ def main():
         '-p',
         type=str,
         help='Pretrained models',
-        # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_hanging_render/1014/hpnet_latestmodel_20201018_0109.pt') # shapenet
-        # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/hpnet_latestmodel_20201016_0453.pt')  # gan
-        # default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201218_1032.pt')  # noqa
-        default='/media/kosuke55/SANDISK-2/meshdata/shapenet_pouring_render/1218_mug_cap_helmet_bowl/hpnet_latestmodel_20201219_0213.pt')  # noqa
+        default=osp.join(trained_model_dir, 'hanging_1020.pt'))
+        # default=osp.join(trained_model_dir, 'pouring.pt'))
+        # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_hanging_render/1010/gan_2000per0-1000obj_1020.pt')  # gan hanging # noqa
+        # default='/media/kosuke55/SANDISK-2/meshdata/random_shape_shapenet_pouring_render/1227/pouring_random_20201230_0215_5epoch.pt')  # gan pouring # noqa
+
     parser.add_argument(
         '--predict-depth', '-pd', type=int,
         help='predict-depth', default=0)
