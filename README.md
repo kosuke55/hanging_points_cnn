@@ -8,10 +8,10 @@ pip install -e .
 
 ## Create training dataset
 ### Rendering
-Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator)
+Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator)  
 If you use ycb to generate hanging points
-`python run_many.py 'python generate_hanging_points.py'`
-you can get contact_points.json like
+`run-many 'python generate_hanging_points.py'`  
+you can get contact_points.json like  
 `<path to ycb urdf> /019_pitcher_base/contact_points/pocky-2020-08-14-18-23-50-720607-41932/contact_points.json`
 
 
