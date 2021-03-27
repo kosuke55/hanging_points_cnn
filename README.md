@@ -8,6 +8,7 @@ pip install -e .
 
 ## Create training dataset
 ### Rendering
+<img src="https://user-images.githubusercontent.com/39142679/112718067-f87d5700-8f33-11eb-9622-bfa754324bdb.png" width="800">  
 Download [Describable Textures Dataset](https://www.robots.ox.ac.uk/~vgg/data/dtd/) to <random_texture_path>. 
 
 Generate hanging points using [hanging_points_generator](https://github.com/kosuke55/hanging_points_generator).
