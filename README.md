@@ -101,13 +101,19 @@ Download ycb rgbd with annotation and trained model.
 [ycb_real_eval](https://drive.google.com/file/d/1jGcLZ0vDQBx_rqViCwI6bBqhu5RuOiS9/view?usp=sharing)  
 [pretrained_model](https://drive.google.com/file/d/1m8qluHL0rUYiaef_0WzrMj0nQ9AFWReX/view?usp=sharing)
 
+## Manipulation Demo Example
+<!-- hanging -->
+<img src="https://user-images.githubusercontent.com/39142679/112717313-2613d180-8f2f-11eb-923f-6f3a29fbfa98.gif" width="800">  
+<!-- pouring -->
+<img src="https://user-images.githubusercontent.com/39142679/112717312-24e2a480-8f2f-11eb-9a93-c6cde1b390f7.gif" width="800">
+
 ## Citation
 ```
 @inproceedings{takeuchi_icra_2021,
  author = {Takeuchi, Kosuke and Yanokura, Iori and Kakiuchi, Yohei and Okada, Kei and Inaba, Masayuki},
  booktitle = {ICRA},
  month = {May},
- title = {Annotation-Free Hanging Point Learning from Random Shape Generation and Physical Function Validation},
+ title = {Automatic Hanging Point Learning from Random Shape Generation and Physical Function Validation},
  year = {2021},
 }
 ```
