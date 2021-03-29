@@ -1,4 +1,4 @@
-# hanging_point_cnn
+# hanging_points_cnn
 <img src="https://user-images.githubusercontent.com/39142679/102420461-8ac4b380-4045-11eb-80d8-9848e63ea376.png" width="800">
 
 ## setup
