@@ -118,3 +118,14 @@ Download ycb rgbd with annotation and trained model.
  year = {2021},
 }
 ```
+
+```
+@inproceedings{takeuchi_iros_2021,
+ author = {Takeuchi, Kosuke and Yanokura, Iori and Kakiuchi, Yohei and Okada, Kei and Inaba, Masayuki},
+ booktitle = {IROS},
+ month = {September},
+ title = {Automatic Learning System for Object Function Points from Random Shape Generation and Physical Validation},
+ year = {2021},
+}
+```
+
